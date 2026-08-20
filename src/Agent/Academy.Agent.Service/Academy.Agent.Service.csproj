@@ -4,11 +4,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>dotnet-Academy.Agent.Service-fd881cf2-9267-4613-b892-8abdca1c237f</UserSecretsId>
+    <UserSecretsId>dotnet-Academy.Agent.Service-b5f80c9f-6eff-4250-9b6e-753d25f23214</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.11" />
   </ItemGroup>
 </Project>

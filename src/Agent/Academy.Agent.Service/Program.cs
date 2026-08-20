@@ -1,7 +1,14 @@
 using Academy.Agent.Service;
 
 var builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddHostedService<Worker>();
+
+builder.Services.AddWindowsService(options =>
+{
+    options.ServiceName = "Academy Agent Service";
+});
+
+builder.Services.AddHostedService<RecordingWorker>();
 
 var host = builder.Build();
+
 host.Run();

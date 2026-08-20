@@ -1,7 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk.Worker">
+﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-Academy.Agent.Service-b5f80c9f-6eff-4250-9b6e-753d25f23214</UserSecretsId>
@@ -9,5 +9,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Academy.Agent.Capture\Academy.Agent.Capture.csproj" />
+    <ProjectReference Include="..\Academy.Agent.Audio\Academy.Agent.Audio.csproj" />
+    <ProjectReference Include="..\Academy.Agent.Media\Academy.Agent.Media.csproj" />
   </ItemGroup>
 </Project>
+

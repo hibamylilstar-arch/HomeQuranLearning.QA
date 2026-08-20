@@ -41,15 +41,12 @@ public sealed class AudioCaptureService : IAudioCaptureService
 
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
-        if (sender is WasapiLoopbackCapture capture)
+        DataAvailable?.Invoke(this, new AudioDataAvailableEventArgs
         {
-            DataAvailable?.Invoke(this, new AudioDataAvailableEventArgs
-            {
-                Buffer = e.Buffer,
-                BytesRecorded = e.BytesRecorded,
-                WaveFormat = capture.WaveFormat
-            });
-        }
+            Buffer = e.Buffer,
+            BytesRecorded = e.BytesRecorded,
+            WaveFormat = _capture?.WaveFormat ?? WaveFormat.CreateIeeeFloatWaveFormat(48000, 2)
+        });
     }
 
     private void OnRecordingStopped(object? sender, StoppedEventArgs e)

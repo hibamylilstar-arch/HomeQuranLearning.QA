@@ -6,6 +6,8 @@ namespace Academy.Agent.Cloud;
 
 public sealed class AgentCloudClient : IAgentCloudClient
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     private readonly HttpClient _httpClient;
     private readonly CloudOptions _options;
 
@@ -19,7 +21,7 @@ public sealed class AgentCloudClient : IAgentCloudClient
         HeartbeatRequest request,
         CancellationToken cancellationToken = default)
     {
-        string json = JsonSerializer.Serialize(request);
+        string json = JsonSerializer.Serialize(request, JsonOptions);
 
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
@@ -37,7 +39,7 @@ public sealed class AgentCloudClient : IAgentCloudClient
 
         string responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
 
-        return JsonSerializer.Deserialize<HeartbeatResponse>(responseJson)
+        return JsonSerializer.Deserialize<HeartbeatResponse>(responseJson, JsonOptions)
             ?? new HeartbeatResponse { Received = false };
     }
 }

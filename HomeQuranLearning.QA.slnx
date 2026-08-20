@@ -1,5 +1,8 @@
 <Solution>
   <Folder Name="/src/" />
+  <Folder Name="/src/Agent/">
+    <Project Path="src/Agent/Academy.Agent.Service/Academy.Agent.Service.csproj" />
+  </Folder>
   <Folder Name="/src/Backend/">
     <Project Path="src/Backend/Academy.Api/Academy.Api.csproj" />
     <Project Path="src/Backend/Academy.Application/Academy.Application.csproj" />

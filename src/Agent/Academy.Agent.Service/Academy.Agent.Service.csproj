@@ -10,12 +10,14 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.11" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Academy.Agent.Capture\Academy.Agent.Capture.csproj" />
     <ProjectReference Include="..\Academy.Agent.Audio\Academy.Agent.Audio.csproj" />
     <ProjectReference Include="..\Academy.Agent.Media\Academy.Agent.Media.csproj" />
+    <ProjectReference Include="..\Academy.Agent.Cloud\Academy.Agent.Cloud.csproj" />
   </ItemGroup>
 </Project>
 

@@ -18,3 +18,19 @@ export interface RecordingListItem {
   sizeBytes: number;
   status: string;
 }
+
+export interface QaRuleListItem {
+  id: string;
+  phrase: string;
+  severity: string;
+  isActive: boolean;
+}
+
+export interface QaAlertListItem {
+  id: string;
+  recordingId: string;
+  matchedPhrase: string;
+  timestampUtc: string;
+  status: string;
+  rulePhrase?: string | null;
+}

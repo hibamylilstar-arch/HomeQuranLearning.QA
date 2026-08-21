@@ -1,4 +1,9 @@
-import type { DeviceListItem, RecordingListItem } from "@/types";
+import type {
+  DeviceListItem,
+  RecordingListItem,
+  QaRuleListItem,
+  QaAlertListItem,
+} from "@/types";
 
 const backendBaseUrl = process.env.BACKEND_BASE_URL ?? "http://localhost:5100";
 const adminApiKey = process.env.ADMIN_API_KEY ?? "local-dev-admin-key";
@@ -24,6 +29,32 @@ export async function getRecordings(): Promise<RecordingListItem[]> {
 
   if (!res.ok) {
     throw new Error(`Recordings request failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+export async function getQaRules(): Promise<QaRuleListItem[]> {
+  const res = await fetch(`${backendBaseUrl}/api/admin/qa-rules`, {
+    headers: { "X-Api-Key": adminApiKey },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(`QA Rules request failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+export async function getQaAlerts(): Promise<QaAlertListItem[]> {
+  const res = await fetch(`${backendBaseUrl}/api/admin/qa-alerts`, {
+    headers: { "X-Api-Key": adminApiKey },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(`QA Alerts request failed: ${res.status}`);
   }
 
   return res.json();

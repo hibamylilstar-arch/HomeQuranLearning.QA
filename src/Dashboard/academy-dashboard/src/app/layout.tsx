@@ -34,6 +34,12 @@ export default function RootLayout({
                 <Link href="/recordings" className="rounded-md px-3 py-2 hover:bg-slate-100">
                   Recordings
                 </Link>
+                <Link href="/qa-rules" className="rounded-md px-3 py-2 hover:bg-slate-100">
+                  QA Rules
+                </Link>
+                <Link href="/qa-alerts" className="rounded-md px-3 py-2 hover:bg-slate-100">
+                  QA Alerts
+                </Link>
               </nav>
             </div>
           </header>

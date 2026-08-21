@@ -1,3 +1,4 @@
+using Academy.Application.Abstractions;
 using Academy.Application.Contracts;
 using Academy.Application.Services;
 using Academy.Infrastructure.DependencyInjection;
@@ -8,7 +9,24 @@ builder.Services.AddOpenApi();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<DeviceService>();
 builder.Services.AddScoped<DeviceQueryService>();
-builder.Services.AddScoped<RecordingService>();
+
+builder.Services.AddSingleton(builder.Configuration["Storage:Bucket"] ?? "academy-recordings");
+
+builder.Services.AddScoped<RecordingService>(sp =>
+{
+    var recordingRepository = sp.GetRequiredService<IRecordingRepository>();
+    var deviceRepository = sp.GetRequiredService<IDeviceRepository>();
+    var storageService = sp.GetRequiredService<IStorageService>();
+    var unitOfWork = sp.GetRequiredService<IUnitOfWork>();
+    var bucketName = sp.GetRequiredService<string>();
+
+    return new RecordingService(
+        recordingRepository,
+        deviceRepository,
+        storageService,
+        unitOfWork,
+        bucketName);
+});
 
 var app = builder.Build();
 
@@ -52,6 +70,42 @@ app.MapPost("/api/agent/recordings", async (
 
     var response = await recordingService.SubmitRecordingAsync(body, cancellationToken);
     return Results.Ok(response);
+});
+
+app.MapPost("/api/agent/recordings/{recordingId:guid}/upload", async (
+    HttpRequest request,
+    Guid recordingId,
+    RecordingService recordingService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != agentApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!request.HasFormContentType)
+    {
+        return Results.BadRequest("Expected multipart/form-data.");
+    }
+
+    var form = await request.ReadFormAsync(cancellationToken);
+    var file = form.Files.FirstOrDefault();
+
+    if (file is null)
+    {
+        return Results.BadRequest("No file uploaded.");
+    }
+
+    await using var stream = file.OpenReadStream();
+
+    await recordingService.UploadRecordingAsync(
+        recordingId,
+        stream,
+        file.ContentType,
+        cancellationToken);
+
+    return Results.Ok(new { uploaded = true });
 });
 
 app.MapGet("/api/admin/devices", async (

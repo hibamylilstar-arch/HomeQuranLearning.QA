@@ -1,9 +1,11 @@
 using Academy.Application.Abstractions;
 using Academy.Infrastructure.Persistence;
 using Academy.Infrastructure.Repositories;
+using Academy.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Minio;
 
 namespace Academy.Infrastructure.DependencyInjection;
 
@@ -25,6 +27,20 @@ public static class InfrastructureServiceRegistration
         services.AddScoped<IHeartbeatRepository, HeartbeatRepository>();
         services.AddScoped<IRecordingRepository, RecordingRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        string minioEndpoint = configuration["Storage:Endpoint"] ?? "localhost:9000";
+        string minioAccessKey = configuration["Storage:AccessKey"] ?? "academy_minio";
+        string minioSecretKey = configuration["Storage:SecretKey"] ?? "AcademyMinio2026";
+        string minioBucket = configuration["Storage:Bucket"] ?? "academy-recordings";
+
+        services.AddSingleton<IMinioClient>(_ =>
+            new MinioClient()
+                .WithEndpoint(minioEndpoint)
+                .WithCredentials(minioAccessKey, minioSecretKey)
+                .Build());
+
+        services.AddSingleton(minioBucket);
+        services.AddScoped<IStorageService, MinioStorageService>();
 
         return services;
     }

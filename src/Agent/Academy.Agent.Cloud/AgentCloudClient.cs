@@ -37,6 +37,33 @@ public sealed class AgentCloudClient : IAgentCloudClient
             cancellationToken);
     }
 
+    public async Task UploadRecordingAsync(
+        Guid recordingId,
+        string filePath,
+        CancellationToken cancellationToken = default)
+    {
+        using var form = new MultipartFormDataContent();
+
+        await using var fileStream = File.OpenRead(filePath);
+        var fileContent = new StreamContent(fileStream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+
+        form.Add(fileContent, "file", Path.GetFileName(filePath));
+
+        using var message = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/agent/recordings/{recordingId}/upload")
+        {
+            Content = form
+        };
+
+        message.Headers.Add("X-Api-Key", _options.ApiKey);
+
+        using var response = await _httpClient.SendAsync(message, cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+    }
+
     private async Task<TResponse> PostAsync<TRequest, TResponse>(
         string path,
         TRequest requestBody,

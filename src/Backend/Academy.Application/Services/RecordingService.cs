@@ -9,16 +9,22 @@ public sealed class RecordingService
 {
     private readonly IRecordingRepository _recordingRepository;
     private readonly IDeviceRepository _deviceRepository;
+    private readonly IStorageService _storageService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly string _bucketName;
 
     public RecordingService(
         IRecordingRepository recordingRepository,
         IDeviceRepository deviceRepository,
-        IUnitOfWork unitOfWork)
+        IStorageService storageService,
+        IUnitOfWork unitOfWork,
+        string bucketName)
     {
         _recordingRepository = recordingRepository;
         _deviceRepository = deviceRepository;
+        _storageService = storageService;
         _unitOfWork = unitOfWork;
+        _bucketName = bucketName;
     }
 
     public async Task<RecordingResponse> SubmitRecordingAsync(
@@ -56,6 +62,28 @@ public sealed class RecordingService
             Accepted = true,
             StorageKey = storageKey
         };
+    }
+
+    public async Task UploadRecordingAsync(
+        Guid recordingId,
+        Stream fileStream,
+        string contentType,
+        CancellationToken cancellationToken = default)
+    {
+        var recording = await _recordingRepository.GetByIdAsync(recordingId, cancellationToken)
+            ?? throw new InvalidOperationException("Recording not found.");
+
+        await _storageService.UploadAsync(
+            _bucketName,
+            recording.StorageKey,
+            fileStream,
+            contentType,
+            cancellationToken);
+
+        recording.Status = RecordingStatus.Uploaded;
+        recording.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<RecordingListItem>> GetRecordingListAsync(

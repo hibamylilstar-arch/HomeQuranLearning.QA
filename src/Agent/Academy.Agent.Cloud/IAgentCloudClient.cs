@@ -9,4 +9,9 @@ public interface IAgentCloudClient
     Task<RecordingResponse> SubmitRecordingAsync(
         RecordingSubmittedRequest request,
         CancellationToken cancellationToken = default);
+
+    Task UploadRecordingAsync(
+        Guid recordingId,
+        string filePath,
+        CancellationToken cancellationToken = default);
 }

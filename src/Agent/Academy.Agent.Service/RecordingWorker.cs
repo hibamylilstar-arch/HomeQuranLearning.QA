@@ -66,11 +66,11 @@ public sealed class RecordingWorker : BackgroundService
             {
                 try
                 {
-                    SubmitRecordingMetadataAsync(deviceIdentity, e).GetAwaiter().GetResult();
+                    SubmitRecordingAndUploadAsync(deviceIdentity, e).GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to submit recording metadata.");
+                    _logger.LogWarning(ex, "Failed to submit/upload recording.");
                 }
             }
         };
@@ -108,7 +108,7 @@ public sealed class RecordingWorker : BackgroundService
         }
     }
 
-    private async Task SubmitRecordingMetadataAsync(
+    private async Task SubmitRecordingAndUploadAsync(
         DeviceIdentity deviceIdentity,
         RecordingCompletedEventArgs e)
     {
@@ -128,5 +128,14 @@ public sealed class RecordingWorker : BackgroundService
             response.RecordingId,
             response.Accepted,
             response.StorageKey ?? "None");
+
+        if (response.Accepted && response.RecordingId != Guid.Empty)
+        {
+            _logger.LogInformation("Uploading recording file {FileName}...", e.FileName);
+
+            await _cloudClient.UploadRecordingAsync(response.RecordingId, e.OutputPath);
+
+            _logger.LogInformation("Recording file uploaded successfully.");
+        }
     }
 }

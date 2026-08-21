@@ -28,7 +28,7 @@ public sealed class ScreenCaptureSession : IScreenCaptureSession
 
     public event EventHandler<FrameCapturedEventArgs>? FrameCaptured;
 
-    public Task StartAsync(CancellationToken cancellationToken = default)
+    public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         if (_started)
         {
@@ -38,10 +38,11 @@ public sealed class ScreenCaptureSession : IScreenCaptureSession
         InitializeCapture();
 
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        await WaitForFirstFrameAsync(_cts.Token);
+
         _captureTask = Task.Run(() => CaptureLoopAsync(_cts.Token), _cts.Token);
         _started = true;
-
-        return Task.CompletedTask;
     }
 
     public async Task StopAsync()
@@ -125,6 +126,32 @@ public sealed class ScreenCaptureSession : IScreenCaptureSession
         _duplication = duplication;
     }
 
+    private async Task WaitForFirstFrameAsync(CancellationToken token)
+    {
+        var timeout = TimeSpan.FromSeconds(10);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        while (!token.IsCancellationRequested)
+        {
+            var frame = AcquireFrame(1000);
+
+            if (frame is not null)
+            {
+                _lastFramePixels = frame.Pixels;
+                _lastFrameWidth = frame.Width;
+                _lastFrameHeight = frame.Height;
+                return;
+            }
+
+            if (stopwatch.Elapsed > timeout)
+            {
+                throw new TimeoutException("Could not acquire the first screen frame.");
+            }
+
+            await Task.Delay(100, token);
+        }
+    }
+
     private async Task CaptureLoopAsync(CancellationToken token)
     {
         var interval = TimeSpan.FromSeconds(1.0 / _frameRate);
@@ -133,40 +160,35 @@ public sealed class ScreenCaptureSession : IScreenCaptureSession
         {
             CapturedFrame? frame = AcquireFrame();
 
-            if (frame is null)
-            {
-                if (_lastFramePixels is not null)
-                {
-                    frame = new CapturedFrame
-                    {
-                        Width = _lastFrameWidth,
-                        Height = _lastFrameHeight,
-                        Pixels = _lastFramePixels
-                    };
-                }
-                else
-                {
-                    await Task.Delay(100, token);
-                    continue;
-                }
-            }
-            else
+            if (frame is not null)
             {
                 _lastFramePixels = frame.Pixels;
                 _lastFrameWidth = frame.Width;
                 _lastFrameHeight = frame.Height;
             }
-
-            FrameCaptured?.Invoke(this, new FrameCapturedEventArgs
+            else if (_lastFramePixels is not null)
             {
-                Frame = frame
-            });
+                frame = new CapturedFrame
+                {
+                    Width = _lastFrameWidth,
+                    Height = _lastFrameHeight,
+                    Pixels = _lastFramePixels
+                };
+            }
+
+            if (frame is not null)
+            {
+                FrameCaptured?.Invoke(this, new FrameCapturedEventArgs
+                {
+                    Frame = frame
+                });
+            }
 
             await Task.Delay(interval, token);
         }
     }
 
-    private CapturedFrame? AcquireFrame()
+    private CapturedFrame? AcquireFrame(int timeoutMs = 100)
     {
         if (_duplication is null || _device is null)
         {
@@ -174,7 +196,7 @@ public sealed class ScreenCaptureSession : IScreenCaptureSession
         }
 
         var result = _duplication.TryAcquireNextFrame(
-            100,
+            timeoutMs,
             out _,
             out SharpDX.DXGI.Resource desktopResource);
 

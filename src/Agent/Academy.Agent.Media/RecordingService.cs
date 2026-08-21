@@ -23,6 +23,8 @@ public sealed class RecordingService : IRecordingService
 
     private int _videoWidth;
     private int _videoHeight;
+    private long _videoBytesWritten;
+    private long _audioBytesWritten;
 
     private string _audioFormat = "f32le";
     private int _audioSampleRate = 48000;
@@ -54,6 +56,8 @@ public sealed class RecordingService : IRecordingService
         _outputPath = outputPath;
         _startedAt = DateTimeOffset.UtcNow;
         _isRecording = true;
+        _videoBytesWritten = 0;
+        _audioBytesWritten = 0;
 
         _tempDir = Path.Combine(
             Path.GetTempPath(),
@@ -93,6 +97,7 @@ public sealed class RecordingService : IRecordingService
 
     private void OnAudioDataAvailable(object? sender, AudioDataAvailableEventArgs e)
     {
+        _audioBytesWritten += e.BytesRecorded;
         _audioStream?.Write(e.Buffer, 0, e.BytesRecorded);
     }
 
@@ -102,6 +107,7 @@ public sealed class RecordingService : IRecordingService
 
         _videoWidth = frame.Width;
         _videoHeight = frame.Height;
+        _videoBytesWritten += frame.Pixels.Length;
 
         _videoStream?.Write(frame.Pixels, 0, frame.Pixels.Length);
     }
@@ -130,7 +136,13 @@ public sealed class RecordingService : IRecordingService
                 string videoRawPath = Path.Combine(_tempDir, "video.raw");
                 string audioRawPath = Path.Combine(_tempDir, "audio.raw");
 
-                await RunFfmpegAsync(videoRawPath, audioRawPath, _outputPath);
+                bool hasAudio = File.Exists(audioRawPath) && new FileInfo(audioRawPath).Length > 0;
+
+                await RunFfmpegAsync(
+                    videoRawPath,
+                    audioRawPath,
+                    outputMp4Path: _outputPath,
+                    hasAudio);
             }
 
             if (_tempDir is not null && Directory.Exists(_tempDir))
@@ -176,13 +188,18 @@ public sealed class RecordingService : IRecordingService
     private async Task RunFfmpegAsync(
         string videoRawPath,
         string audioRawPath,
-        string outputMp4Path)
+        string outputMp4Path,
+        bool hasAudio)
     {
         string ffmpegPath = _currentOptions.FfmpegPath;
 
+        string audioInput = hasAudio
+            ? $"-f {_audioFormat} -ar {_audioSampleRate} -ac {_audioChannels} -i \"{audioRawPath}\""
+            : $"-f lavfi -i anullsrc=channel_layout=stereo:sample_rate={_audioSampleRate}";
+
         string arguments =
             $"-y -f rawvideo -pixel_format bgra -video_size {_videoWidth}x{_videoHeight} -framerate {_currentOptions.FrameRate} -i \"{videoRawPath}\" " +
-            $"-f {_audioFormat} -ar {_audioSampleRate} -ac {_audioChannels} -i \"{audioRawPath}\" " +
+            $"{audioInput} " +
             $"-c:v libx264 -pix_fmt yuv420p -crf {_currentOptions.VideoCrf} -c:a aac -b:a {_currentOptions.AudioBitrate} -shortest \"{outputMp4Path}\"";
 
         var startInfo = new ProcessStartInfo(ffmpegPath, arguments)

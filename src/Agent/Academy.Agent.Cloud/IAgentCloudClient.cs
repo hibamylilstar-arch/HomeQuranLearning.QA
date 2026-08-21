@@ -5,4 +5,8 @@ public interface IAgentCloudClient
     Task<HeartbeatResponse> SendHeartbeatAsync(
         HeartbeatRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<RecordingResponse> SubmitRecordingAsync(
+        RecordingSubmittedRequest request,
+        CancellationToken cancellationToken = default);
 }

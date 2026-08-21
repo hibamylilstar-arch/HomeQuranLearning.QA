@@ -1,3 +1,4 @@
+using Academy.Agent.Cloud;
 using Academy.Agent.Media;
 
 namespace Academy.Agent.Service;
@@ -6,13 +7,22 @@ public sealed class RecordingWorker : BackgroundService
 {
     private readonly ILogger<RecordingWorker> _logger;
     private readonly IConfiguration _configuration;
+    private readonly IAgentCloudClient _cloudClient;
+    private readonly IDeviceIdentityProvider _identityProvider;
+    private readonly CloudOptions _cloudOptions;
 
     public RecordingWorker(
         ILogger<RecordingWorker> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IAgentCloudClient cloudClient,
+        IDeviceIdentityProvider identityProvider,
+        CloudOptions cloudOptions)
     {
         _logger = logger;
         _configuration = configuration;
+        _cloudClient = cloudClient;
+        _identityProvider = identityProvider;
+        _cloudOptions = cloudOptions;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -38,12 +48,31 @@ public sealed class RecordingWorker : BackgroundService
 
         var service = new RecordingService(options);
 
+        DeviceIdentity? deviceIdentity = null;
+
+        if (_cloudOptions.Enabled)
+        {
+            deviceIdentity = await _identityProvider.GetOrCreateIdentityAsync(stoppingToken);
+        }
+
         service.RecordingCompleted += (_, e) =>
         {
             _logger.LogInformation(
                 "Recording completed: {OutputPath}, Duration: {Duration}",
                 e.OutputPath,
                 e.Duration);
+
+            if (_cloudOptions.Enabled && deviceIdentity is not null)
+            {
+                try
+                {
+                    SubmitRecordingMetadataAsync(deviceIdentity, e).GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to submit recording metadata.");
+                }
+            }
         };
 
         service.RecordingFailed += (_, e) =>
@@ -77,5 +106,27 @@ public sealed class RecordingWorker : BackgroundService
                 _logger.LogError(ex, "Error while stopping recording.");
             }
         }
+    }
+
+    private async Task SubmitRecordingMetadataAsync(
+        DeviceIdentity deviceIdentity,
+        RecordingCompletedEventArgs e)
+    {
+        var request = new RecordingSubmittedRequest
+        {
+            DeviceId = deviceIdentity.DeviceId,
+            FileName = e.FileName,
+            StartedAtUtc = e.StartedAtUtc,
+            EndedAtUtc = e.EndedAtUtc,
+            SizeBytes = e.SizeBytes
+        };
+
+        var response = await _cloudClient.SubmitRecordingAsync(request);
+
+        _logger.LogInformation(
+            "Recording metadata submitted. RecordingId={RecordingId}, Accepted={Accepted}, StorageKey={StorageKey}",
+            response.RecordingId,
+            response.Accepted,
+            response.StorageKey ?? "None");
     }
 }

@@ -21,12 +21,33 @@ public sealed class AgentCloudClient : IAgentCloudClient
         HeartbeatRequest request,
         CancellationToken cancellationToken = default)
     {
-        string json = JsonSerializer.Serialize(request, JsonOptions);
+        return await PostAsync<HeartbeatRequest, HeartbeatResponse>(
+            "/api/agent/heartbeat",
+            request,
+            cancellationToken);
+    }
+
+    public async Task<RecordingResponse> SubmitRecordingAsync(
+        RecordingSubmittedRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return await PostAsync<RecordingSubmittedRequest, RecordingResponse>(
+            "/api/agent/recordings",
+            request,
+            cancellationToken);
+    }
+
+    private async Task<TResponse> PostAsync<TRequest, TResponse>(
+        string path,
+        TRequest requestBody,
+        CancellationToken cancellationToken)
+    {
+        string json = JsonSerializer.Serialize(requestBody, JsonOptions);
 
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
-        using var message = new HttpRequestMessage(HttpMethod.Post, "/api/agent/heartbeat")
+        using var message = new HttpRequestMessage(HttpMethod.Post, path)
         {
             Content = content
         };
@@ -39,7 +60,7 @@ public sealed class AgentCloudClient : IAgentCloudClient
 
         string responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
 
-        return JsonSerializer.Deserialize<HeartbeatResponse>(responseJson, JsonOptions)
-            ?? new HeartbeatResponse { Received = false };
+        return JsonSerializer.Deserialize<TResponse>(responseJson, JsonOptions)
+            ?? throw new InvalidOperationException("Empty response from cloud.");
     }
 }

@@ -140,10 +140,24 @@ public sealed class RecordingService : IRecordingService
 
             _isRecording = false;
 
+            string outputFileName = Path.GetFileName(_outputPath ?? string.Empty);
+
+            long fileSize = 0;
+            if (_outputPath is not null && File.Exists(_outputPath))
+            {
+                fileSize = new FileInfo(_outputPath).Length;
+            }
+
+            var endedAtUtc = DateTimeOffset.UtcNow;
+
             RecordingCompleted?.Invoke(this, new RecordingCompletedEventArgs
             {
                 OutputPath = _outputPath ?? string.Empty,
-                Duration = DateTimeOffset.UtcNow - _startedAt
+                FileName = outputFileName,
+                StartedAtUtc = _startedAt,
+                EndedAtUtc = endedAtUtc,
+                Duration = endedAtUtc - _startedAt,
+                SizeBytes = fileSize
             });
         }
         catch (Exception ex)

@@ -8,6 +8,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<DeviceService>();
 builder.Services.AddScoped<DeviceQueryService>();
+builder.Services.AddScoped<RecordingService>();
 
 var app = builder.Build();
 
@@ -34,7 +35,22 @@ app.MapPost("/api/agent/heartbeat", async (
     }
 
     var response = await deviceService.ProcessHeartbeatAsync(body, cancellationToken);
+    return Results.Ok(response);
+});
 
+app.MapPost("/api/agent/recordings", async (
+    HttpRequest request,
+    RecordingSubmittedRequest body,
+    RecordingService recordingService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != agentApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var response = await recordingService.SubmitRecordingAsync(body, cancellationToken);
     return Results.Ok(response);
 });
 
@@ -50,8 +66,22 @@ app.MapGet("/api/admin/devices", async (
     }
 
     var devices = await deviceQueryService.GetDevicesAsync(cancellationToken);
-
     return Results.Ok(devices);
+});
+
+app.MapGet("/api/admin/recordings", async (
+    HttpRequest request,
+    RecordingService recordingService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != adminApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var recordings = await recordingService.GetRecordingsAsync(cancellationToken);
+    return Results.Ok(recordings);
 });
 
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));

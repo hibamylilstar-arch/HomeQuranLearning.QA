@@ -12,6 +12,7 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<Device> Devices => Set<Device>();
     public DbSet<DeviceHeartbeat> DeviceHeartbeats => Set<DeviceHeartbeat>();
+    public DbSet<Recording> Recordings => Set<Recording>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -57,6 +58,30 @@ public sealed class AppDbContext : DbContext
 
             entity.HasOne(x => x.Device)
                 .WithMany(d => d.Heartbeats)
+                .HasForeignKey(x => x.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Recording>(entity =>
+        {
+            entity.ToTable("recordings");
+
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.FileName)
+                .IsRequired()
+                .HasMaxLength(512);
+
+            entity.Property(x => x.StorageKey)
+                .IsRequired()
+                .HasMaxLength(1024);
+
+            entity.Property(x => x.Status)
+                .HasConversion<string>()
+                .HasMaxLength(32);
+
+            entity.HasOne(x => x.Device)
+                .WithMany()
                 .HasForeignKey(x => x.DeviceId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

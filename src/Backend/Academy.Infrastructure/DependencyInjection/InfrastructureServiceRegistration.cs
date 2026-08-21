@@ -23,6 +23,7 @@ public static class InfrastructureServiceRegistration
 
         services.AddScoped<IDeviceRepository, DeviceRepository>();
         services.AddScoped<IHeartbeatRepository, HeartbeatRepository>();
+        services.AddScoped<IRecordingRepository, RecordingRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         return services;

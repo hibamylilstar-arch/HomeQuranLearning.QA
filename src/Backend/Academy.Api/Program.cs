@@ -43,6 +43,7 @@ app.UseHttpsRedirection();
 
 string agentApiKey = app.Configuration["AgentApiKey"] ?? string.Empty;
 string adminApiKey = app.Configuration["AdminApiKey"] ?? string.Empty;
+string workerApiKey = app.Configuration["WorkerApiKey"] ?? string.Empty;
 
 var jsonOptions = new System.Text.Json.JsonSerializerOptions(
     System.Text.Json.JsonSerializerDefaults.Web);
@@ -251,6 +252,38 @@ app.MapPost("/api/admin/qa-alerts", async (
         cancellationToken);
 
     return Results.Ok(new { created = true });
+});
+
+app.MapGet("/api/worker/recordings/pending", async (
+    HttpRequest request,
+    RecordingService recordingService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var pending = await recordingService.GetPendingQaRecordingsAsync(cancellationToken);
+    return Results.Ok(pending);
+});
+
+app.MapPost("/api/worker/recordings/{recordingId:guid}/mark-qa-processed", async (
+    HttpRequest request,
+    Guid recordingId,
+    RecordingService recordingService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    await recordingService.MarkQaProcessedAsync(recordingId, cancellationToken);
+
+    return Results.Ok(new { processed = true });
 });
 
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));

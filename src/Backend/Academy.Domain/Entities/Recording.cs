@@ -24,6 +24,8 @@ public sealed class Recording
 
     public RecordingStatus Status { get; set; } = RecordingStatus.Pending;
 
+    public DateTimeOffset? QaProcessedAtUtc { get; set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public DateTimeOffset UpdatedAtUtc { get; set; }

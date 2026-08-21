@@ -108,6 +108,47 @@ public sealed class RecordingService
             .ToList();
     }
 
+    public async Task<IReadOnlyList<PendingQaRecordingDto>> GetPendingQaRecordingsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var recordings = await _recordingRepository.GetPendingQaAsync(cancellationToken);
+
+        var result = new List<PendingQaRecordingDto>();
+
+        foreach (var recording in recordings)
+        {
+            string presignedUrl = await _storageService.GetPresignedUrlAsync(
+                _bucketName,
+                recording.StorageKey,
+                TimeSpan.FromMinutes(10),
+                cancellationToken);
+
+            result.Add(new PendingQaRecordingDto
+            {
+                RecordingId = recording.Id,
+                FileName = recording.FileName,
+                StorageKey = recording.StorageKey,
+                PresignedUrl = presignedUrl
+            });
+        }
+
+        return result;
+    }
+
+    public async Task MarkQaProcessedAsync(
+        Guid recordingId,
+        CancellationToken cancellationToken = default)
+    {
+        var recording = await _recordingRepository.GetByIdAsync(recordingId, cancellationToken)
+            ?? throw new InvalidOperationException("Recording not found.");
+
+        recording.QaProcessedAtUtc = DateTimeOffset.UtcNow;
+        recording.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+        _recordingRepository.Update(recording);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<string> GetPlaybackUrlAsync(
         Guid recordingId,
         TimeSpan expiry,

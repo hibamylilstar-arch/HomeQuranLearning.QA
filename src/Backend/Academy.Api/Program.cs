@@ -1,9 +1,17 @@
+﻿using System.Security.Claims;
+using System.Text;
 using System.Text.Json.Serialization;
 using Academy.Application.Abstractions;
 using Academy.Application.Contracts;
+using Academy.Application.Options;
 using Academy.Application.Services;
+using Academy.Domain.Entities;
 using Academy.Domain.Enums;
 using Academy.Infrastructure.DependencyInjection;
+using Academy.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +40,33 @@ builder.Services.AddScoped<RecordingService>(sp =>
         bucketName);
 });
 
+// Authentication / JWT
+var jwtOptions = builder.Configuration
+    .GetSection("Jwt")
+    .Get<JwtOptions>() ?? new JwtOptions();
+
+builder.Services.AddSingleton(jwtOptions);
+builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
+builder.Services.AddScoped<AuthService>();
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidAudience = jwtOptions.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtOptions.SigningKey))
+        };
+    });
+
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -40,6 +75,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 
 string agentApiKey = app.Configuration["AgentApiKey"] ?? string.Empty;
 string adminApiKey = app.Configuration["AdminApiKey"] ?? string.Empty;
@@ -48,6 +85,40 @@ string workerApiKey = app.Configuration["WorkerApiKey"] ?? string.Empty;
 var jsonOptions = new System.Text.Json.JsonSerializerOptions(
     System.Text.Json.JsonSerializerDefaults.Web);
 jsonOptions.Converters.Add(new JsonStringEnumConverter());
+
+// Seed owner
+await SeedOwnerAsync(app);
+
+app.MapPost("/api/auth/login", async (
+    LoginRequest request,
+    AuthService authService,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var response = await authService.LoginAsync(request, cancellationToken);
+        return Results.Ok(response);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Json(new { message = ex.Message }, statusCode: 401);
+    }
+});
+
+app.MapGet("/api/auth/me", async (
+    ClaimsPrincipal user,
+    AuthService authService,
+    CancellationToken cancellationToken) =>
+{
+    string? userIdValue = user.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (userIdValue is null || !Guid.TryParse(userIdValue, out Guid userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    var profile = await authService.GetCurrentUserAsync(userId, cancellationToken);
+    return Results.Ok(profile);
+}).RequireAuthorization();
 
 app.MapPost("/api/agent/heartbeat", async (
     HttpRequest request,
@@ -130,7 +201,7 @@ app.MapGet("/api/admin/devices", async (
 
     var devices = await deviceQueryService.GetDevicesAsync(cancellationToken);
     return Results.Ok(devices);
-});
+}).RequireAuthorization();
 
 app.MapGet("/api/admin/recordings", async (
     HttpRequest request,
@@ -145,7 +216,7 @@ app.MapGet("/api/admin/recordings", async (
 
     var recordings = await recordingService.GetRecordingListAsync(cancellationToken);
     return Results.Ok(recordings);
-});
+}).RequireAuthorization();
 
 app.MapGet("/api/admin/recordings/{recordingId:guid}/playback-url", async (
     HttpRequest request,
@@ -165,7 +236,7 @@ app.MapGet("/api/admin/recordings/{recordingId:guid}/playback-url", async (
         cancellationToken);
 
     return Results.Ok(new { url });
-});
+}).RequireAuthorization();
 
 app.MapGet("/api/admin/qa-rules", async (
     HttpRequest request,
@@ -180,7 +251,7 @@ app.MapGet("/api/admin/qa-rules", async (
 
     var rules = await ruleService.GetRulesAsync(cancellationToken);
     return Results.Ok(rules);
-});
+}).RequireAuthorization();
 
 app.MapPost("/api/admin/qa-rules", async (
     HttpRequest request,
@@ -208,7 +279,7 @@ app.MapPost("/api/admin/qa-rules", async (
         cancellationToken);
 
     return Results.Ok(rule);
-});
+}).RequireAuthorization();
 
 app.MapGet("/api/admin/qa-alerts", async (
     HttpRequest request,
@@ -223,7 +294,7 @@ app.MapGet("/api/admin/qa-alerts", async (
 
     var alerts = await alertService.GetAlertsAsync(cancellationToken);
     return Results.Ok(alerts);
-});
+}).RequireAuthorization();
 
 app.MapPost("/api/admin/qa-alerts", async (
     HttpRequest request,
@@ -252,7 +323,7 @@ app.MapPost("/api/admin/qa-alerts", async (
         cancellationToken);
 
     return Results.Ok(new { created = true });
-});
+}).RequireAuthorization();
 
 app.MapGet("/api/worker/recordings/pending", async (
     HttpRequest request,
@@ -289,3 +360,35 @@ app.MapPost("/api/worker/recordings/{recordingId:guid}/mark-qa-processed", async
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 
 app.Run();
+
+static async Task SeedOwnerAsync(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+    await dbContext.Database.MigrateAsync();
+
+    string seedEmail = app.Configuration["SeedOwner:Email"] ?? "owner@academy.local";
+
+    bool exists = await dbContext.Users.AnyAsync(u => u.Email == seedEmail);
+
+    if (!exists)
+    {
+        var owner = new User
+        {
+            Id = Guid.NewGuid(),
+            FullName = app.Configuration["SeedOwner:FullName"] ?? "Owner",
+            Email = seedEmail,
+            PasswordHash = passwordHasher.Hash(
+                app.Configuration["SeedOwner:Password"] ?? "OwnerPass123!"),
+            Role = UserRole.Owner,
+            IsActive = true,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        };
+
+        dbContext.Users.Add(owner);
+        await dbContext.SaveChangesAsync();
+    }
+}

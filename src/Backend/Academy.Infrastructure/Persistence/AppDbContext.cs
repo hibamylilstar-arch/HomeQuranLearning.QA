@@ -15,6 +15,9 @@ public sealed class AppDbContext : DbContext
     public DbSet<Recording> Recordings => Set<Recording>();
     public DbSet<QaRule> QaRules => Set<QaRule>();
     public DbSet<QaAlert> QaAlerts => Set<QaAlert>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Teacher> Teachers => Set<Teacher>();
+    public DbSet<ManagerTeacherAssignment> ManagerTeacherAssignments => Set<ManagerTeacherAssignment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -129,6 +132,73 @@ public sealed class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.QaRuleId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.ToTable("users");
+
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.FullName)
+                .IsRequired()
+                .HasMaxLength(256);
+
+            entity.Property(x => x.Email)
+                .IsRequired()
+                .HasMaxLength(256);
+
+            entity.HasIndex(x => x.Email)
+                .IsUnique();
+
+            entity.Property(x => x.PasswordHash)
+                .IsRequired()
+                .HasMaxLength(1024);
+
+            entity.Property(x => x.Role)
+                .HasConversion<string>()
+                .HasMaxLength(32);
+
+            entity.Property(x => x.IsActive)
+                .IsRequired();
+        });
+
+        modelBuilder.Entity<Teacher>(entity =>
+        {
+            entity.ToTable("teachers");
+
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.FullName)
+                .IsRequired()
+                .HasMaxLength(256);
+
+            entity.Property(x => x.Email)
+                .IsRequired()
+                .HasMaxLength(256);
+
+            entity.Property(x => x.Phone)
+                .HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<ManagerTeacherAssignment>(entity =>
+        {
+            entity.ToTable("manager_teacher_assignments");
+
+            entity.HasKey(x => x.Id);
+
+            entity.HasIndex(x => new { x.ManagerUserId, x.TeacherId })
+                .IsUnique();
+
+            entity.HasOne(x => x.ManagerUser)
+                .WithMany()
+                .HasForeignKey(x => x.ManagerUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Teacher)
+                .WithMany(t => t.ManagerAssignments)
+                .HasForeignKey(x => x.TeacherId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

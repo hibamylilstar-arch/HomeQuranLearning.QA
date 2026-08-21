@@ -1,12 +1,15 @@
+using Academy.Application.Contracts;
+using Academy.Application.Services;
+using Academy.Infrastructure.DependencyInjection;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddScoped<DeviceService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -14,28 +17,25 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+string configuredApiKey = app.Configuration["AgentApiKey"] ?? string.Empty;
 
-app.MapGet("/weatherforecast", () =>
+app.MapPost("/api/agent/heartbeat", async (
+    HttpRequest request,
+    HeartbeatRequest body,
+    DeviceService deviceService,
+    CancellationToken cancellationToken) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != configuredApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var response = await deviceService.ProcessHeartbeatAsync(body, cancellationToken);
+
+    return Results.Ok(response);
+});
+
+app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

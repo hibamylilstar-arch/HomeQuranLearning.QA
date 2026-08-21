@@ -1,8 +1,28 @@
-import Link from "next/link";
-import { getDevices, getRecordings } from "@/lib/api";
+"use client";
 
-export default async function OverviewPage() {
-  const [devices, recordings] = await Promise.all([getDevices(), getRecordings()]);
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { getDevices, getRecordings } from "@/lib/api";
+import type { DeviceListItem, RecordingListItem } from "@/types";
+
+export default function OverviewPage() {
+  const [devices, setDevices] = useState<DeviceListItem[]>([]);
+  const [recordings, setRecordings] = useState<RecordingListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    Promise.all([getDevices(), getRecordings()])
+      .then(([d, r]) => {
+        setDevices(d);
+        setRecordings(r);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p className="text-slate-500">Loading...</p>;
+  if (error) return <p className="text-red-600">{error}</p>;
 
   const onlineDevices = devices.filter((d) => d.status === "Online").length;
 

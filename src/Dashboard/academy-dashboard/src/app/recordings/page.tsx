@@ -1,8 +1,24 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { getRecordings } from "@/lib/api";
 import PlayButton from "./PlayButton";
+import type { RecordingListItem } from "@/types";
 
-export default async function RecordingsPage() {
-  const recordings = await getRecordings();
+export default function RecordingsPage() {
+  const [recordings, setRecordings] = useState<RecordingListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getRecordings()
+      .then(setRecordings)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p className="text-slate-500">Loading...</p>;
+  if (error) return <p className="text-red-600">{error}</p>;
 
   return (
     <div className="space-y-6">

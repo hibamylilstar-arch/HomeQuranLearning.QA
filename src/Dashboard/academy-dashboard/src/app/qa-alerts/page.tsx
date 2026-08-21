@@ -1,7 +1,23 @@
-import { getQaAlerts } from "@/lib/api";
+"use client";
 
-export default async function QaAlertsPage() {
-  const alerts = await getQaAlerts();
+import { useEffect, useState } from "react";
+import { getQaAlerts } from "@/lib/api";
+import type { QaAlertListItem } from "@/types";
+
+export default function QaAlertsPage() {
+  const [alerts, setAlerts] = useState<QaAlertListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getQaAlerts()
+      .then(setAlerts)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p className="text-slate-500">Loading...</p>;
+  if (error) return <p className="text-red-600">{error}</p>;
 
   return (
     <div className="space-y-6">

@@ -1,7 +1,23 @@
-import { getQaRules } from "@/lib/api";
+"use client";
 
-export default async function QaRulesPage() {
-  const rules = await getQaRules();
+import { useEffect, useState } from "react";
+import { getQaRules } from "@/lib/api";
+import type { QaRuleListItem } from "@/types";
+
+export default function QaRulesPage() {
+  const [rules, setRules] = useState<QaRuleListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getQaRules()
+      .then(setRules)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p className="text-slate-500">Loading...</p>;
+  if (error) return <p className="text-red-600">{error}</p>;
 
   return (
     <div className="space-y-6">

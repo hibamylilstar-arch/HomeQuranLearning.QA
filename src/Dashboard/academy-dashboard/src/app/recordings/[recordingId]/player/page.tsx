@@ -1,13 +1,22 @@
+"use client";
+
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { getPlaybackUrl } from "@/lib/api";
 
-export default async function RecordingPlayerPage({
-  params,
-}: {
-  params: Promise<{ recordingId: string }>;
-}) {
-  const { recordingId } = await params;
+export default function RecordingPlayerPage() {
+  const { recordingId } = useParams<{ recordingId: string }>();
+  const [playbackUrl, setPlaybackUrl] = useState("");
+  const [error, setError] = useState("");
 
-  const playbackUrl = await getPlaybackUrl(recordingId);
+  useEffect(() => {
+    if (!recordingId) return;
+    getPlaybackUrl(recordingId)
+      .then(setPlaybackUrl)
+      .catch((err) => setError(err.message));
+  }, [recordingId]);
+
+  if (error) return <p className="text-red-600">{error}</p>;
 
   return (
     <div className="space-y-4">
@@ -18,15 +27,18 @@ export default async function RecordingPlayerPage({
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-black">
-        <video
-          key={playbackUrl}
-          controls
-          autoPlay
-          className="aspect-video w-full"
-          src={playbackUrl}
-        />
-      </div>
+      {playbackUrl ? (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-black">
+          <video
+            controls
+            autoPlay
+            className="aspect-video w-full"
+            src={playbackUrl}
+          />
+        </div>
+      ) : (
+        <p className="text-slate-500">Loading player...</p>
+      )}
 
       <a
         href="/recordings"

@@ -67,6 +67,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("DashboardCors", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -75,11 +85,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors("DashboardCors");
 app.UseAuthentication();
 app.UseAuthorization();
 
 string agentApiKey = app.Configuration["AgentApiKey"] ?? string.Empty;
-string adminApiKey = app.Configuration["AdminApiKey"] ?? string.Empty;
 string workerApiKey = app.Configuration["WorkerApiKey"] ?? string.Empty;
 
 var jsonOptions = new System.Text.Json.JsonSerializerOptions(
@@ -193,12 +203,6 @@ app.MapGet("/api/admin/devices", async (
     DeviceQueryService deviceQueryService,
     CancellationToken cancellationToken) =>
 {
-    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
-        values.ToString() != adminApiKey)
-    {
-        return Results.Unauthorized();
-    }
-
     var devices = await deviceQueryService.GetDevicesAsync(cancellationToken);
     return Results.Ok(devices);
 }).RequireAuthorization();
@@ -208,12 +212,6 @@ app.MapGet("/api/admin/recordings", async (
     RecordingService recordingService,
     CancellationToken cancellationToken) =>
 {
-    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
-        values.ToString() != adminApiKey)
-    {
-        return Results.Unauthorized();
-    }
-
     var recordings = await recordingService.GetRecordingListAsync(cancellationToken);
     return Results.Ok(recordings);
 }).RequireAuthorization();
@@ -224,12 +222,6 @@ app.MapGet("/api/admin/recordings/{recordingId:guid}/playback-url", async (
     RecordingService recordingService,
     CancellationToken cancellationToken) =>
 {
-    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
-        values.ToString() != adminApiKey)
-    {
-        return Results.Unauthorized();
-    }
-
     var url = await recordingService.GetPlaybackUrlAsync(
         recordingId,
         TimeSpan.FromMinutes(10),
@@ -243,12 +235,6 @@ app.MapGet("/api/admin/qa-rules", async (
     QaRuleService ruleService,
     CancellationToken cancellationToken) =>
 {
-    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
-        values.ToString() != adminApiKey)
-    {
-        return Results.Unauthorized();
-    }
-
     var rules = await ruleService.GetRulesAsync(cancellationToken);
     return Results.Ok(rules);
 }).RequireAuthorization();
@@ -258,12 +244,6 @@ app.MapPost("/api/admin/qa-rules", async (
     QaRuleService ruleService,
     CancellationToken cancellationToken) =>
 {
-    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
-        values.ToString() != adminApiKey)
-    {
-        return Results.Unauthorized();
-    }
-
     var body = await request.ReadFromJsonAsync<CreateQaRuleRequest>(
         jsonOptions,
         cancellationToken);
@@ -286,12 +266,6 @@ app.MapGet("/api/admin/qa-alerts", async (
     QaAlertService alertService,
     CancellationToken cancellationToken) =>
 {
-    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
-        values.ToString() != adminApiKey)
-    {
-        return Results.Unauthorized();
-    }
-
     var alerts = await alertService.GetAlertsAsync(cancellationToken);
     return Results.Ok(alerts);
 }).RequireAuthorization();
@@ -301,12 +275,6 @@ app.MapPost("/api/admin/qa-alerts", async (
     QaAlertService alertService,
     CancellationToken cancellationToken) =>
 {
-    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
-        values.ToString() != adminApiKey)
-    {
-        return Results.Unauthorized();
-    }
-
     var body = await request.ReadFromJsonAsync<CreateQaAlertRequest>(
         jsonOptions,
         cancellationToken);
@@ -353,8 +321,51 @@ app.MapPost("/api/worker/recordings/{recordingId:guid}/mark-qa-processed", async
     }
 
     await recordingService.MarkQaProcessedAsync(recordingId, cancellationToken);
-
     return Results.Ok(new { processed = true });
+});
+
+app.MapGet("/api/worker/qa-rules", async (
+    HttpRequest request,
+    QaRuleService ruleService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var rules = await ruleService.GetRulesAsync(cancellationToken);
+    return Results.Ok(rules);
+});
+
+app.MapPost("/api/worker/qa-alerts", async (
+    HttpRequest request,
+    QaAlertService alertService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var body = await request.ReadFromJsonAsync<CreateQaAlertRequest>(
+        jsonOptions,
+        cancellationToken);
+
+    if (body is null || string.IsNullOrWhiteSpace(body.MatchedPhrase))
+    {
+        return Results.BadRequest("MatchedPhrase is required.");
+    }
+
+    await alertService.CreateAlertAsync(
+        body.RecordingId,
+        body.MatchedPhrase,
+        body.TimestampUtc,
+        cancellationToken);
+
+    return Results.Ok(new { created = true });
 });
 
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));

@@ -1,7 +1,23 @@
-import { getDevices } from "@/lib/api";
+"use client";
 
-export default async function DevicesPage() {
-  const devices = await getDevices();
+import { useEffect, useState } from "react";
+import { getDevices } from "@/lib/api";
+import type { DeviceListItem } from "@/types";
+
+export default function DevicesPage() {
+  const [devices, setDevices] = useState<DeviceListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getDevices()
+      .then(setDevices)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p className="text-slate-500">Loading...</p>;
+  if (error) return <p className="text-red-600">{error}</p>;
 
   return (
     <div className="space-y-6">

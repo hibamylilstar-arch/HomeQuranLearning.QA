@@ -8,26 +8,25 @@ from faster_whisper import WhisperModel
 
 BACKEND_BASE_URL = "http://localhost:5100"
 WORKER_API_KEY = "local-dev-worker-key"
-ADMIN_API_KEY = "local-dev-admin-key"
 POLL_INTERVAL_SECONDS = 10
 
 
-def http_get_json(path, api_key):
+def http_get_json(path):
     request = urllib.request.Request(
         f"{BACKEND_BASE_URL}{path}",
-        headers={"X-Api-Key": api_key},
+        headers={"X-Api-Key": WORKER_API_KEY},
     )
     with urllib.request.urlopen(request) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
-def http_post_json(path, body, api_key):
+def http_post_json(path, body):
     data = json.dumps(body).encode("utf-8")
     request = urllib.request.Request(
         f"{BACKEND_BASE_URL}{path}",
         data=data,
         headers={
-            "X-Api-Key": api_key,
+            "X-Api-Key": WORKER_API_KEY,
             "Content-Type": "application/json",
         },
         method="POST",
@@ -44,22 +43,21 @@ def download_file(url, output_path):
 
 
 def get_pending_recordings():
-    return http_get_json("/api/worker/recordings/pending", WORKER_API_KEY)
+    return http_get_json("/api/worker/recordings/pending")
 
 
 def get_active_rules():
-    return http_get_json("/api/admin/qa-rules", ADMIN_API_KEY)
+    return http_get_json("/api/worker/qa-rules")
 
 
 def create_alert(recording_id, matched_phrase, timestamp_utc):
     return http_post_json(
-        "/api/admin/qa-alerts",
+        "/api/worker/qa-alerts",
         {
             "recordingId": recording_id,
             "matchedPhrase": matched_phrase,
             "timestampUtc": timestamp_utc,
         },
-        ADMIN_API_KEY,
     )
 
 
@@ -67,7 +65,6 @@ def mark_processed(recording_id):
     return http_post_json(
         f"/api/worker/recordings/{recording_id}/mark-qa-processed",
         {},
-        WORKER_API_KEY,
     )
 
 

@@ -58,17 +58,24 @@ public sealed class RecordingService
         };
     }
 
-    public async Task<IReadOnlyList<RecordingResponse>> GetRecordingsAsync(
+    public async Task<IReadOnlyList<RecordingListItem>> GetRecordingListAsync(
         CancellationToken cancellationToken = default)
     {
-        var recordings = await _recordingRepository.GetAllAsync(cancellationToken);
+        var recordings = await _recordingRepository.GetAllWithDeviceAsync(cancellationToken);
 
         return recordings
-            .Select(x => new RecordingResponse
+            .OrderByDescending(x => x.StartedAtUtc)
+            .Select(x => new RecordingListItem
             {
-                RecordingId = x.Id,
-                Accepted = true,
-                StorageKey = x.StorageKey
+                Id = x.Id,
+                DeviceName = x.Device?.DeviceName ?? "Unknown",
+                FileName = x.FileName,
+                StorageKey = x.StorageKey,
+                StartedAtUtc = x.StartedAtUtc,
+                EndedAtUtc = x.EndedAtUtc,
+                Duration = x.Duration,
+                SizeBytes = x.SizeBytes,
+                Status = x.Status.ToString()
             })
             .ToList();
     }

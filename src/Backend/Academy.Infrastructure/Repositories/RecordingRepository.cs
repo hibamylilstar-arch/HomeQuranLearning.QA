@@ -28,6 +28,16 @@ public sealed class RecordingRepository : IRecordingRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Recording>> GetAllWithDeviceAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Recordings
+            .AsNoTracking()
+            .Include(x => x.Device)
+            .OrderByDescending(x => x.StartedAtUtc)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Recording?> GetByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default)

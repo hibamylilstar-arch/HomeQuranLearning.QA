@@ -80,7 +80,7 @@ app.MapGet("/api/admin/recordings", async (
         return Results.Unauthorized();
     }
 
-    var recordings = await recordingService.GetRecordingsAsync(cancellationToken);
+    var recordings = await recordingService.GetRecordingListAsync(cancellationToken);
     return Results.Ok(recordings);
 });
 

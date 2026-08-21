@@ -1,4 +1,5 @@
 import { getRecordings } from "@/lib/api";
+import PlayButton from "./PlayButton";
 
 export default async function RecordingsPage() {
   const recordings = await getRecordings();
@@ -20,6 +21,7 @@ export default async function RecordingsPage() {
               <th className="px-4 py-3 font-medium">Duration</th>
               <th className="px-4 py-3 font-medium">Size</th>
               <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -35,15 +37,26 @@ export default async function RecordingsPage() {
                   {(recording.sizeBytes / 1024 / 1024).toFixed(2)} MB
                 </td>
                 <td className="px-4 py-3">
-                  <span className="inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">
+                  <span
+                    className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                      recording.status === "Uploaded"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
                     {recording.status}
                   </span>
+                </td>
+                <td className="px-4 py-3">
+                  {recording.status === "Uploaded" && (
+                    <PlayButton recordingId={recording.id} />
+                  )}
                 </td>
               </tr>
             ))}
             {recordings.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
                   No recordings yet.
                 </td>
               </tr>

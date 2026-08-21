@@ -40,4 +40,18 @@ public sealed class MinioStorageService : IStorageService
                 .WithContentType(contentType),
             cancellationToken);
     }
+
+    public async Task<string> GetPresignedUrlAsync(
+        string bucketName,
+        string objectKey,
+        TimeSpan expiry,
+        CancellationToken cancellationToken = default)
+    {
+        var args = new PresignedGetObjectArgs()
+            .WithBucket(bucketName)
+            .WithObject(objectKey)
+            .WithExpiry((int)expiry.TotalSeconds);
+
+        return await _minioClient.PresignedGetObjectAsync(args);
+    }
 }

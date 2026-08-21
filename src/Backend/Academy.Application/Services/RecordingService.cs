@@ -107,4 +107,24 @@ public sealed class RecordingService
             })
             .ToList();
     }
+
+    public async Task<string> GetPlaybackUrlAsync(
+        Guid recordingId,
+        TimeSpan expiry,
+        CancellationToken cancellationToken = default)
+    {
+        var recording = await _recordingRepository.GetByIdAsync(recordingId, cancellationToken)
+            ?? throw new InvalidOperationException("Recording not found.");
+
+        if (recording.Status != RecordingStatus.Uploaded)
+        {
+            throw new InvalidOperationException("Recording is not uploaded yet.");
+        }
+
+        return await _storageService.GetPresignedUrlAsync(
+            _bucketName,
+            recording.StorageKey,
+            expiry,
+            cancellationToken);
+    }
 }

@@ -8,4 +8,10 @@ public interface IStorageService
         Stream content,
         string contentType,
         CancellationToken cancellationToken = default);
+
+    Task<string> GetPresignedUrlAsync(
+        string bucketName,
+        string objectKey,
+        TimeSpan expiry,
+        CancellationToken cancellationToken = default);
 }

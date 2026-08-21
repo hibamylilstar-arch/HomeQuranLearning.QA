@@ -28,3 +28,20 @@ export async function getRecordings(): Promise<RecordingListItem[]> {
 
   return res.json();
 }
+
+export async function getPlaybackUrl(recordingId: string): Promise<string> {
+  const res = await fetch(
+    `${backendBaseUrl}/api/admin/recordings/${recordingId}/playback-url`,
+    {
+      headers: { "X-Api-Key": adminApiKey },
+      cache: "no-store",
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Playback URL request failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.url;
+}

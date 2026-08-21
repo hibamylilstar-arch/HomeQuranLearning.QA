@@ -138,6 +138,26 @@ app.MapGet("/api/admin/recordings", async (
     return Results.Ok(recordings);
 });
 
+app.MapGet("/api/admin/recordings/{recordingId:guid}/playback-url", async (
+    HttpRequest request,
+    Guid recordingId,
+    RecordingService recordingService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != adminApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var url = await recordingService.GetPlaybackUrlAsync(
+        recordingId,
+        TimeSpan.FromMinutes(10),
+        cancellationToken);
+
+    return Results.Ok(new { url });
+});
+
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 
 app.Run();

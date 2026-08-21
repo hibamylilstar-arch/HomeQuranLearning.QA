@@ -65,3 +65,10 @@ publish/
 # Visual Studio Code debug
 .vscode/launch.json
 .vscode/tasks.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.wav
+spikes/SttSpike/sample.wav

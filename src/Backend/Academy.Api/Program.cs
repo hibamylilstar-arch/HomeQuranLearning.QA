@@ -1,6 +1,8 @@
+using System.Text.Json.Serialization;
 using Academy.Application.Abstractions;
 using Academy.Application.Contracts;
 using Academy.Application.Services;
+using Academy.Domain.Enums;
 using Academy.Infrastructure.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +11,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<DeviceService>();
 builder.Services.AddScoped<DeviceQueryService>();
+builder.Services.AddScoped<QaRuleService>();
+builder.Services.AddScoped<QaAlertService>();
 
 builder.Services.AddSingleton(builder.Configuration["Storage:Bucket"] ?? "academy-recordings");
 
@@ -39,6 +43,10 @@ app.UseHttpsRedirection();
 
 string agentApiKey = app.Configuration["AgentApiKey"] ?? string.Empty;
 string adminApiKey = app.Configuration["AdminApiKey"] ?? string.Empty;
+
+var jsonOptions = new System.Text.Json.JsonSerializerOptions(
+    System.Text.Json.JsonSerializerDefaults.Web);
+jsonOptions.Converters.Add(new JsonStringEnumConverter());
 
 app.MapPost("/api/agent/heartbeat", async (
     HttpRequest request,
@@ -156,6 +164,64 @@ app.MapGet("/api/admin/recordings/{recordingId:guid}/playback-url", async (
         cancellationToken);
 
     return Results.Ok(new { url });
+});
+
+app.MapGet("/api/admin/qa-rules", async (
+    HttpRequest request,
+    QaRuleService ruleService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != adminApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var rules = await ruleService.GetRulesAsync(cancellationToken);
+    return Results.Ok(rules);
+});
+
+app.MapPost("/api/admin/qa-rules", async (
+    HttpRequest request,
+    QaRuleService ruleService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != adminApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var body = await request.ReadFromJsonAsync<CreateQaRuleRequest>(
+        jsonOptions,
+        cancellationToken);
+
+    if (body is null || string.IsNullOrWhiteSpace(body.Phrase))
+    {
+        return Results.BadRequest("Phrase is required.");
+    }
+
+    var rule = await ruleService.CreateRuleAsync(
+        body.Phrase,
+        body.Severity,
+        cancellationToken);
+
+    return Results.Ok(rule);
+});
+
+app.MapGet("/api/admin/qa-alerts", async (
+    HttpRequest request,
+    QaAlertService alertService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != adminApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var alerts = await alertService.GetAlertsAsync(cancellationToken);
+    return Results.Ok(alerts);
 });
 
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));

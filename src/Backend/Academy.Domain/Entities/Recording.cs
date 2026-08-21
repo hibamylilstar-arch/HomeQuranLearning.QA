@@ -27,4 +27,6 @@ public sealed class Recording
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public DateTimeOffset UpdatedAtUtc { get; set; }
+
+    public ICollection<QaAlert> QaAlerts { get; set; } = new List<QaAlert>();
 }

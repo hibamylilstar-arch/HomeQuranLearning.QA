@@ -26,6 +26,8 @@ public static class InfrastructureServiceRegistration
         services.AddScoped<IDeviceRepository, DeviceRepository>();
         services.AddScoped<IHeartbeatRepository, HeartbeatRepository>();
         services.AddScoped<IRecordingRepository, RecordingRepository>();
+        services.AddScoped<IQaRuleRepository, QaRuleRepository>();
+        services.AddScoped<IQaAlertRepository, QaAlertRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         string minioEndpoint = configuration["Storage:Endpoint"] ?? "localhost:9000";

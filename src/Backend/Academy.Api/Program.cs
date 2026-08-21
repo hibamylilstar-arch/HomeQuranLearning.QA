@@ -224,6 +224,35 @@ app.MapGet("/api/admin/qa-alerts", async (
     return Results.Ok(alerts);
 });
 
+app.MapPost("/api/admin/qa-alerts", async (
+    HttpRequest request,
+    QaAlertService alertService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != adminApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var body = await request.ReadFromJsonAsync<CreateQaAlertRequest>(
+        jsonOptions,
+        cancellationToken);
+
+    if (body is null || string.IsNullOrWhiteSpace(body.MatchedPhrase))
+    {
+        return Results.BadRequest("MatchedPhrase is required.");
+    }
+
+    await alertService.CreateAlertAsync(
+        body.RecordingId,
+        body.MatchedPhrase,
+        body.TimestampUtc,
+        cancellationToken);
+
+    return Results.Ok(new { created = true });
+});
+
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 
 app.Run();

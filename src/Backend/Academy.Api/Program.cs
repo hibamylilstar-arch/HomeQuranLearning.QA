@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<DeviceService>();
+builder.Services.AddScoped<DeviceQueryService>();
 
 var app = builder.Build();
 
@@ -17,7 +18,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-string configuredApiKey = app.Configuration["AgentApiKey"] ?? string.Empty;
+string agentApiKey = app.Configuration["AgentApiKey"] ?? string.Empty;
+string adminApiKey = app.Configuration["AdminApiKey"] ?? string.Empty;
 
 app.MapPost("/api/agent/heartbeat", async (
     HttpRequest request,
@@ -26,7 +28,7 @@ app.MapPost("/api/agent/heartbeat", async (
     CancellationToken cancellationToken) =>
 {
     if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
-        values.ToString() != configuredApiKey)
+        values.ToString() != agentApiKey)
     {
         return Results.Unauthorized();
     }
@@ -34,6 +36,22 @@ app.MapPost("/api/agent/heartbeat", async (
     var response = await deviceService.ProcessHeartbeatAsync(body, cancellationToken);
 
     return Results.Ok(response);
+});
+
+app.MapGet("/api/admin/devices", async (
+    HttpRequest request,
+    DeviceQueryService deviceQueryService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != adminApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var devices = await deviceQueryService.GetDevicesAsync(cancellationToken);
+
+    return Results.Ok(devices);
 });
 
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));

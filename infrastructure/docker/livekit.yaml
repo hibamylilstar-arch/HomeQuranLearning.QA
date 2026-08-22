@@ -2,12 +2,16 @@ port: 7880
 
 rtc:
   tcp_port: 7881
-  port_range_start: 50000
-  port_range_end: 50100
+  port_range_start: 51000
+  port_range_end: 51100
   use_external_ip: false
+  node_ip: 172.26.224.1
 
 keys:
   devkey: dev-secret-key-for-livekit-change-me-1234567890
+
+redis:
+  address: redis:6379
 
 logging:
   level: info

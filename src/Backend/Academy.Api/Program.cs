@@ -600,6 +600,15 @@ app.MapPost("/api/admin/livekit/token", async (
     });
 }).RequireAuthorization();
 
+app.MapGet("/api/admin/livekit/server-token", async (
+    ClaimsPrincipal user,
+    HttpRequest request,
+    LiveKitTokenService liveKitTokenService) =>
+{
+    var token = liveKitTokenService.GenerateServerApiToken();
+    return Results.Ok(new { token });
+}).RequireAuthorization();
+
 app.MapGet("/api/worker/recordings/pending", async (
     HttpRequest request,
     RecordingService recordingService,

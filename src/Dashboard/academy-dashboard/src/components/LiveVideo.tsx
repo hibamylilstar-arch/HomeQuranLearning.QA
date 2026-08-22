@@ -25,13 +25,18 @@ export default function LiveVideo({ url, token }: LiveVideoProps) {
         r.on(RoomEvent.TrackSubscribed, (track) => {
           if (track.kind === Track.Kind.Video && videoRef.current) {
             track.attach(videoRef.current);
+            videoRef.current.play().catch(() => {});
           }
         });
 
         r.on(RoomEvent.Connected, () => setConnected(true));
         r.on(RoomEvent.Disconnected, () => setConnected(false));
 
-        await r.connect(url, token);
+        const connectOptions: any = {
+          forceTcp: true,
+        };
+
+        await r.connect(url, token, connectOptions);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Live connection failed");
@@ -43,14 +48,23 @@ export default function LiveVideo({ url, token }: LiveVideoProps) {
 
     return () => {
       cancelled = true;
-      room?.disconnect();
+      if (room) {
+        room.disconnect();
+      }
+      room = null;
     };
   }, [url, token]);
 
   return (
     <div className="space-y-2">
       <div className="aspect-video w-full overflow-hidden rounded-lg bg-black">
-        <video ref={videoRef} autoPlay playsInline className="h-full w-full object-contain" />
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="h-full w-full object-contain"
+        />
       </div>
       {!connected && !error && <p className="text-sm text-slate-500">Connecting...</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}

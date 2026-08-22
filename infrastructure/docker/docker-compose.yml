@@ -1,4 +1,4 @@
-services:
+﻿services:
   postgres:
     image: postgres:16-alpine
     container_name: academy-postgres
@@ -60,13 +60,30 @@ services:
     ports:
       - "7880:7880"
       - "7881:7881"
-      - "50000-50100:50000-50100/udp"
-    networks:
-      - academy
+      - "51000-51100:51000-51100/udp"
 
-networks:
-  academy:
-    driver: bridge
+  livekit-ingress:
+    image: livekit/ingress:latest
+    container_name: academy-livekit-ingress
+    restart: unless-stopped
+    environment:
+      INGRESS_CONFIG_BODY: |
+        api_key: devkey
+        api_secret: dev-secret-key-for-livekit-change-me-1234567890
+        ws_url: ws://livekit:7880
+        redis:
+          address: redis:6379
+        rtmp_port: 1935
+        whip_port: 8088
+        http_port: 9090
+        http_address: 0.0.0.0
+    ports:
+      - "1935:1935"
+      - "8088:8088"
+      - "9090:9090"
+    depends_on:
+      - livekit
+      - redis
 
 volumes:
   postgres_data:

@@ -24,6 +24,7 @@ builder.Services.AddScoped<QaAlertService>();
 builder.Services.AddScoped<AdminUserService>();
 builder.Services.AddScoped<TeacherService>();
 builder.Services.AddScoped<ManagerAssignmentService>();
+builder.Services.AddScoped<DashboardQueryService>();
 
 builder.Services.AddSingleton(builder.Configuration["Storage:Bucket"] ?? "academy-recordings");
 
@@ -202,24 +203,29 @@ app.MapPost("/api/agent/recordings/{recordingId:guid}/upload", async (
 });
 
 app.MapGet("/api/admin/devices", async (
+    ClaimsPrincipal user,
     HttpRequest request,
-    DeviceQueryService deviceQueryService,
+    DashboardQueryService dashboardQueryService,
     CancellationToken cancellationToken) =>
 {
-    var devices = await deviceQueryService.GetDevicesAsync(cancellationToken);
+    var (userId, role) = GetUserInfo(user);
+    var devices = await dashboardQueryService.GetVisibleDevicesAsync(userId, role, cancellationToken);
     return Results.Ok(devices);
 }).RequireAuthorization();
 
 app.MapGet("/api/admin/recordings", async (
+    ClaimsPrincipal user,
     HttpRequest request,
-    RecordingService recordingService,
+    DashboardQueryService dashboardQueryService,
     CancellationToken cancellationToken) =>
 {
-    var recordings = await recordingService.GetRecordingListAsync(cancellationToken);
+    var (userId, role) = GetUserInfo(user);
+    var recordings = await dashboardQueryService.GetVisibleRecordingsAsync(userId, role, cancellationToken);
     return Results.Ok(recordings);
 }).RequireAuthorization();
 
 app.MapGet("/api/admin/recordings/{recordingId:guid}/playback-url", async (
+    ClaimsPrincipal user,
     HttpRequest request,
     Guid recordingId,
     RecordingService recordingService,
@@ -234,6 +240,7 @@ app.MapGet("/api/admin/recordings/{recordingId:guid}/playback-url", async (
 }).RequireAuthorization();
 
 app.MapGet("/api/admin/qa-rules", async (
+    ClaimsPrincipal user,
     HttpRequest request,
     QaRuleService ruleService,
     CancellationToken cancellationToken) =>
@@ -243,6 +250,7 @@ app.MapGet("/api/admin/qa-rules", async (
 }).RequireAuthorization();
 
 app.MapPost("/api/admin/qa-rules", async (
+    ClaimsPrincipal user,
     HttpRequest request,
     QaRuleService ruleService,
     CancellationToken cancellationToken) =>
@@ -265,15 +273,18 @@ app.MapPost("/api/admin/qa-rules", async (
 }).RequireAuthorization();
 
 app.MapGet("/api/admin/qa-alerts", async (
+    ClaimsPrincipal user,
     HttpRequest request,
-    QaAlertService alertService,
+    DashboardQueryService dashboardQueryService,
     CancellationToken cancellationToken) =>
 {
-    var alerts = await alertService.GetAlertsAsync(cancellationToken);
+    var (userId, role) = GetUserInfo(user);
+    var alerts = await dashboardQueryService.GetVisibleQaAlertsAsync(userId, role, cancellationToken);
     return Results.Ok(alerts);
 }).RequireAuthorization();
 
 app.MapPost("/api/admin/qa-alerts", async (
+    ClaimsPrincipal user,
     HttpRequest request,
     QaAlertService alertService,
     CancellationToken cancellationToken) =>
@@ -297,6 +308,7 @@ app.MapPost("/api/admin/qa-alerts", async (
 }).RequireAuthorization();
 
 app.MapGet("/api/admin/users", async (
+    ClaimsPrincipal user,
     HttpRequest request,
     AdminUserService adminUserService,
     CancellationToken cancellationToken) =>
@@ -306,6 +318,7 @@ app.MapGet("/api/admin/users", async (
 }).RequireAuthorization();
 
 app.MapPost("/api/admin/users", async (
+    ClaimsPrincipal user,
     HttpRequest request,
     AdminUserService adminUserService,
     CancellationToken cancellationToken) =>
@@ -321,8 +334,8 @@ app.MapPost("/api/admin/users", async (
 
     try
     {
-        var user = await adminUserService.CreateUserAsync(body, cancellationToken);
-        return Results.Ok(user);
+        var createdUser = await adminUserService.CreateUserAsync(body, cancellationToken);
+        return Results.Ok(createdUser);
     }
     catch (InvalidOperationException ex)
     {
@@ -331,9 +344,10 @@ app.MapPost("/api/admin/users", async (
 }).RequireAuthorization();
 
 app.MapPatch("/api/admin/users/{userId:guid}/status", async (
+    ClaimsPrincipal user,
+    HttpRequest request,
     Guid userId,
     bool isActive,
-    HttpRequest request,
     AdminUserService adminUserService,
     CancellationToken cancellationToken) =>
 {
@@ -349,6 +363,7 @@ app.MapPatch("/api/admin/users/{userId:guid}/status", async (
 }).RequireAuthorization();
 
 app.MapGet("/api/admin/teachers", async (
+    ClaimsPrincipal user,
     HttpRequest request,
     TeacherService teacherService,
     CancellationToken cancellationToken) =>
@@ -358,6 +373,7 @@ app.MapGet("/api/admin/teachers", async (
 }).RequireAuthorization();
 
 app.MapPost("/api/admin/teachers", async (
+    ClaimsPrincipal user,
     HttpRequest request,
     TeacherService teacherService,
     CancellationToken cancellationToken) =>
@@ -376,6 +392,7 @@ app.MapPost("/api/admin/teachers", async (
 }).RequireAuthorization();
 
 app.MapGet("/api/admin/manager-assignments", async (
+    ClaimsPrincipal user,
     HttpRequest request,
     ManagerAssignmentService assignmentService,
     CancellationToken cancellationToken) =>
@@ -385,6 +402,7 @@ app.MapGet("/api/admin/manager-assignments", async (
 }).RequireAuthorization();
 
 app.MapPost("/api/admin/manager-assignments", async (
+    ClaimsPrincipal user,
     HttpRequest request,
     ManagerAssignmentService assignmentService,
     CancellationToken cancellationToken) =>
@@ -491,6 +509,18 @@ app.MapPost("/api/worker/qa-alerts", async (
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 
 app.Run();
+
+static (Guid UserId, string Role) GetUserInfo(ClaimsPrincipal user)
+{
+    string? userIdValue = user.FindFirstValue(ClaimTypes.NameIdentifier);
+    Guid userId = userIdValue is not null && Guid.TryParse(userIdValue, out Guid parsed)
+        ? parsed
+        : Guid.Empty;
+
+    string role = user.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+
+    return (userId, role);
+}
 
 static async Task SeedOwnerAsync(WebApplication app)
 {

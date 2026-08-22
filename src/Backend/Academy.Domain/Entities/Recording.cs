@@ -10,6 +10,10 @@ public sealed class Recording
 
     public Device? Device { get; set; }
 
+    public Guid? TeacherId { get; set; }
+
+    public Teacher? Teacher { get; set; }
+
     public string FileName { get; set; } = string.Empty;
 
     public string StorageKey { get; set; } = string.Empty;

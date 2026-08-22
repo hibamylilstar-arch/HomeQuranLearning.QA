@@ -49,6 +49,18 @@ export default function NavLinks() {
           <Link href="/teachers" className="rounded-md px-3 py-2 hover:bg-slate-100">
             Teachers
           </Link>
+          <Link href="/students" className="rounded-md px-3 py-2 hover:bg-slate-100">
+            Students
+          </Link>
+          <Link href="/courses" className="rounded-md px-3 py-2 hover:bg-slate-100">
+            Courses
+          </Link>
+          <Link href="/schedules" className="rounded-md px-3 py-2 hover:bg-slate-100">
+            Schedules
+          </Link>
+          <Link href="/sessions" className="rounded-md px-3 py-2 hover:bg-slate-100">
+            Sessions
+          </Link>
           <Link href="/users" className="rounded-md px-3 py-2 hover:bg-slate-100">
             Users
           </Link>

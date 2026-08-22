@@ -6,6 +6,10 @@ import type {
   UserListItem,
   TeacherListItem,
   ManagerAssignmentListItem,
+  StudentListItem,
+  CourseListItem,
+  ScheduleListItem,
+  SessionListItem,
 } from "@/types";
 
 const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5100";
@@ -104,5 +108,72 @@ export async function createManagerAssignment(
   return authFetch<{ assigned: boolean }>("/api/admin/manager-assignments", {
     method: "POST",
     body: JSON.stringify({ managerUserId, teacherId }),
+  });
+}
+
+export async function getStudents(): Promise<StudentListItem[]> {
+  return authFetch<StudentListItem[]>("/api/admin/students");
+}
+
+export async function createStudent(
+  fullName: string,
+  email: string,
+  phone: string,
+  assignedTeacherId: string | null
+): Promise<StudentListItem> {
+  return authFetch<StudentListItem>("/api/admin/students", {
+    method: "POST",
+    body: JSON.stringify({ fullName, email, phone, assignedTeacherId }),
+  });
+}
+
+export async function getCourses(): Promise<CourseListItem[]> {
+  return authFetch<CourseListItem[]>("/api/admin/courses");
+}
+
+export async function createCourse(
+  name: string,
+  description: string
+): Promise<CourseListItem> {
+  return authFetch<CourseListItem>("/api/admin/courses", {
+    method: "POST",
+    body: JSON.stringify({ name, description }),
+  });
+}
+
+export async function getSchedules(): Promise<ScheduleListItem[]> {
+  return authFetch<ScheduleListItem[]>("/api/admin/schedules");
+}
+
+export async function createSchedule(
+  teacherId: string,
+  studentId: string,
+  courseId: string,
+  deviceId: string,
+  dayOfWeek: number,
+  startTime: string,
+  endTime: string
+): Promise<ScheduleListItem> {
+  return authFetch<ScheduleListItem>("/api/admin/schedules", {
+    method: "POST",
+    body: JSON.stringify({ teacherId, studentId, courseId, deviceId, dayOfWeek, startTime, endTime }),
+  });
+}
+
+export async function getSessions(): Promise<SessionListItem[]> {
+  return authFetch<SessionListItem[]>("/api/admin/sessions");
+}
+
+export async function createSession(
+  teacherId: string,
+  studentId: string,
+  courseId: string,
+  deviceId: string,
+  startedAtUtc: string,
+  endedAtUtc: string | null
+): Promise<SessionListItem> {
+  return authFetch<SessionListItem>("/api/admin/sessions", {
+    method: "POST",
+    body: JSON.stringify({ teacherId, studentId, courseId, deviceId, startedAtUtc, endedAtUtc }),
   });
 }

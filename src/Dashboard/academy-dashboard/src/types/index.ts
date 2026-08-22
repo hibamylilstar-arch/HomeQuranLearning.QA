@@ -58,3 +58,50 @@ export interface ManagerAssignmentListItem {
   teacherFullName: string;
   assignedAtUtc: string;
 }
+
+export interface StudentListItem {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  assignedTeacherId?: string | null;
+  assignedTeacherFullName: string;
+}
+
+export interface CourseListItem {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface ScheduleListItem {
+  id: string;
+  teacherId: string;
+  teacherFullName: string;
+  studentId: string;
+  studentFullName: string;
+  courseId: string;
+  courseName: string;
+  deviceId: string;
+  deviceName: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
+}
+
+export interface SessionListItem {
+  id: string;
+  scheduleId?: string | null;
+  teacherId: string;
+  teacherFullName: string;
+  studentId: string;
+  studentFullName: string;
+  courseId: string;
+  courseName: string;
+  deviceId: string;
+  deviceName: string;
+  startedAtUtc: string;
+  endedAtUtc?: string | null;
+  status: string;
+}

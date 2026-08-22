@@ -1,0 +1,24 @@
+# HomeQuranLearning QA — Production Environment Variables
+#
+# Copy this file to .env or set these values in your production environment.
+# ASP.NET Core will override appsettings.json placeholders automatically.
+
+ConnectionStrings__DefaultConnection=Host=YOUR_DB_HOST;Port=5432;Database=homequranlearning_qa;Username=YOUR_DB_USER;Password=YOUR_DB_PASSWORD
+
+AgentApiKey=YOUR_AGENT_API_KEY
+WorkerApiKey=YOUR_WORKER_API_KEY
+AdminApiKey=YOUR_ADMIN_API_KEY
+
+Storage__Endpoint=YOUR_MINIO_ENDPOINT
+Storage__AccessKey=YOUR_MINIO_ACCESS_KEY
+Storage__SecretKey=YOUR_MINIO_SECRET_KEY
+Storage__Bucket=academy-recordings
+
+Jwt__Issuer=HomeQuranLearning
+Jwt__Audience=HomeQuranLearning.Dashboard
+Jwt__SigningKey=YOUR_LONG_RANDOM_SECRET_KEY
+Jwt__ExpiryMinutes=120
+
+SeedOwner__FullName=Owner
+SeedOwner__Email=owner@academy.local
+SeedOwner__Password=YOUR_STRONG_OWNER_PASSWORD

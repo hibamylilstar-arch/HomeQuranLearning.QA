@@ -18,6 +18,10 @@ public sealed class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
     public DbSet<ManagerTeacherAssignment> ManagerTeacherAssignments => Set<ManagerTeacherAssignment>();
+    public DbSet<Student> Students => Set<Student>();
+    public DbSet<Course> Courses => Set<Course>();
+    public DbSet<Schedule> Schedules => Set<Schedule>();
+    public DbSet<Session> Sessions => Set<Session>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -38,6 +42,7 @@ public sealed class AppDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.Property(x => x.AgentVersion).IsRequired().HasMaxLength(64);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
+
             entity.HasOne(x => x.Device)
                 .WithMany(d => d.Heartbeats)
                 .HasForeignKey(x => x.DeviceId)
@@ -60,6 +65,11 @@ public sealed class AppDbContext : DbContext
             entity.HasOne(x => x.Teacher)
                 .WithMany()
                 .HasForeignKey(x => x.TeacherId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(x => x.Session)
+                .WithMany()
+                .HasForeignKey(x => x.SessionId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 
@@ -125,6 +135,88 @@ public sealed class AppDbContext : DbContext
             entity.HasOne(x => x.Teacher)
                 .WithMany(t => t.ManagerAssignments)
                 .HasForeignKey(x => x.TeacherId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Student>(entity =>
+        {
+            entity.ToTable("students");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.FullName).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.Email).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.Phone).HasMaxLength(64);
+
+            entity.HasOne(x => x.AssignedTeacher)
+                .WithMany()
+                .HasForeignKey(x => x.AssignedTeacherId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Course>(entity =>
+        {
+            entity.ToTable("courses");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.Description).HasMaxLength(1024);
+        });
+
+        modelBuilder.Entity<Schedule>(entity =>
+        {
+            entity.ToTable("schedules");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.DayOfWeek).HasConversion<int>();
+            entity.Property(x => x.IsActive).IsRequired();
+
+            entity.HasOne(x => x.Teacher)
+                .WithMany()
+                .HasForeignKey(x => x.TeacherId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Student)
+                .WithMany()
+                .HasForeignKey(x => x.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Course)
+                .WithMany()
+                .HasForeignKey(x => x.CourseId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Device)
+                .WithMany()
+                .HasForeignKey(x => x.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Session>(entity =>
+        {
+            entity.ToTable("sessions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
+
+            entity.HasOne(x => x.Schedule)
+                .WithMany()
+                .HasForeignKey(x => x.ScheduleId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(x => x.Teacher)
+                .WithMany()
+                .HasForeignKey(x => x.TeacherId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Student)
+                .WithMany()
+                .HasForeignKey(x => x.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Course)
+                .WithMany()
+                .HasForeignKey(x => x.CourseId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Device)
+                .WithMany()
+                .HasForeignKey(x => x.DeviceId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

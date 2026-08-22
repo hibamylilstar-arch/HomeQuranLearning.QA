@@ -31,6 +31,10 @@ public static class InfrastructureServiceRegistration
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITeacherRepository, TeacherRepository>();
         services.AddScoped<IManagerTeacherAssignmentRepository, ManagerTeacherAssignmentRepository>();
+        services.AddScoped<IStudentRepository, StudentRepository>();
+        services.AddScoped<ICourseRepository, CourseRepository>();
+        services.AddScoped<IScheduleRepository, ScheduleRepository>();
+        services.AddScoped<ISessionRepository, SessionRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         string minioEndpoint = configuration["Storage:Endpoint"] ?? "localhost:9000";

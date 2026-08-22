@@ -25,6 +25,10 @@ builder.Services.AddScoped<AdminUserService>();
 builder.Services.AddScoped<TeacherService>();
 builder.Services.AddScoped<ManagerAssignmentService>();
 builder.Services.AddScoped<DashboardQueryService>();
+builder.Services.AddScoped<StudentService>();
+builder.Services.AddScoped<CourseService>();
+builder.Services.AddScoped<ScheduleService>();
+builder.Services.AddScoped<SessionService>();
 
 builder.Services.AddSingleton(builder.Configuration["Storage:Bucket"] ?? "academy-recordings");
 
@@ -429,6 +433,122 @@ app.MapPost("/api/admin/manager-assignments", async (
     {
         return Results.BadRequest(new { message = ex.Message });
     }
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/students", async (
+    ClaimsPrincipal user,
+    HttpRequest request,
+    StudentService studentService,
+    CancellationToken cancellationToken) =>
+{
+    var students = await studentService.GetStudentsAsync(cancellationToken);
+    return Results.Ok(students);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/students", async (
+    ClaimsPrincipal user,
+    HttpRequest request,
+    StudentService studentService,
+    CancellationToken cancellationToken) =>
+{
+    var body = await request.ReadFromJsonAsync<CreateStudentRequest>(
+        jsonOptions,
+        cancellationToken);
+
+    if (body is null || string.IsNullOrWhiteSpace(body.FullName))
+    {
+        return Results.BadRequest("FullName is required.");
+    }
+
+    var student = await studentService.CreateStudentAsync(body, cancellationToken);
+    return Results.Ok(student);
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/courses", async (
+    ClaimsPrincipal user,
+    HttpRequest request,
+    CourseService courseService,
+    CancellationToken cancellationToken) =>
+{
+    var courses = await courseService.GetCoursesAsync(cancellationToken);
+    return Results.Ok(courses);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/courses", async (
+    ClaimsPrincipal user,
+    HttpRequest request,
+    CourseService courseService,
+    CancellationToken cancellationToken) =>
+{
+    var body = await request.ReadFromJsonAsync<CreateCourseRequest>(
+        jsonOptions,
+        cancellationToken);
+
+    if (body is null || string.IsNullOrWhiteSpace(body.Name))
+    {
+        return Results.BadRequest("Name is required.");
+    }
+
+    var course = await courseService.CreateCourseAsync(body, cancellationToken);
+    return Results.Ok(course);
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/schedules", async (
+    ClaimsPrincipal user,
+    HttpRequest request,
+    ScheduleService scheduleService,
+    CancellationToken cancellationToken) =>
+{
+    var schedules = await scheduleService.GetSchedulesAsync(cancellationToken);
+    return Results.Ok(schedules);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/schedules", async (
+    ClaimsPrincipal user,
+    HttpRequest request,
+    ScheduleService scheduleService,
+    CancellationToken cancellationToken) =>
+{
+    var body = await request.ReadFromJsonAsync<CreateScheduleRequest>(
+        jsonOptions,
+        cancellationToken);
+
+    if (body is null)
+    {
+        return Results.BadRequest("Schedule data is required.");
+    }
+
+    var schedule = await scheduleService.CreateScheduleAsync(body, cancellationToken);
+    return Results.Ok(schedule);
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/sessions", async (
+    ClaimsPrincipal user,
+    HttpRequest request,
+    SessionService sessionService,
+    CancellationToken cancellationToken) =>
+{
+    var sessions = await sessionService.GetSessionsAsync(cancellationToken);
+    return Results.Ok(sessions);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/sessions", async (
+    ClaimsPrincipal user,
+    HttpRequest request,
+    SessionService sessionService,
+    CancellationToken cancellationToken) =>
+{
+    var body = await request.ReadFromJsonAsync<CreateSessionRequest>(
+        jsonOptions,
+        cancellationToken);
+
+    if (body is null)
+    {
+        return Results.BadRequest("Session data is required.");
+    }
+
+    var session = await sessionService.CreateSessionAsync(body, cancellationToken);
+    return Results.Ok(session);
 }).RequireAuthorization();
 
 app.MapGet("/api/worker/recordings/pending", async (

@@ -14,6 +14,10 @@ public sealed class Recording
 
     public Teacher? Teacher { get; set; }
 
+    public Guid? SessionId { get; set; }
+
+    public Session? Session { get; set; }
+
     public string FileName { get; set; } = string.Empty;
 
     public string StorageKey { get; set; } = string.Empty;

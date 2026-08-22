@@ -8,5 +8,8 @@ public interface IManagerTeacherAssignmentRepository
         Guid managerUserId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<ManagerTeacherAssignment>> GetAllWithDetailsAsync(
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(ManagerTeacherAssignment assignment, CancellationToken cancellationToken = default);
 }

@@ -21,6 +21,9 @@ builder.Services.AddScoped<DeviceService>();
 builder.Services.AddScoped<DeviceQueryService>();
 builder.Services.AddScoped<QaRuleService>();
 builder.Services.AddScoped<QaAlertService>();
+builder.Services.AddScoped<AdminUserService>();
+builder.Services.AddScoped<TeacherService>();
+builder.Services.AddScoped<ManagerAssignmentService>();
 
 builder.Services.AddSingleton(builder.Configuration["Storage:Bucket"] ?? "academy-recordings");
 
@@ -291,6 +294,123 @@ app.MapPost("/api/admin/qa-alerts", async (
         cancellationToken);
 
     return Results.Ok(new { created = true });
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/users", async (
+    HttpRequest request,
+    AdminUserService adminUserService,
+    CancellationToken cancellationToken) =>
+{
+    var users = await adminUserService.GetUsersAsync(cancellationToken);
+    return Results.Ok(users);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/users", async (
+    HttpRequest request,
+    AdminUserService adminUserService,
+    CancellationToken cancellationToken) =>
+{
+    var body = await request.ReadFromJsonAsync<CreateUserRequest>(
+        jsonOptions,
+        cancellationToken);
+
+    if (body is null || string.IsNullOrWhiteSpace(body.Email) || string.IsNullOrWhiteSpace(body.Password))
+    {
+        return Results.BadRequest("FullName, Email, and Password are required.");
+    }
+
+    try
+    {
+        var user = await adminUserService.CreateUserAsync(body, cancellationToken);
+        return Results.Ok(user);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+}).RequireAuthorization();
+
+app.MapPatch("/api/admin/users/{userId:guid}/status", async (
+    Guid userId,
+    bool isActive,
+    HttpRequest request,
+    AdminUserService adminUserService,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        await adminUserService.UpdateUserStatusAsync(userId, isActive, cancellationToken);
+        return Results.Ok(new { updated = true });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/teachers", async (
+    HttpRequest request,
+    TeacherService teacherService,
+    CancellationToken cancellationToken) =>
+{
+    var teachers = await teacherService.GetTeachersAsync(cancellationToken);
+    return Results.Ok(teachers);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/teachers", async (
+    HttpRequest request,
+    TeacherService teacherService,
+    CancellationToken cancellationToken) =>
+{
+    var body = await request.ReadFromJsonAsync<CreateTeacherRequest>(
+        jsonOptions,
+        cancellationToken);
+
+    if (body is null || string.IsNullOrWhiteSpace(body.FullName))
+    {
+        return Results.BadRequest("FullName is required.");
+    }
+
+    var teacher = await teacherService.CreateTeacherAsync(body, cancellationToken);
+    return Results.Ok(teacher);
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/manager-assignments", async (
+    HttpRequest request,
+    ManagerAssignmentService assignmentService,
+    CancellationToken cancellationToken) =>
+{
+    var assignments = await assignmentService.GetAssignmentsAsync(cancellationToken);
+    return Results.Ok(assignments);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/manager-assignments", async (
+    HttpRequest request,
+    ManagerAssignmentService assignmentService,
+    CancellationToken cancellationToken) =>
+{
+    var body = await request.ReadFromJsonAsync<CreateManagerAssignmentRequest>(
+        jsonOptions,
+        cancellationToken);
+
+    if (body is null || body.ManagerUserId == Guid.Empty || body.TeacherId == Guid.Empty)
+    {
+        return Results.BadRequest("ManagerUserId and TeacherId are required.");
+    }
+
+    try
+    {
+        await assignmentService.AssignTeacherAsync(
+            body.ManagerUserId,
+            body.TeacherId,
+            cancellationToken);
+
+        return Results.Ok(new { assigned = true });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { message = ex.Message });
+    }
 }).RequireAuthorization();
 
 app.MapGet("/api/worker/recordings/pending", async (

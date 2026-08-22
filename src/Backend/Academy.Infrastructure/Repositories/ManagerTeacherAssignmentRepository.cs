@@ -25,6 +25,16 @@ public sealed class ManagerTeacherAssignmentRepository : IManagerTeacherAssignme
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ManagerTeacherAssignment>> GetAllWithDetailsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.ManagerTeacherAssignments
+            .AsNoTracking()
+            .Include(x => x.ManagerUser)
+            .Include(x => x.Teacher)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(
         ManagerTeacherAssignment assignment,
         CancellationToken cancellationToken = default)

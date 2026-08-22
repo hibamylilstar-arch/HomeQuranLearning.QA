@@ -6,27 +6,27 @@ from datetime import datetime, timezone
 
 from faster_whisper import WhisperModel
 
-BACKEND_BASE_URL = "http://localhost:5100"
-WORKER_API_KEY = "local-dev-worker-key"
+BACKEND_BASE_URL = os.environ.get("BACKEND_BASE_URL", "http://localhost:5100")
+WORKER_API_KEY = os.environ.get("WORKER_API_KEY", "local-dev-worker-key")
 POLL_INTERVAL_SECONDS = 10
 
 
-def http_get_json(path):
+def http_get_json(path, api_key):
     request = urllib.request.Request(
         f"{BACKEND_BASE_URL}{path}",
-        headers={"X-Api-Key": WORKER_API_KEY},
+        headers={"X-Api-Key": api_key},
     )
     with urllib.request.urlopen(request) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
-def http_post_json(path, body):
+def http_post_json(path, body, api_key):
     data = json.dumps(body).encode("utf-8")
     request = urllib.request.Request(
         f"{BACKEND_BASE_URL}{path}",
         data=data,
         headers={
-            "X-Api-Key": WORKER_API_KEY,
+            "X-Api-Key": api_key,
             "Content-Type": "application/json",
         },
         method="POST",
@@ -43,11 +43,11 @@ def download_file(url, output_path):
 
 
 def get_pending_recordings():
-    return http_get_json("/api/worker/recordings/pending")
+    return http_get_json("/api/worker/recordings/pending", WORKER_API_KEY)
 
 
 def get_active_rules():
-    return http_get_json("/api/worker/qa-rules")
+    return http_get_json("/api/worker/qa-rules", WORKER_API_KEY)
 
 
 def create_alert(recording_id, matched_phrase, timestamp_utc):
@@ -58,6 +58,7 @@ def create_alert(recording_id, matched_phrase, timestamp_utc):
             "matchedPhrase": matched_phrase,
             "timestampUtc": timestamp_utc,
         },
+        WORKER_API_KEY,
     )
 
 
@@ -65,6 +66,7 @@ def mark_processed(recording_id):
     return http_post_json(
         f"/api/worker/recordings/{recording_id}/mark-qa-processed",
         {},
+        WORKER_API_KEY,
     )
 
 
@@ -122,6 +124,7 @@ def process_recording(recording):
 
 def main():
     print("QA worker started.")
+    print(f"Backend URL: {BACKEND_BASE_URL}")
     print(f"Polling every {POLL_INTERVAL_SECONDS} seconds...")
 
     while True:

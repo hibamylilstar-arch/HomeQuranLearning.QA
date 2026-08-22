@@ -1,0 +1,128 @@
+﻿services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: academy-postgres
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - academy
+
+  redis:
+    image: redis:7-alpine
+    container_name: academy-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - academy
+
+  minio:
+    image: minio/minio:latest
+    container_name: academy-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    env_file:
+      - .env.production
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - academy
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.api
+    container_name: academy-api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      AgentApiKey: ${AGENT_API_KEY}
+      WorkerApiKey: ${WORKER_API_KEY}
+      Storage__Endpoint: minio:9000
+      Storage__AccessKey: ${MINIO_ROOT_USER}
+      Storage__SecretKey: ${MINIO_ROOT_PASSWORD}
+      Storage__Bucket: ${MINIO_BUCKET}
+      Jwt__Issuer: HomeQuranLearning
+      Jwt__Audience: HomeQuranLearning.Dashboard
+      Jwt__SigningKey: ${JWT_SIGNING_KEY}
+      SeedOwner__FullName: Owner
+      SeedOwner__Email: ${SEED_OWNER_EMAIL}
+      SeedOwner__Password: ${SEED_OWNER_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks:
+      - academy
+
+  dashboard:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.dashboard
+    container_name: academy-dashboard
+    restart: unless-stopped
+    environment:
+      BACKEND_BASE_URL: http://api:8080
+      NODE_ENV: production
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+    networks:
+      - academy
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.worker
+    container_name: academy-qa-worker
+    restart: unless-stopped
+    environment:
+      BACKEND_BASE_URL: http://api:8080
+      WORKER_API_KEY: ${WORKER_API_KEY}
+      HF_HOME: /app/hf_cache
+    volumes:
+      - worker_hf_cache:/app/hf_cache
+    depends_on:
+      - api
+    networks:
+      - academy
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  worker_hf_cache:
+
+networks:
+  academy:
+    driver: bridge

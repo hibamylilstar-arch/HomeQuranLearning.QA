@@ -1,0 +1,22 @@
+﻿# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Copy backend project files
+COPY src/Backend/Academy.Domain/Academy.Domain.csproj src/Backend/Academy.Domain/
+COPY src/Backend/Academy.Application/Academy.Application.csproj src/Backend/Academy.Application/
+COPY src/Backend/Academy.Infrastructure/Academy.Infrastructure.csproj src/Backend/Academy.Infrastructure/
+COPY src/Backend/Academy.Api/Academy.Api.csproj src/Backend/Academy.Api/
+
+RUN dotnet restore src/Backend/Academy.Api/Academy.Api.csproj
+
+COPY src/Backend/ src/Backend/
+
+RUN dotnet publish src/Backend/Academy.Api/Academy.Api.csproj -c Release -o /app/publish --no-restore
+
+# Runtime stage
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "Academy.Api.dll"]

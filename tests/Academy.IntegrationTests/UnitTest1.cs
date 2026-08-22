@@ -22,7 +22,18 @@ public class IntegrationTestBase : IDisposable
     {
         _testDatabaseName = $"academy_test_{Guid.NewGuid():N}";
 
-        var adminConnectionString = "Host=localhost;Port=5433;Database=postgres;Username=academy;Password=AcademyLocalDev2026";
+        string adminConnectionString =
+            Environment.GetEnvironmentVariable("TEST_PG_ADMIN_CONNECTION")
+            ?? "Host=localhost;Port=5433;Database=postgres;Username=academy;Password=AcademyLocalDev2026";
+
+        string databaseHost =
+            Environment.GetEnvironmentVariable("TEST_PG_HOST")
+            ?? "localhost";
+
+        int databasePort =
+            int.TryParse(Environment.GetEnvironmentVariable("TEST_PG_PORT"), out int port)
+                ? port
+                : 5433;
 
         using (var adminConnection = new Npgsql.NpgsqlConnection(adminConnectionString))
         {
@@ -32,7 +43,8 @@ public class IntegrationTestBase : IDisposable
             cmd.ExecuteNonQuery();
         }
 
-        var connectionString = $"Host=localhost;Port=5433;Database={_testDatabaseName};Username=academy;Password=AcademyLocalDev2026";
+        var connectionString =
+            $"Host={databaseHost};Port={databasePort};Database={_testDatabaseName};Username=academy;Password=AcademyLocalDev2026";
 
         var configBuilder = new ConfigurationBuilder();
         configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
@@ -53,7 +65,10 @@ public class IntegrationTestBase : IDisposable
     {
         DbContext.Dispose();
 
-        var adminConnectionString = "Host=localhost;Port=5433;Database=postgres;Username=academy;Password=AcademyLocalDev2026";
+        string adminConnectionString =
+            Environment.GetEnvironmentVariable("TEST_PG_ADMIN_CONNECTION")
+            ?? "Host=localhost;Port=5433;Database=postgres;Username=academy;Password=AcademyLocalDev2026";
+
         using var adminConnection = new Npgsql.NpgsqlConnection(adminConnectionString);
         adminConnection.Open();
         using var cmd = adminConnection.CreateCommand();

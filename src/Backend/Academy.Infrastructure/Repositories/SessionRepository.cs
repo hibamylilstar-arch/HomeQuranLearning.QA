@@ -1,5 +1,6 @@
 using Academy.Application.Abstractions;
 using Academy.Domain.Entities;
+using Academy.Domain.Enums;
 using Academy.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -46,6 +47,28 @@ public sealed class SessionRepository : ISessionRepository
             .Where(x => x.EndedAtUtc == null || x.EndedAtUtc >= timestampUtc)
             .OrderByDescending(x => x.StartedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<Session?> GetActiveSessionForScheduleAsync(
+        Guid scheduleId,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Sessions
+            .AsNoTracking()
+            .Where(x => x.ScheduleId == scheduleId)
+            .Where(x => x.Status == SessionStatus.Live)
+            .Where(x => x.StartedAtUtc <= nowUtc)
+            .Where(x => x.EndedAtUtc == null || x.EndedAtUtc >= nowUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Session>> GetLiveSessionsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Sessions
+            .Where(x => x.Status == SessionStatus.Live)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task AddAsync(Session session, CancellationToken cancellationToken = default)

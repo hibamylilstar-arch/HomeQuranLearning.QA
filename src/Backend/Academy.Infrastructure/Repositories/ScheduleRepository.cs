@@ -34,6 +34,19 @@ public sealed class ScheduleRepository : IScheduleRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Schedule>> GetActiveSchedulesForNowAsync(
+        DayOfWeek day,
+        TimeSpan time,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Schedules
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Where(x => x.DayOfWeek == day)
+            .Where(x => x.StartTime <= time && x.EndTime >= time)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Schedule schedule, CancellationToken cancellationToken = default)
     {
         await _dbContext.Schedules.AddAsync(schedule, cancellationToken);

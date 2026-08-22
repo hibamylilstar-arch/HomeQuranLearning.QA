@@ -13,4 +13,7 @@
     <Project Path="src/Backend/Academy.Domain/Academy.Domain.csproj" />
     <Project Path="src/Backend/Academy.Infrastructure/Academy.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Academy.UnitTests/Academy.UnitTests.csproj" />
+  </Folder>
 </Solution>

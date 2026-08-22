@@ -30,6 +30,8 @@ builder.Services.AddScoped<CourseService>();
 builder.Services.AddScoped<ScheduleService>();
 builder.Services.AddScoped<SessionService>();
 
+builder.Services.AddHostedService<Academy.Api.SessionSchedulerWorker>();
+
 builder.Services.AddSingleton(builder.Configuration["Storage:Bucket"] ?? "academy-recordings");
 
 builder.Services.AddScoped<RecordingService>(sp =>

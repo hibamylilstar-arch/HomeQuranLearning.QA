@@ -10,6 +10,11 @@ public interface ISessionRepository
         Guid deviceId,
         DateTimeOffset timestampUtc,
         CancellationToken cancellationToken = default);
+    Task<Session?> GetActiveSessionForScheduleAsync(
+        Guid scheduleId,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Session>> GetLiveSessionsAsync(CancellationToken cancellationToken = default);
     Task AddAsync(Session session, CancellationToken cancellationToken = default);
     void Update(Session session);
 }

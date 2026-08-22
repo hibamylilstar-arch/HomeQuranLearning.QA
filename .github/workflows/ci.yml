@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Full Solution Build
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore HomeQuranLearning.QA.slnx
+
+      - name: Build
+        run: dotnet build HomeQuranLearning.QA.slnx --no-restore
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore tests/Academy.UnitTests/Academy.UnitTests.csproj
+
+      - name: Run Unit Tests
+        run: dotnet test tests/Academy.UnitTests/Academy.UnitTests.csproj --no-restore
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: academy
+          POSTGRES_PASSWORD: AcademyLocalDev2026
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U academy -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_PG_ADMIN_CONNECTION: Host=localhost;Port=5432;Database=postgres;Username=academy;Password=AcademyLocalDev2026
+      TEST_PG_HOST: localhost
+      TEST_PG_PORT: 5432
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore tests/Academy.IntegrationTests/Academy.IntegrationTests.csproj
+
+      - name: Run Integration Tests
+        run: dotnet test tests/Academy.IntegrationTests/Academy.IntegrationTests.csproj --no-restore

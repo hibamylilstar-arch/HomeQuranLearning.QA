@@ -29,10 +29,17 @@ builder.Services.AddScoped<StudentService>();
 builder.Services.AddScoped<CourseService>();
 builder.Services.AddScoped<ScheduleService>();
 builder.Services.AddScoped<SessionService>();
+builder.Services.AddScoped<LiveKitTokenService>();
 
 builder.Services.AddHostedService<Academy.Api.SessionSchedulerWorker>();
 
 builder.Services.AddSingleton(builder.Configuration["Storage:Bucket"] ?? "academy-recordings");
+
+var liveKitOptions = builder.Configuration
+    .GetSection("LiveKit")
+    .Get<LiveKitOptions>() ?? new LiveKitOptions();
+
+builder.Services.AddSingleton(liveKitOptions);
 
 builder.Services.AddScoped<RecordingService>(sp =>
 {
@@ -553,6 +560,34 @@ app.MapPost("/api/admin/sessions", async (
 
     var session = await sessionService.CreateSessionAsync(body, cancellationToken);
     return Results.Ok(session);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/livekit/token", async (
+    ClaimsPrincipal user,
+    HttpRequest request,
+    LiveKitTokenService liveKitTokenService,
+    CancellationToken cancellationToken) =>
+{
+    var body = await request.ReadFromJsonAsync<LiveKitTokenRequest>(
+        jsonOptions,
+        cancellationToken);
+
+    if (body is null || string.IsNullOrWhiteSpace(body.RoomName) || string.IsNullOrWhiteSpace(body.Identity))
+    {
+        return Results.BadRequest("RoomName and Identity are required.");
+    }
+
+    var token = liveKitTokenService.GenerateToken(
+        body.RoomName,
+        body.Identity,
+        body.CanPublish,
+        body.CanSubscribe);
+
+    return Results.Ok(new
+    {
+        url = liveKitTokenService.Host,
+        token = token
+    });
 }).RequireAuthorization();
 
 app.MapGet("/api/worker/recordings/pending", async (

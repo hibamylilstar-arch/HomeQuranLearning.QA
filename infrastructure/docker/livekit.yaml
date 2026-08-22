@@ -7,7 +7,7 @@ rtc:
   use_external_ip: false
 
 keys:
-  devkey: devsecret
+  devkey: dev-secret-key-for-livekit-change-me-1234567890
 
 logging:
   level: info

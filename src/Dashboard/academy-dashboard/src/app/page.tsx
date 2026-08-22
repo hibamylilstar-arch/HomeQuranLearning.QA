@@ -3,26 +3,58 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getDevices, getRecordings } from "@/lib/api";
+import { useAuth } from "@/components/AuthProvider";
 import type { DeviceListItem, RecordingListItem } from "@/types";
 
 export default function OverviewPage() {
+  const { user, loading: authLoading } = useAuth();
   const [devices, setDevices] = useState<DeviceListItem[]>([]);
   const [recordings, setRecordings] = useState<RecordingListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
     Promise.all([getDevices(), getRecordings()])
       .then(([d, r]) => {
         setDevices(d);
         setRecordings(r);
       })
-      .catch((err) => setError(err.message))
+      .catch(() => {
+        setDevices([]);
+        setRecordings([]);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [user]);
 
-  if (loading) return <p className="text-slate-500">Loading...</p>;
-  if (error) return <p className="text-red-600">{error}</p>;
+  if (authLoading || loading) {
+    return <p className="text-slate-500">Loading...</p>;
+  }
+
+  if (!user) {
+    return (
+      <div className="mx-auto max-w-xl text-center space-y-6">
+        <h2 className="text-3xl font-semibold">HomeQuranLearning QA</h2>
+        <p className="text-slate-600">
+          Welcome to the private teacher monitoring and QA dashboard.
+        </p>
+        <p className="text-slate-500">
+          Please sign in to view devices, recordings, and QA alerts.
+        </p>
+        <Link
+          href="/login"
+          className="inline-block rounded-lg bg-slate-900 px-6 py-3 text-sm font-medium text-white hover:bg-slate-700"
+        >
+          Login
+        </Link>
+      </div>
+    );
+  }
 
   const onlineDevices = devices.filter((d) => d.status === "Online").length;
 

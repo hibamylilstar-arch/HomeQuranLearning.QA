@@ -12,25 +12,15 @@ import type {
   SessionListItem,
 } from "@/types";
 
-const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5100";
-
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem("auth_token");
-}
-
-async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getToken();
-
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
-
-  const res = await fetch(`${backendBaseUrl}${path}`, {
+async function proxyFetch<T>(
+  pathSegments: string[],
+  init?: RequestInit
+): Promise<T> {
+  const res = await fetch(`/api/proxy/${pathSegments.join("/")}`, {
     ...init,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
       ...(init?.headers ?? {}),
     },
   });
@@ -43,30 +33,32 @@ async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function getDevices(): Promise<DeviceListItem[]> {
-  return authFetch<DeviceListItem[]>("/api/admin/devices");
+  return proxyFetch<DeviceListItem[]>(["devices"]);
 }
 
 export async function getRecordings(): Promise<RecordingListItem[]> {
-  return authFetch<RecordingListItem[]>("/api/admin/recordings");
+  return proxyFetch<RecordingListItem[]>(["recordings"]);
 }
 
 export async function getQaRules(): Promise<QaRuleListItem[]> {
-  return authFetch<QaRuleListItem[]>("/api/admin/qa-rules");
+  return proxyFetch<QaRuleListItem[]>(["qa-rules"]);
 }
 
 export async function getQaAlerts(): Promise<QaAlertListItem[]> {
-  return authFetch<QaAlertListItem[]>("/api/admin/qa-alerts");
+  return proxyFetch<QaAlertListItem[]>(["qa-alerts"]);
 }
 
 export async function getPlaybackUrl(recordingId: string): Promise<string> {
-  const data = await authFetch<{ url: string }>(
-    `/api/admin/recordings/${recordingId}/playback-url`
-  );
+  const data = await proxyFetch<{ url: string }>([
+    "recordings",
+    recordingId,
+    "playback-url",
+  ]);
   return data.url;
 }
 
 export async function getUsers(): Promise<UserListItem[]> {
-  return authFetch<UserListItem[]>("/api/admin/users");
+  return proxyFetch<UserListItem[]>(["users"]);
 }
 
 export async function createUser(
@@ -76,14 +68,14 @@ export async function createUser(
   role: string,
   isActive: boolean
 ): Promise<UserListItem> {
-  return authFetch<UserListItem>("/api/admin/users", {
+  return proxyFetch<UserListItem>(["users"], {
     method: "POST",
     body: JSON.stringify({ fullName, email, password, role, isActive }),
   });
 }
 
 export async function getTeachers(): Promise<TeacherListItem[]> {
-  return authFetch<TeacherListItem[]>("/api/admin/teachers");
+  return proxyFetch<TeacherListItem[]>(["teachers"]);
 }
 
 export async function createTeacher(
@@ -91,28 +83,28 @@ export async function createTeacher(
   email: string,
   phone: string
 ): Promise<TeacherListItem> {
-  return authFetch<TeacherListItem>("/api/admin/teachers", {
+  return proxyFetch<TeacherListItem>(["teachers"], {
     method: "POST",
     body: JSON.stringify({ fullName, email, phone }),
   });
 }
 
 export async function getManagerAssignments(): Promise<ManagerAssignmentListItem[]> {
-  return authFetch<ManagerAssignmentListItem[]>("/api/admin/manager-assignments");
+  return proxyFetch<ManagerAssignmentListItem[]>(["manager-assignments"]);
 }
 
 export async function createManagerAssignment(
   managerUserId: string,
   teacherId: string
 ): Promise<{ assigned: boolean }> {
-  return authFetch<{ assigned: boolean }>("/api/admin/manager-assignments", {
+  return proxyFetch<{ assigned: boolean }>(["manager-assignments"], {
     method: "POST",
     body: JSON.stringify({ managerUserId, teacherId }),
   });
 }
 
 export async function getStudents(): Promise<StudentListItem[]> {
-  return authFetch<StudentListItem[]>("/api/admin/students");
+  return proxyFetch<StudentListItem[]>(["students"]);
 }
 
 export async function createStudent(
@@ -121,28 +113,28 @@ export async function createStudent(
   phone: string,
   assignedTeacherId: string | null
 ): Promise<StudentListItem> {
-  return authFetch<StudentListItem>("/api/admin/students", {
+  return proxyFetch<StudentListItem>(["students"], {
     method: "POST",
     body: JSON.stringify({ fullName, email, phone, assignedTeacherId }),
   });
 }
 
 export async function getCourses(): Promise<CourseListItem[]> {
-  return authFetch<CourseListItem[]>("/api/admin/courses");
+  return proxyFetch<CourseListItem[]>(["courses"]);
 }
 
 export async function createCourse(
   name: string,
   description: string
 ): Promise<CourseListItem> {
-  return authFetch<CourseListItem>("/api/admin/courses", {
+  return proxyFetch<CourseListItem>(["courses"], {
     method: "POST",
     body: JSON.stringify({ name, description }),
   });
 }
 
 export async function getSchedules(): Promise<ScheduleListItem[]> {
-  return authFetch<ScheduleListItem[]>("/api/admin/schedules");
+  return proxyFetch<ScheduleListItem[]>(["schedules"]);
 }
 
 export async function createSchedule(
@@ -154,14 +146,14 @@ export async function createSchedule(
   startTime: string,
   endTime: string
 ): Promise<ScheduleListItem> {
-  return authFetch<ScheduleListItem>("/api/admin/schedules", {
+  return proxyFetch<ScheduleListItem>(["schedules"], {
     method: "POST",
     body: JSON.stringify({ teacherId, studentId, courseId, deviceId, dayOfWeek, startTime, endTime }),
   });
 }
 
 export async function getSessions(): Promise<SessionListItem[]> {
-  return authFetch<SessionListItem[]>("/api/admin/sessions");
+  return proxyFetch<SessionListItem[]>(["sessions"]);
 }
 
 export async function createSession(
@@ -172,7 +164,7 @@ export async function createSession(
   startedAtUtc: string,
   endedAtUtc: string | null
 ): Promise<SessionListItem> {
-  return authFetch<SessionListItem>("/api/admin/sessions", {
+  return proxyFetch<SessionListItem>(["sessions"], {
     method: "POST",
     body: JSON.stringify({ teacherId, studentId, courseId, deviceId, startedAtUtc, endedAtUtc }),
   });

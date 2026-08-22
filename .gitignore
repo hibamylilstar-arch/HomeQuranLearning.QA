@@ -44,6 +44,7 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # OS files
 Thumbs.db

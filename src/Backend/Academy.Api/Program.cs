@@ -36,6 +36,7 @@ builder.Services.AddScoped<RecordingService>(sp =>
 {
     var recordingRepository = sp.GetRequiredService<IRecordingRepository>();
     var deviceRepository = sp.GetRequiredService<IDeviceRepository>();
+    var sessionRepository = sp.GetRequiredService<ISessionRepository>();
     var storageService = sp.GetRequiredService<IStorageService>();
     var unitOfWork = sp.GetRequiredService<IUnitOfWork>();
     var bucketName = sp.GetRequiredService<string>();
@@ -43,6 +44,7 @@ builder.Services.AddScoped<RecordingService>(sp =>
     return new RecordingService(
         recordingRepository,
         deviceRepository,
+        sessionRepository,
         storageService,
         unitOfWork,
         bucketName);

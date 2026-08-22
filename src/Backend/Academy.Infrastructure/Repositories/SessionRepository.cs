@@ -34,6 +34,20 @@ public sealed class SessionRepository : ISessionRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<Session?> GetActiveSessionForDeviceAsync(
+        Guid deviceId,
+        DateTimeOffset timestampUtc,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Sessions
+            .AsNoTracking()
+            .Where(x => x.DeviceId == deviceId)
+            .Where(x => x.StartedAtUtc <= timestampUtc)
+            .Where(x => x.EndedAtUtc == null || x.EndedAtUtc >= timestampUtc)
+            .OrderByDescending(x => x.StartedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Session session, CancellationToken cancellationToken = default)
     {
         await _dbContext.Sessions.AddAsync(session, cancellationToken);

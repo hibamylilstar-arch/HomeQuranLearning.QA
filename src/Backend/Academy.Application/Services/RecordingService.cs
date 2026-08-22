@@ -9,6 +9,7 @@ public sealed class RecordingService
 {
     private readonly IRecordingRepository _recordingRepository;
     private readonly IDeviceRepository _deviceRepository;
+    private readonly ISessionRepository _sessionRepository;
     private readonly IStorageService _storageService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly string _bucketName;
@@ -16,12 +17,14 @@ public sealed class RecordingService
     public RecordingService(
         IRecordingRepository recordingRepository,
         IDeviceRepository deviceRepository,
+        ISessionRepository sessionRepository,
         IStorageService storageService,
         IUnitOfWork unitOfWork,
         string bucketName)
     {
         _recordingRepository = recordingRepository;
         _deviceRepository = deviceRepository;
+        _sessionRepository = sessionRepository;
         _storageService = storageService;
         _unitOfWork = unitOfWork;
         _bucketName = bucketName;
@@ -52,6 +55,18 @@ public sealed class RecordingService
             CreatedAtUtc = DateTimeOffset.UtcNow,
             UpdatedAtUtc = DateTimeOffset.UtcNow
         };
+
+        // Resolve active session for this device at the recording start time.
+        var activeSession = await _sessionRepository.GetActiveSessionForDeviceAsync(
+            device.Id,
+            request.StartedAtUtc,
+            cancellationToken);
+
+        if (activeSession is not null)
+        {
+            recording.SessionId = activeSession.Id;
+            recording.TeacherId = activeSession.TeacherId;
+        }
 
         await _recordingRepository.AddAsync(recording, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

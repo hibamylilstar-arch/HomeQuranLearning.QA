@@ -156,6 +156,10 @@ export async function getSessions(): Promise<SessionListItem[]> {
   return proxyFetch<SessionListItem[]>(["sessions"]);
 }
 
+export async function getLiveSessions(): Promise<SessionListItem[]> {
+  return proxyFetch<SessionListItem[]>(["live-sessions"]);
+}
+
 export async function createSession(
   teacherId: string,
   studentId: string,
@@ -167,5 +171,17 @@ export async function createSession(
   return proxyFetch<SessionListItem>(["sessions"], {
     method: "POST",
     body: JSON.stringify({ teacherId, studentId, courseId, deviceId, startedAtUtc, endedAtUtc }),
+  });
+}
+
+export async function getLiveKitToken(
+  roomName: string,
+  identity: string,
+  canPublish: boolean,
+  canSubscribe: boolean
+): Promise<{ url: string; token: string }> {
+  return proxyFetch<{ url: string; token: string }>(["livekit", "token"], {
+    method: "POST",
+    body: JSON.stringify({ roomName, identity, canPublish, canSubscribe }),
   });
 }

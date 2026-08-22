@@ -543,6 +543,16 @@ app.MapGet("/api/admin/sessions", async (
     return Results.Ok(sessions);
 }).RequireAuthorization();
 
+app.MapGet("/api/admin/live-sessions", async (
+    ClaimsPrincipal user,
+    HttpRequest request,
+    SessionService sessionService,
+    CancellationToken cancellationToken) =>
+{
+    var sessions = await sessionService.GetLiveSessionsAsync(cancellationToken);
+    return Results.Ok(sessions);
+}).RequireAuthorization();
+
 app.MapPost("/api/admin/sessions", async (
     ClaimsPrincipal user,
     HttpRequest request,

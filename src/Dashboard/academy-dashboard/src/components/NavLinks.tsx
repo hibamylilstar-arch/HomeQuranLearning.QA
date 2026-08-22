@@ -30,6 +30,9 @@ export default function NavLinks() {
       <Link href="/" className="rounded-md px-3 py-2 hover:bg-slate-100">
         Overview
       </Link>
+      <Link href="/live" className="rounded-md px-3 py-2 hover:bg-slate-100">
+        Live
+      </Link>
       <Link href="/devices" className="rounded-md px-3 py-2 hover:bg-slate-100">
         Devices
       </Link>

@@ -20,25 +20,14 @@ public sealed class SessionService
     {
         var sessions = await _sessionRepository.GetAllWithDetailsAsync(cancellationToken);
 
-        return sessions
-            .OrderByDescending(x => x.StartedAtUtc)
-            .Select(x => new SessionDto
-            {
-                Id = x.Id,
-                ScheduleId = x.ScheduleId,
-                TeacherId = x.TeacherId,
-                TeacherFullName = x.Teacher?.FullName ?? string.Empty,
-                StudentId = x.StudentId,
-                StudentFullName = x.Student?.FullName ?? string.Empty,
-                CourseId = x.CourseId,
-                CourseName = x.Course?.Name ?? string.Empty,
-                DeviceId = x.DeviceId,
-                DeviceName = x.Device?.DeviceName ?? string.Empty,
-                StartedAtUtc = x.StartedAtUtc,
-                EndedAtUtc = x.EndedAtUtc,
-                Status = x.Status.ToString()
-            })
-            .ToList();
+        return MapSessions(sessions);
+    }
+
+    public async Task<IReadOnlyList<SessionDto>> GetLiveSessionsAsync(CancellationToken cancellationToken = default)
+    {
+        var sessions = await _sessionRepository.GetAllWithDetailsAsync(cancellationToken);
+
+        return MapSessions(sessions.Where(x => x.Status == SessionStatus.Live));
     }
 
     public async Task<SessionDto> CreateSessionAsync(
@@ -73,5 +62,28 @@ public sealed class SessionService
             EndedAtUtc = session.EndedAtUtc,
             Status = session.Status.ToString()
         };
+    }
+
+    private static IReadOnlyList<SessionDto> MapSessions(IEnumerable<Session> sessions)
+    {
+        return sessions
+            .OrderByDescending(x => x.StartedAtUtc)
+            .Select(x => new SessionDto
+            {
+                Id = x.Id,
+                ScheduleId = x.ScheduleId,
+                TeacherId = x.TeacherId,
+                TeacherFullName = x.Teacher?.FullName ?? string.Empty,
+                StudentId = x.StudentId,
+                StudentFullName = x.Student?.FullName ?? string.Empty,
+                CourseId = x.CourseId,
+                CourseName = x.Course?.Name ?? string.Empty,
+                DeviceId = x.DeviceId,
+                DeviceName = x.Device?.DeviceName ?? string.Empty,
+                StartedAtUtc = x.StartedAtUtc,
+                EndedAtUtc = x.EndedAtUtc,
+                Status = x.Status.ToString()
+            })
+            .ToList();
     }
 }

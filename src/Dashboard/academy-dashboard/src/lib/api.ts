@@ -3,6 +3,9 @@ import type {
   RecordingListItem,
   QaRuleListItem,
   QaAlertListItem,
+  UserListItem,
+  TeacherListItem,
+  ManagerAssignmentListItem,
 } from "@/types";
 
 const backendBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5100";
@@ -56,4 +59,50 @@ export async function getPlaybackUrl(recordingId: string): Promise<string> {
     `/api/admin/recordings/${recordingId}/playback-url`
   );
   return data.url;
+}
+
+export async function getUsers(): Promise<UserListItem[]> {
+  return authFetch<UserListItem[]>("/api/admin/users");
+}
+
+export async function createUser(
+  fullName: string,
+  email: string,
+  password: string,
+  role: string,
+  isActive: boolean
+): Promise<UserListItem> {
+  return authFetch<UserListItem>("/api/admin/users", {
+    method: "POST",
+    body: JSON.stringify({ fullName, email, password, role, isActive }),
+  });
+}
+
+export async function getTeachers(): Promise<TeacherListItem[]> {
+  return authFetch<TeacherListItem[]>("/api/admin/teachers");
+}
+
+export async function createTeacher(
+  fullName: string,
+  email: string,
+  phone: string
+): Promise<TeacherListItem> {
+  return authFetch<TeacherListItem>("/api/admin/teachers", {
+    method: "POST",
+    body: JSON.stringify({ fullName, email, phone }),
+  });
+}
+
+export async function getManagerAssignments(): Promise<ManagerAssignmentListItem[]> {
+  return authFetch<ManagerAssignmentListItem[]>("/api/admin/manager-assignments");
+}
+
+export async function createManagerAssignment(
+  managerUserId: string,
+  teacherId: string
+): Promise<{ assigned: boolean }> {
+  return authFetch<{ assigned: boolean }>("/api/admin/manager-assignments", {
+    method: "POST",
+    body: JSON.stringify({ managerUserId, teacherId }),
+  });
 }

@@ -34,3 +34,27 @@ export interface QaAlertListItem {
   status: string;
   rulePhrase?: string | null;
 }
+
+export interface UserListItem {
+  id: string;
+  fullName: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+}
+
+export interface TeacherListItem {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+}
+
+export interface ManagerAssignmentListItem {
+  id: string;
+  managerUserId: string;
+  teacherId: string;
+  managerFullName: string;
+  teacherFullName: string;
+  assignedAtUtc: string;
+}

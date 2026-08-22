@@ -74,5 +74,4 @@ __pycache__/
 spikes/SttSpike/sample.wav
 
 # QA worker generated test files
-spikes/SttSpike/sample_speech.mp4
-spikes/SttSpike/download.mp4
+spikes/SttSpike/*.mp4

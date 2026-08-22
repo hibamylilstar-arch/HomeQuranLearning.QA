@@ -11,17 +11,20 @@ public sealed class DashboardQueryService
     private readonly IQaAlertRepository _qaAlertRepository;
     private readonly IDeviceRepository _deviceRepository;
     private readonly IManagerTeacherAssignmentRepository _assignmentRepository;
+    private readonly ISessionRepository _sessionRepository;
 
     public DashboardQueryService(
         IRecordingRepository recordingRepository,
         IQaAlertRepository qaAlertRepository,
         IDeviceRepository deviceRepository,
-        IManagerTeacherAssignmentRepository assignmentRepository)
+        IManagerTeacherAssignmentRepository assignmentRepository,
+        ISessionRepository sessionRepository)
     {
         _recordingRepository = recordingRepository;
         _qaAlertRepository = qaAlertRepository;
         _deviceRepository = deviceRepository;
         _assignmentRepository = assignmentRepository;
+        _sessionRepository = sessionRepository;
     }
 
     public async Task<IReadOnlyList<RecordingListItem>> GetVisibleRecordingsAsync(
@@ -94,7 +97,20 @@ public sealed class DashboardQueryService
     {
         var devices = await _deviceRepository.GetAllAsync(cancellationToken);
 
-        // TODO: Once Session/Device-Teacher relationship exists, filter devices for Managers.
+        if (role == UserRole.Manager.ToString())
+        {
+            var teacherIds = await GetAssignedTeacherIdsAsync(userId, cancellationToken);
+
+            var visibleDeviceIds = (await _sessionRepository.GetAllWithDetailsAsync(cancellationToken))
+                .Where(s => teacherIds.Contains(s.TeacherId))
+                .Select(s => s.DeviceId)
+                .ToHashSet();
+
+            devices = devices
+                .Where(d => visibleDeviceIds.Contains(d.Id))
+                .ToList();
+        }
+
         return devices
             .OrderByDescending(x => x.LastSeenUtc)
             .Select(x => new DeviceListItem

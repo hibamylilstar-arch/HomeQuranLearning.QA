@@ -165,6 +165,36 @@ app.MapPost("/api/agent/heartbeat", async (
     return Results.Ok(response);
 });
 
+app.MapGet("/api/agent/sessions/active-stream", async (
+    HttpRequest request,
+    SessionService sessionService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != agentApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!request.Query.TryGetValue("deviceId", out var deviceIdValue) ||
+        !Guid.TryParse(deviceIdValue.ToString(), out Guid deviceId))
+    {
+        return Results.BadRequest("deviceId is required.");
+    }
+
+    var info = await sessionService.GetAgentLiveStreamInfoAsync(deviceId, cancellationToken);
+
+    return info is null
+        ? Results.Ok(new { hasStream = false })
+        : Results.Ok(new
+        {
+            hasStream = true,
+            sessionId = info.SessionId,
+            roomName = info.RoomName,
+            streamKey = info.StreamKey
+        });
+});
+
 app.MapPost("/api/agent/recordings", async (
     HttpRequest request,
     RecordingSubmittedRequest body,

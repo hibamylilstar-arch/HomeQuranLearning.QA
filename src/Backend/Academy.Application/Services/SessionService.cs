@@ -45,6 +45,28 @@ public sealed class SessionService
             .ToList();
     }
 
+    public async Task<AgentLiveStreamInfo?> GetAgentLiveStreamInfoAsync(
+        Guid deviceId,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await _sessionRepository.GetActiveSessionForDeviceAsync(
+            deviceId,
+            DateTimeOffset.UtcNow,
+            cancellationToken);
+
+        if (session is null || string.IsNullOrWhiteSpace(session.LiveKitStreamKey))
+        {
+            return null;
+        }
+
+        return new AgentLiveStreamInfo
+        {
+            SessionId = session.Id,
+            RoomName = $"session-{session.Id}",
+            StreamKey = session.LiveKitStreamKey
+        };
+    }
+
     public async Task<SessionDto> CreateSessionAsync(
         CreateSessionRequest request,
         CancellationToken cancellationToken = default)

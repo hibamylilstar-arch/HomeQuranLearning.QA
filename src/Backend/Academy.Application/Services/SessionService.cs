@@ -64,6 +64,23 @@ public sealed class SessionService
         };
     }
 
+    public async Task UpdateLiveKitIngressAsync(
+        Guid sessionId,
+        string ingressId,
+        string streamKey,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await _sessionRepository.GetByIdAsync(sessionId, cancellationToken)
+            ?? throw new InvalidOperationException("Session not found.");
+
+        session.LiveKitIngressId = ingressId;
+        session.LiveKitStreamKey = streamKey;
+        session.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+        _sessionRepository.Update(session);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
     private static IReadOnlyList<SessionDto> MapSessions(IEnumerable<Session> sessions)
     {
         return sessions

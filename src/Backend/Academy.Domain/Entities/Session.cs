@@ -32,6 +32,10 @@ public sealed class Session
 
     public SessionStatus Status { get; set; } = SessionStatus.Scheduled;
 
+    public string? LiveKitIngressId { get; set; }
+
+    public string? LiveKitStreamKey { get; set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public DateTimeOffset UpdatedAtUtc { get; set; }

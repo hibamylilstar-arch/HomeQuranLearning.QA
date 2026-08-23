@@ -609,6 +609,28 @@ app.MapGet("/api/admin/livekit/server-token", async (
     return Results.Ok(new { token });
 }).RequireAuthorization();
 
+app.MapPost("/api/worker/sessions/{sessionId:guid}/livekit-ingress", async (
+    HttpRequest request,
+    Guid sessionId,
+    UpdateSessionLiveKitIngressRequest body,
+    SessionService sessionService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (body is null || string.IsNullOrWhiteSpace(body.IngressId) || string.IsNullOrWhiteSpace(body.StreamKey))
+    {
+        return Results.BadRequest("IngressId and StreamKey are required.");
+    }
+
+    await sessionService.UpdateLiveKitIngressAsync(sessionId, body.IngressId, body.StreamKey, cancellationToken);
+    return Results.Ok(new { updated = true });
+});
+
 app.MapGet("/api/worker/recordings/pending", async (
     HttpRequest request,
     RecordingService recordingService,

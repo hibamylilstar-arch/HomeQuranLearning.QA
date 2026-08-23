@@ -609,6 +609,21 @@ app.MapGet("/api/admin/livekit/server-token", async (
     return Results.Ok(new { token });
 }).RequireAuthorization();
 
+app.MapGet("/api/worker/sessions/pending-livekit-ingress", async (
+    HttpRequest request,
+    SessionService sessionService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var pending = await sessionService.GetPendingLiveKitIngressAsync(cancellationToken);
+    return Results.Ok(pending);
+});
+
 app.MapPost("/api/worker/sessions/{sessionId:guid}/livekit-ingress", async (
     HttpRequest request,
     Guid sessionId,

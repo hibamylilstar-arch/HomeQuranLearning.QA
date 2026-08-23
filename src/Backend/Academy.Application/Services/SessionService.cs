@@ -30,6 +30,21 @@ public sealed class SessionService
         return MapSessions(sessions.Where(x => x.Status == SessionStatus.Live));
     }
 
+    public async Task<IReadOnlyList<PendingLiveKitIngressDto>> GetPendingLiveKitIngressAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var sessions = await _sessionRepository.GetAllWithDetailsAsync(cancellationToken);
+
+        return sessions
+            .Where(x => x.Status == SessionStatus.Live && string.IsNullOrWhiteSpace(x.LiveKitStreamKey))
+            .Select(x => new PendingLiveKitIngressDto
+            {
+                SessionId = x.Id,
+                RoomName = $"session-{x.Id}"
+            })
+            .ToList();
+    }
+
     public async Task<SessionDto> CreateSessionAsync(
         CreateSessionRequest request,
         CancellationToken cancellationToken = default)

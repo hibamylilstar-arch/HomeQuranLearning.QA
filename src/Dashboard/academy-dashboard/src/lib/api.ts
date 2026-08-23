@@ -185,3 +185,10 @@ export async function getLiveKitToken(
     body: JSON.stringify({ roomName, identity, canPublish, canSubscribe }),
   });
 }
+
+export async function createQaRule(phrase: string, severity: string, isActive: boolean): Promise<QaRuleListItem> {
+  return proxyFetch<QaRuleListItem>(['qa-rules'], {
+    method: 'POST',
+    body: JSON.stringify({ phrase, severity, isActive }),
+  });
+}

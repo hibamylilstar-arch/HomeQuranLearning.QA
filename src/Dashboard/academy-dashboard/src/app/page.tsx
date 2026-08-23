@@ -1,94 +1,103 @@
-"use client";
+﻿"use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getDevices, getRecordings } from "@/lib/api";
-import { useAuth } from "@/components/AuthProvider";
-import type { DeviceListItem, RecordingListItem } from "@/types";
+import { getDevices, getRecordings, getQaRules } from "@/lib/api";
+import Link from "next/link";
 
 export default function OverviewPage() {
-  const { user, loading: authLoading } = useAuth();
-  const [devices, setDevices] = useState<DeviceListItem[]>([]);
-  const [recordings, setRecordings] = useState<RecordingListItem[]>([]);
+  const [deviceCount, setDeviceCount] = useState(0);
+  const [onlineCount, setOnlineCount] = useState(0);
+  const [recordingCount, setRecordingCount] = useState(0);
+  const [ruleCount, setRuleCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
+    async function loadStats() {
+      try {
+        const [devices, recordings, rules] = await Promise.all([
+          getDevices().catch(() => []),
+          getRecordings().catch(() => []),
+          getQaRules().catch(() => []),
+        ]);
+
+        setDeviceCount(devices.length);
+        setOnlineCount(devices.filter((d: any) => d.isOnline || d.status === "Online").length);
+        setRecordingCount(recordings.length);
+        setRuleCount(rules.length);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     }
-
-    setLoading(true);
-
-    Promise.all([getDevices(), getRecordings()])
-      .then(([d, r]) => {
-        setDevices(d);
-        setRecordings(r);
-      })
-      .catch(() => {
-        setDevices([]);
-        setRecordings([]);
-      })
-      .finally(() => setLoading(false));
-  }, [user]);
-
-  if (authLoading || loading) {
-    return <p className="text-slate-500">Loading...</p>;
-  }
-
-  if (!user) {
-    return (
-      <div className="mx-auto max-w-xl text-center space-y-6">
-        <h2 className="text-3xl font-semibold">HomeQuranLearning QA</h2>
-        <p className="text-slate-600">
-          Welcome to the private teacher monitoring and QA dashboard.
-        </p>
-        <p className="text-slate-500">
-          Please sign in to view devices, recordings, and QA alerts.
-        </p>
-        <Link
-          href="/login"
-          className="inline-block rounded-lg bg-slate-900 px-6 py-3 text-sm font-medium text-white hover:bg-slate-700"
-        >
-          Login
-        </Link>
-      </div>
-    );
-  }
-
-  const onlineDevices = devices.filter((d) => d.status === "Online").length;
+    loadStats();
+  }, []);
 
   return (
-    <div className="space-y-8">
-      <section className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
-          <p className="text-sm text-slate-500">Total Devices</p>
-          <p className="text-3xl font-semibold">{devices.length}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
-          <p className="text-sm text-slate-500">Online Devices</p>
-          <p className="text-3xl font-semibold text-emerald-600">{onlineDevices}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
-          <p className="text-sm text-slate-500">Recordings</p>
-          <p className="text-3xl font-semibold">{recordings.length}</p>
-        </div>
-      </section>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Academy Overview</h2>
+        <p className="text-xs text-slate-500 mt-0.5">Real-time telemetry, device states, and monitoring summary</p>
+      </div>
 
-      <section className="flex gap-4">
-        <Link
-          href="/devices"
-          className="rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-700"
-        >
-          View Devices
-        </Link>
-        <Link
-          href="/recordings"
-          className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-900 hover:bg-slate-50"
-        >
-          View Recordings
-        </Link>
-      </section>
+      {/* Quick Stat Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Devices</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{loading ? "..." : deviceCount}</p>
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+            <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+            {onlineCount} Active / Online
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Offline Devices</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{loading ? "..." : (deviceCount - onlineCount)}</p>
+          <div className="mt-2 text-xs text-slate-500 font-medium">
+            Require attention or reconnect
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Recorded Sessions</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{loading ? "..." : recordingCount}</p>
+          <div className="mt-2 text-xs text-indigo-600 font-medium">
+            Archived teacher streams
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">QA Rules Configured</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1">{loading ? "..." : ruleCount}</p>
+          <div className="mt-2 text-xs text-amber-600 font-medium">
+            Restricted keywords active
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Navigation Cards */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900">Live Classroom Monitoring</h3>
+          <p className="text-xs text-slate-500">Inspect active teacher connections, view real-time screen/audio feeds, and monitor active sessions.</p>
+          <div>
+            <Link href="/live" className="inline-flex items-center rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition-colors">
+              Open Live Monitor &rarr;
+            </Link>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900">Device Fleet Management</h3>
+          <p className="text-xs text-slate-500">Review all registered teacher endpoints, check online/offline telemetry, and manage device access.</p>
+          <div>
+            <Link href="/devices" className="inline-flex items-center rounded-lg bg-slate-800 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-700 transition-colors">
+              View Devices &rarr;
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

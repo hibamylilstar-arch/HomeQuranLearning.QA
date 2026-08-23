@@ -85,6 +85,19 @@
       - livekit
       - redis
 
+  ingress-manager:
+    image: academy-ingress-manager:latest
+    container_name: academy-ingress-manager
+    restart: unless-stopped
+    environment:
+      - BACKEND_BASE_URL=http://host.docker.internal:5100
+      - WORKER_API_KEY=local-dev-worker-key
+      - LIVEKIT_URL=http://livekit:7880
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=dev-secret-key-for-livekit-change-me-1234567890
+    depends_on:
+      - livekit
+
 volumes:
   postgres_data:
   redis_data:

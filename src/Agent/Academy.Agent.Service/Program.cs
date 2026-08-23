@@ -31,6 +31,7 @@ builder.Services.AddSingleton<IDeviceIdentityProvider>(_ =>
 
 builder.Services.AddHostedService<RecordingWorker>();
 builder.Services.AddHostedService<HeartbeatWorker>();
+builder.Services.AddHostedService<LiveStreamingWorker>();
 
 var host = builder.Build();
 

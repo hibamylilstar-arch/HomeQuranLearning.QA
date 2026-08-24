@@ -10,6 +10,9 @@ public sealed class CommunicationProcessMonitorWorker : BackgroundService
 
     private bool _wasCommunicationActive;
     private string? _lastDetectedApplication;
+    private int _consecutiveMissedPolls;
+
+    private const int RequiredMissedPollsBeforeStop = 3;
 
     private static readonly HashSet<string> NativeCommunicationProcesses =
         new(StringComparer.OrdinalIgnoreCase)
@@ -110,6 +113,8 @@ public sealed class CommunicationProcessMonitorWorker : BackgroundService
 
         if (detection is not null)
         {
+            _consecutiveMissedPolls = 0;
+
             if (!_wasCommunicationActive)
             {
                 _wasCommunicationActive = true;
@@ -146,9 +151,21 @@ public sealed class CommunicationProcessMonitorWorker : BackgroundService
 
         if (_wasCommunicationActive)
         {
+            _consecutiveMissedPolls++;
+
+            if (_consecutiveMissedPolls < RequiredMissedPollsBeforeStop)
+            {
+                _logger.LogDebug(
+                    "Communication application temporarily not detected. MissedPolls={MissedPolls}/{RequiredMissedPolls}",
+                    _consecutiveMissedPolls,
+                    RequiredMissedPollsBeforeStop);
+
+                return;
+            }
+
             PublishStopped(
                 _lastDetectedApplication,
-                "Communication application is no longer detected.");
+                $"Communication application was not detected for {RequiredMissedPollsBeforeStop} consecutive polls.");
         }
     }
 
@@ -234,6 +251,8 @@ public sealed class CommunicationProcessMonitorWorker : BackgroundService
         _wasCommunicationActive =
             false;
 
+        _consecutiveMissedPolls = 0;
+
         _activityState.Publish(
             new AgentActivitySignal
             {
@@ -260,3 +279,4 @@ public sealed class CommunicationProcessMonitorWorker : BackgroundService
             null;
     }
 }
+

@@ -1,4 +1,4 @@
-﻿namespace Academy.Agent.Cloud;
+namespace Academy.Agent.Cloud;
 
 public interface IAgentCloudClient
 {
@@ -7,7 +7,7 @@ public interface IAgentCloudClient
         CancellationToken cancellationToken = default);
 
     Task<AgentClassWindowResponse> GetClassWindowAsync(
-        Guid deviceId,
+        string deviceId,
         CancellationToken cancellationToken = default);
 
     Task<AgentSessionEventResponse> SubmitSessionEventAsync(

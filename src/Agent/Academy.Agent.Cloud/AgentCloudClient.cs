@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Headers;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -28,12 +28,12 @@ public sealed class AgentCloudClient : IAgentCloudClient
     }
 
     public async Task<AgentClassWindowResponse> GetClassWindowAsync(
-        Guid deviceId,
+        string deviceId,
         CancellationToken cancellationToken = default)
     {
         using var message = new HttpRequestMessage(
             HttpMethod.Get,
-            $"/api/agent/class-window?deviceId={deviceId:D}");
+            $"/api/agent/class-window?deviceId={Uri.EscapeDataString(deviceId)}");
 
         message.Headers.Add(
             "X-Api-Key",

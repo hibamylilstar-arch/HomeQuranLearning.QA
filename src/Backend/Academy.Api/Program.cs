@@ -247,16 +247,25 @@ app.MapGet("/api/agent/class-window", async (
     }
 
     if (!request.Query.TryGetValue("deviceId", out var deviceIdValue) ||
-        !Guid.TryParse(deviceIdValue.ToString(), out Guid deviceId))
+        string.IsNullOrWhiteSpace(deviceIdValue.ToString()))
     {
         return Results.BadRequest("deviceId is required.");
     }
 
-    var window = await sessionService.GetAgentClassWindowAsync(
-        deviceId,
-        cancellationToken);
+    try
+    {
+        var window =
+            await sessionService.GetAgentClassWindowAsync(
+                deviceIdValue.ToString(),
+                cancellationToken);
 
-    return Results.Ok(window);
+        return Results.Ok(window);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(
+            new { error = ex.Message });
+    }
 });
 app.MapPost("/api/agent/recordings", async (
     HttpRequest request,

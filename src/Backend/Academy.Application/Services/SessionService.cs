@@ -220,9 +220,21 @@ public sealed class SessionService
         };
     }
     public async Task<AgentClassWindowResponse> GetAgentClassWindowAsync(
-        Guid deviceId,
+        string deviceId,
         CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(deviceId))
+        {
+            throw new ArgumentException("DeviceId is required.");
+        }
+
+        var device =
+            await _deviceRepository.GetByDeviceIdAsync(
+                deviceId,
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Unknown device.");
+
         var now = DateTimeOffset.UtcNow;
 
         // Include a small historical grace period so an agent recovering
@@ -235,7 +247,7 @@ public sealed class SessionService
 
         var sessions =
             await _sessionRepository.GetClassWindowSessionsForDeviceAsync(
-                deviceId,
+                device.Id,
                 fromUtc,
                 toUtc,
                 cancellationToken);

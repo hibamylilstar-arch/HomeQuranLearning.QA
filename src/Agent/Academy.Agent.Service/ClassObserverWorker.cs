@@ -86,16 +86,6 @@ public sealed class ClassObserverWorker : BackgroundService
             return;
         }
 
-        if (!Guid.TryParse(
-                identity.DeviceId,
-                out Guid backendDeviceId))
-        {
-            _logger.LogError(
-                "Class observer device identity is not a valid GUID: {DeviceId}",
-                identity.DeviceId);
-
-            return;
-        }
 
         _logger.LogInformation(
             "Class observer started. DeviceId={DeviceId}, InstanceId={InstanceId}, Poll={PollSeconds}s, Grace={GraceMinutes}m",
@@ -112,7 +102,6 @@ public sealed class ClassObserverWorker : BackgroundService
                 {
                     await ObserveAsync(
                         identity,
-                        backendDeviceId,
                         stoppingToken);
                 }
                 catch (OperationCanceledException)
@@ -174,7 +163,6 @@ public sealed class ClassObserverWorker : BackgroundService
 
     private async Task ObserveAsync(
         DeviceIdentity identity,
-        Guid backendDeviceId,
         CancellationToken cancellationToken)
     {
         AgentClassWindowResponse? window = null;
@@ -187,7 +175,7 @@ public sealed class ClassObserverWorker : BackgroundService
 
             window =
                 await _cloudClient.GetClassWindowAsync(
-                    backendDeviceId,
+                    identity.DeviceId,
                     cancellationToken);
 
             var localAfterRequest =

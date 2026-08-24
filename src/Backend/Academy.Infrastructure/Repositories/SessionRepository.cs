@@ -1,4 +1,4 @@
-﻿using Academy.Application.Abstractions;
+using Academy.Application.Abstractions;
 using Academy.Domain.Entities;
 using Academy.Domain.Enums;
 using Academy.Infrastructure.Persistence;
@@ -60,6 +60,21 @@ public sealed class SessionRepository : ISessionRepository
             .Where(x => x.Status == SessionStatus.Live)
             .Where(x => x.StartedAtUtc <= nowUtc)
             .Where(x => x.EndedAtUtc == null || x.EndedAtUtc >= nowUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<Session?> GetLiveSessionForDeviceAsync(
+        Guid deviceId,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Sessions
+            .AsNoTracking()
+            .Where(x => x.DeviceId == deviceId)
+            .Where(x => x.Status == SessionStatus.Live)
+            .Where(x => x.ScheduledStartUtc <= nowUtc)
+            .Where(x => x.ScheduledEndUtc >= nowUtc)
+            .OrderBy(x => x.ScheduledStartUtc)
             .FirstOrDefaultAsync(cancellationToken);
     }
 

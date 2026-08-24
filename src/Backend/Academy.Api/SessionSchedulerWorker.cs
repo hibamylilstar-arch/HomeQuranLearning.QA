@@ -113,6 +113,12 @@ public sealed class SessionSchedulerWorker : BackgroundService
                     academyTime,
                     ct);
 
+        // Defensive same-pass protection.
+        // EF database queries do not reliably see Added-but-unsaved
+        // sessions, so reserve each device immediately in memory.
+        var devicesReservedThisPass =
+            new HashSet<Guid>();
+
         foreach (var schedule in schedules)
         {
             // Effective-date protection:
@@ -139,6 +145,36 @@ public sealed class SessionSchedulerWorker : BackgroundService
 
             if (existing is not null)
             {
+                continue;
+            }
+
+            if (devicesReservedThisPass.Contains(schedule.DeviceId))
+            {
+                _logger.LogError(
+                    "Session creation blocked because device {DeviceId} is already reserved during this scheduler pass. Conflicting schedule {ScheduleId} was not started.",
+                    schedule.DeviceId,
+                    schedule.Id);
+
+                continue;
+            }
+
+            var conflictingLiveSession =
+                await sessionRepo
+                    .GetLiveSessionForDeviceAsync(
+                        schedule.DeviceId,
+                        nowUtc,
+                        ct);
+
+            if (conflictingLiveSession is not null &&
+                conflictingLiveSession.ScheduleId != schedule.Id)
+            {
+                _logger.LogError(
+                    "Session creation blocked because device {DeviceId} already has live session {SessionId} for schedule {ExistingScheduleId}. Conflicting schedule {ScheduleId} was not started.",
+                    schedule.DeviceId,
+                    conflictingLiveSession.Id,
+                    conflictingLiveSession.ScheduleId,
+                    schedule.Id);
+
                 continue;
             }
 
@@ -217,6 +253,9 @@ public sealed class SessionSchedulerWorker : BackgroundService
                 .AddAsync(
                     session,
                     ct);
+
+            devicesReservedThisPass.Add(
+                schedule.DeviceId);
 
             _logger.LogInformation(
                 "Created class session. ScheduleId={ScheduleId}, AcademyWindow={LocalStart} - {LocalEnd}, UtcWindow={UtcStart} - {UtcEnd}",

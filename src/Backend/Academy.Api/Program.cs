@@ -802,8 +802,25 @@ app.MapPost("/api/admin/schedules", async (
         return Results.BadRequest("Schedule data is required.");
     }
 
-    var schedule = await scheduleService.CreateScheduleAsync(body, cancellationToken);
-    return Results.Ok(schedule);
+    try
+    {
+        var schedule =
+            await scheduleService.CreateScheduleAsync(
+                body,
+                cancellationToken);
+
+        return Results.Ok(schedule);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(
+            new { error = ex.Message });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(
+            new { error = ex.Message });
+    }
 }).RequireAuthorization();
 
 app.MapGet("/api/admin/sessions", async (
@@ -1041,7 +1058,6 @@ static async Task SeedOwnerAsync(WebApplication app)
         await dbContext.SaveChangesAsync();
     }
 }
-
 
 
 

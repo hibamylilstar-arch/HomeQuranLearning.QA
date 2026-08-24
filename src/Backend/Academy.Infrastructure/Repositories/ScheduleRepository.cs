@@ -1,4 +1,4 @@
-using Academy.Application.Abstractions;
+﻿using Academy.Application.Abstractions;
 using Academy.Domain.Entities;
 using Academy.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +19,9 @@ public sealed class ScheduleRepository : IScheduleRepository
         CancellationToken cancellationToken = default)
     {
         return await _dbContext.Schedules
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(
+                x => x.Id == id,
+                cancellationToken);
     }
 
     public async Task<IReadOnlyList<Schedule>> GetAllWithDetailsAsync(
@@ -47,9 +49,25 @@ public sealed class ScheduleRepository : IScheduleRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task AddAsync(Schedule schedule, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Schedule>> GetActiveSchedulesForDeviceAsync(
+        Guid deviceId,
+        CancellationToken cancellationToken = default)
     {
-        await _dbContext.Schedules.AddAsync(schedule, cancellationToken);
+        return await _dbContext.Schedules
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Where(x => x.DeviceId == deviceId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task AddAsync(
+        Schedule schedule,
+        CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Schedules
+            .AddAsync(
+                schedule,
+                cancellationToken);
     }
 
     public void Update(Schedule schedule)

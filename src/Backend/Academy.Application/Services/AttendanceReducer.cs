@@ -1,4 +1,4 @@
-﻿using Academy.Domain.Entities;
+using Academy.Domain.Entities;
 using Academy.Domain.Enums;
 
 namespace Academy.Application.Services;
@@ -379,7 +379,9 @@ public sealed class AttendanceReducer
 
         bool ambiguousStudent =
             session.StudentAttendanceStatus ==
-            AttendanceStatus.NeedsReview;
+                AttendanceStatus.Unknown ||
+            session.StudentAttendanceStatus ==
+                AttendanceStatus.NeedsReview;
 
         bool noTeacherEvidence =
             session.TeacherAttendanceStatus ==
@@ -436,6 +438,20 @@ public sealed class AttendanceReducer
         {
             notes.Add(
                 "Technical issue evidence recorded.");
+        }
+
+        if (session.TeacherAttendanceStatus ==
+            AttendanceStatus.Unknown)
+        {
+            notes.Add(
+                "Teacher attendance is still pending sufficient presence evidence.");
+        }
+
+        if (session.StudentAttendanceStatus ==
+            AttendanceStatus.Unknown)
+        {
+            notes.Add(
+                "Student attendance is still pending sufficient participation evidence.");
         }
 
         if (session.StudentAttendanceStatus ==

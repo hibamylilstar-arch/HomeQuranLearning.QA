@@ -1,4 +1,4 @@
-﻿using Academy.Application.Services;
+using Academy.Application.Services;
 using Academy.Domain.Entities;
 using Academy.Domain.Enums;
 
@@ -371,6 +371,198 @@ public sealed class AttendanceReducerTests
             second);
     }
 
+    [Fact]
+    public void Teacher_ExactlyThreeMinutesLate_IsPresent()
+    {
+        var start = DateTimeOffset.UtcNow.AddHours(-2);
+        var session = CreateCompletedSession(start);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.CommunicationDetected,
+                start.AddMinutes(3))
+        };
+
+        _reducer.Reduce(session, events);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.TeacherAttendanceStatus);
+    }
+
+    [Fact]
+    public void Teacher_JustOverThreeMinutesLate_IsLate()
+    {
+        var start = DateTimeOffset.UtcNow.AddHours(-2);
+        var session = CreateCompletedSession(start);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.CommunicationDetected,
+                start.AddMinutes(3).AddSeconds(1))
+        };
+
+        _reducer.Reduce(session, events);
+
+        Assert.Equal(
+            AttendanceStatus.Late,
+            session.TeacherAttendanceStatus);
+    }
+
+    [Fact]
+    public void Student_ExactlyThreeMinutesLate_IsPresent()
+    {
+        var start = DateTimeOffset.UtcNow.AddHours(-2);
+        var session = CreateCompletedSession(start);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.CommunicationDetected,
+                start),
+
+            Event(
+                session,
+                SessionEventType.ActivityStarted,
+                start.AddMinutes(3))
+        };
+
+        _reducer.Reduce(session, events);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.StudentAttendanceStatus);
+    }
+
+    [Fact]
+    public void Student_JustOverThreeMinutesLate_IsLate()
+    {
+        var start = DateTimeOffset.UtcNow.AddHours(-2);
+        var session = CreateCompletedSession(start);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.CommunicationDetected,
+                start),
+
+            Event(
+                session,
+                SessionEventType.ActivityStarted,
+                start.AddMinutes(3).AddSeconds(1))
+        };
+
+        _reducer.Reduce(session, events);
+
+        Assert.Equal(
+            AttendanceStatus.Late,
+            session.StudentAttendanceStatus);
+    }
+
+    [Fact]
+    public void Teacher_ReadyExactlyFiveMinutesBeforeStart_IsAccepted()
+    {
+        var start = DateTimeOffset.UtcNow.AddHours(-2);
+        var session = CreateCompletedSession(start);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.TeacherReady,
+                start.AddMinutes(-5))
+        };
+
+        _reducer.Reduce(session, events);
+
+        Assert.Equal(
+            start.AddMinutes(-5),
+            session.TeacherReadyAtUtc);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.TeacherAttendanceStatus);
+    }
+
+    [Fact]
+    public void Teacher_ReadyEarlierThanFiveMinuteWindow_IsIgnored()
+    {
+        var start = DateTimeOffset.UtcNow.AddHours(-2);
+        var session = CreateCompletedSession(start);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.TeacherReady,
+                start.AddMinutes(-5).AddSeconds(-1))
+        };
+
+        _reducer.Reduce(session, events);
+
+        Assert.Null(
+            session.TeacherReadyAtUtc);
+
+        Assert.Equal(
+            AttendanceStatus.Absent,
+            session.TeacherAttendanceStatus);
+    }
+    [Fact]
+    public void Student_Unknown_DuringLiveClass_KeepsReviewPending()
+    {
+        var start =
+            DateTimeOffset.UtcNow.AddMinutes(-5);
+
+        var session = new Session
+        {
+            Id = Guid.NewGuid(),
+            TeacherId = Guid.NewGuid(),
+            StudentId = Guid.NewGuid(),
+            CourseId = Guid.NewGuid(),
+            DeviceId = Guid.NewGuid(),
+            ScheduledStartUtc = start,
+            ScheduledEndUtc = start.AddMinutes(30),
+            StartedAtUtc = start,
+            EndedAtUtc = start.AddMinutes(30),
+            Status = SessionStatus.Live,
+            CreatedAtUtc = start.AddMinutes(-1),
+            UpdatedAtUtc = start.AddMinutes(-1)
+        };
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.CommunicationDetected,
+                start.AddMinutes(1))
+        };
+
+        _reducer.Reduce(
+            session,
+            events);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.TeacherAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceStatus.Unknown,
+            session.StudentAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceReviewStatus.Pending,
+            session.AttendanceReviewStatus);
+
+        Assert.Contains(
+            "Student attendance is still pending",
+            session.AttendanceNotes ?? string.Empty);
+    }
     private static Session CreateCompletedSession(
         DateTimeOffset start)
     {
@@ -478,3 +670,4 @@ public sealed class AttendanceReducerTests
         AttendanceReviewStatus ReviewStatus,
         string? Notes);
 }
+

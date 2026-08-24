@@ -2,6 +2,7 @@ export interface DeviceListItem {
   id: string;
   deviceId: string;
   deviceName: string;
+  recordingDisplayName: string | null;
   agentVersion: string;
   status: string;
   lastSeenUtc: string;
@@ -9,7 +10,10 @@ export interface DeviceListItem {
 
 export interface RecordingListItem {
   id: string;
+  deviceId: string;
   deviceName: string;
+  actualDeviceName: string;
+  recordingDisplayName: string | null;
   fileName: string;
   storageKey: string;
   startedAtUtc: string;
@@ -17,6 +21,8 @@ export interface RecordingListItem {
   duration: string;
   sizeBytes: number;
   status: string;
+  isPreserved: boolean;
+  preservedAtUtc: string | null;
 }
 
 export interface QaRuleListItem {
@@ -32,6 +38,8 @@ export interface QaAlertListItem {
   matchedPhrase: string;
   timestampUtc: string;
   status: string;
+  isPreserved: boolean;
+  preservedAtUtc: string | null;
   rulePhrase?: string | null;
 }
 

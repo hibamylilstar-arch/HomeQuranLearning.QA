@@ -41,6 +41,17 @@ public sealed class MinioStorageService : IStorageService
             cancellationToken);
     }
 
+    public async Task DeleteAsync(
+        string bucketName,
+        string objectKey,
+        CancellationToken cancellationToken = default)
+    {
+        await _minioClient.RemoveObjectAsync(
+            new RemoveObjectArgs()
+                .WithBucket(bucketName)
+                .WithObject(objectKey),
+            cancellationToken);
+    }
     public async Task<string> GetPresignedUrlAsync(
         string bucketName,
         string objectKey,

@@ -199,4 +199,35 @@ public sealed class RecordingService
             expiry,
             cancellationToken);
     }
+
+    public async Task SetPreservedAsync(
+        Guid recordingId,
+        bool preserved,
+        CancellationToken cancellationToken = default)
+    {
+        var recording =
+            await _recordingRepository.GetByIdAsync(
+                recordingId,
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Recording not found.");
+
+        if (recording.Status == RecordingStatus.Deleted)
+        {
+            throw new InvalidOperationException(
+                "Deleted recording cannot be preserved.");
+        }
+
+        recording.IsPreserved = preserved;
+        recording.PreservedAtUtc =
+            preserved ? DateTimeOffset.UtcNow : null;
+        recording.UpdatedAtUtc =
+            DateTimeOffset.UtcNow;
+
+        _recordingRepository.Update(recording);
+
+        await _unitOfWork.SaveChangesAsync(
+            cancellationToken);
+    }
 }
+

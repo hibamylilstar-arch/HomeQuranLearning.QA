@@ -13,5 +13,10 @@ public interface IRecordingRepository
         Guid deviceId,
         string fileName,
         CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Recording>> GetUploadedBeforeAsync(
+        DateTimeOffset cutoffUtc,
+        int limit,
+        CancellationToken cancellationToken = default);
     void Update(Recording recording);
 }
+

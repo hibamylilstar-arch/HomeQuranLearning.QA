@@ -1,21 +1,41 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
-import { getDevices } from "@/lib/api";
+import {
+  getDevices,
+  updateRecordingDisplayName,
+} from "@/lib/api";
+import { useAuth } from "@/components/AuthProvider";
 import type { DeviceListItem } from "@/types";
 
 export default function DevicesPage() {
+  const { user } = useAuth();
+
   const [devices, setDevices] = useState<DeviceListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const canEdit =
+    user?.role === "Owner" ||
+    user?.role === "Admin";
+
   async function loadDevices() {
     setLoading(true);
+
     try {
       const data = await getDevices();
       setDevices(data);
+      setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error loading devices");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Error loading devices"
+      );
     } finally {
       setLoading(false);
     }
@@ -25,10 +45,39 @@ export default function DevicesPage() {
     loadDevices();
   }, []);
 
+  async function saveRecordingName(device: DeviceListItem) {
+    try {
+      setSavingId(device.id);
+      setError("");
+
+      const value = editName.trim();
+
+      await updateRecordingDisplayName(
+        device.id,
+        value.length > 0 ? value : null
+      );
+
+      setEditingId(null);
+      setEditName("");
+
+      await loadDevices();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not update recording name"
+      );
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-sm font-medium text-slate-500">Loading connected teacher devices...</p>
+      <div className="flex h-64 items-center justify-center">
+        <p className="text-sm font-medium text-slate-500">
+          Loading connected teacher devices...
+        </p>
       </div>
     );
   }
@@ -36,67 +85,186 @@ export default function DevicesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Monitored Devices</h2>
-        <p className="text-xs text-slate-500 mt-0.5">Active teacher laptops and background monitoring agents</p>
+        <h2 className="text-xl font-bold tracking-tight text-slate-900">
+          Monitored Devices
+        </h2>
+
+        <p className="mt-0.5 text-xs text-slate-500">
+          Actual Windows device identity and recording display names
+        </p>
       </div>
 
       {error && (
-        <div className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-xs font-medium text-rose-700">
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-xs font-medium text-rose-700">
           {error}
         </div>
       )}
 
-      {/* Devices Table Card */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 bg-slate-50 px-6 py-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-800">Connected Laptops ({devices.length})</h3>
-          <button 
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
+          <h3 className="text-sm font-semibold text-slate-800">
+            Connected Laptops ({devices.length})
+          </h3>
+
+          <button
+            type="button"
             onClick={loadDevices}
-            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
           >
-            Refresh Status
+            Refresh
           </button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-xs">
-            <thead className="bg-slate-50/75 text-left uppercase text-slate-500 font-semibold tracking-wider">
-              <tr>
-                <th className="px-6 py-3">Device Name</th>
-                <th className="px-6 py-3">Device ID / Host</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3">Agent Version</th>
-                <th className="px-6 py-3">Last Seen</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
-              {devices.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
-                    No connected devices detected.
-                  </td>
-                </tr>
-              ) : (
-                devices.map((device) => {
-                  const isOnline = device.status?.toLowerCase() === "online";
-                  return (
-                    <tr key={device.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="px-6 py-4 font-medium text-slate-900">{device.deviceName}</td>
-                      <td className="px-6 py-4 text-slate-600 font-mono">{device.deviceId}</td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${isOnline ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+
+        <div className="divide-y divide-slate-100">
+          {devices.length === 0 ? (
+            <div className="p-8 text-center text-sm text-slate-400">
+              No connected devices detected.
+            </div>
+          ) : (
+            devices.map((device) => {
+              const online =
+                device.status?.toLowerCase() === "online";
+
+              const editing =
+                editingId === device.id;
+
+              return (
+                <div
+                  key={device.id}
+                  className="p-4 sm:p-5"
+                >
+                  <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_auto] lg:items-center">
+
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Actual Device
+                      </div>
+
+                      <div className="mt-1 font-mono text-sm font-semibold text-slate-900">
+                        {device.deviceName}
+                      </div>
+
+                      <div className="mt-1 break-all font-mono text-[10px] text-slate-400">
+                        {device.deviceId}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Recording Name
+                      </div>
+
+                      {editing ? (
+                        <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+                          <input
+                            autoFocus
+                            type="text"
+                            maxLength={100}
+                            value={editName}
+                            onChange={(e) =>
+                              setEditName(e.target.value)
+                            }
+                            placeholder="Laptop 1"
+                            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                          />
+
+                          <button
+                            type="button"
+                            disabled={savingId === device.id}
+                            onClick={() =>
+                              saveRecordingName(device)
+                            }
+                            className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingId(null);
+                              setEditName("");
+                            }}
+                            className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="mt-1">
+                          <div className="text-base font-bold text-indigo-700">
+                            {device.recordingDisplayName ||
+                              "Not assigned"}
+                          </div>
+
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingId(device.id);
+                                setEditName(
+                                  device.recordingDisplayName ?? ""
+                                );
+                              }}
+                              className="mt-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                            >
+                              {device.recordingDisplayName
+                                ? "Edit name"
+                                : "Set name"}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-3 lg:justify-end">
+                      <div>
+                        <div className="text-[10px] uppercase text-slate-400">
+                          Status
+                        </div>
+
+                        <span
+                          className={
+                            "mt-1 inline-flex rounded border px-2 py-0.5 text-[10px] font-bold uppercase " +
+                            (online
+                              ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+                              : "border-slate-200 bg-slate-100 text-slate-600")
+                          }
+                        >
                           {device.status || "Offline"}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 font-mono">{device.agentVersion || "0.1.0"}</td>
-                      <td className="px-6 py-4 text-slate-500">
-                        {device.lastSeenUtc ? new Date(device.lastSeenUtc).toLocaleString() : "N/A"}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                      </div>
+
+                      <div>
+                        <div className="text-[10px] uppercase text-slate-400">
+                          Agent
+                        </div>
+
+                        <div className="mt-1 font-mono text-xs text-slate-600">
+                          {device.agentVersion || "0.1.0"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[10px] uppercase text-slate-400">
+                          Last Seen
+                        </div>
+
+                        <div className="mt-1 text-xs text-slate-600">
+                          {device.lastSeenUtc
+                            ? new Date(
+                                device.lastSeenUtc
+                              ).toLocaleString()
+                            : "N/A"}
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

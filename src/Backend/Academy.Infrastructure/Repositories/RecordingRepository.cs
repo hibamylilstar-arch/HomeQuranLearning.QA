@@ -69,9 +69,25 @@ public sealed class RecordingRepository : IRecordingRepository
                 cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Recording>> GetUploadedBeforeAsync(
+        DateTimeOffset cutoffUtc,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Recordings
+            .Include(x => x.QaAlerts)
+            .Where(x =>
+                x.Status == RecordingStatus.Uploaded &&
+                !x.IsPreserved &&
+                x.EndedAtUtc < cutoffUtc)
+            .OrderBy(x => x.EndedAtUtc)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
     public void Update(Recording recording)
     {
         _dbContext.Recordings.Update(recording);
     }
 }
+
 

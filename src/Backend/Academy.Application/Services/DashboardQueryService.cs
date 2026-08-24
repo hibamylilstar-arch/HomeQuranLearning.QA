@@ -47,14 +47,19 @@ public sealed class DashboardQueryService
             .Select(x => new RecordingListItem
             {
                 Id = x.Id,
-                DeviceName = x.Device?.DeviceName ?? "Unknown",
+                DeviceId = x.DeviceId,
+                DeviceName = !string.IsNullOrWhiteSpace(x.Device?.RecordingDisplayName) ? x.Device!.RecordingDisplayName! : x.Device?.DeviceName ?? "Unknown",
+                ActualDeviceName = x.Device?.DeviceName ?? "Unknown",
+                RecordingDisplayName = x.Device?.RecordingDisplayName,
                 FileName = x.FileName,
                 StorageKey = x.StorageKey,
                 StartedAtUtc = x.StartedAtUtc,
                 EndedAtUtc = x.EndedAtUtc,
                 Duration = x.Duration,
                 SizeBytes = x.SizeBytes,
-                Status = x.Status.ToString()
+                Status = x.Status.ToString(),
+                IsPreserved = x.IsPreserved,
+                PreservedAtUtc = x.PreservedAtUtc
             })
             .ToList();
     }
@@ -118,6 +123,7 @@ public sealed class DashboardQueryService
                 Id = x.Id,
                 DeviceId = x.DeviceId,
                 DeviceName = x.DeviceName,
+                RecordingDisplayName = x.RecordingDisplayName,
                 AgentVersion = x.AgentVersion,
                 Status = x.Status.ToString(),
                 LastSeenUtc = x.LastSeenUtc

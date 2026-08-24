@@ -32,6 +32,11 @@ public sealed class Recording
 
     public RecordingStatus Status { get; set; } = RecordingStatus.Pending;
 
+    // Preserved recordings are excluded from automatic retention cleanup.
+    public bool IsPreserved { get; set; }
+
+    public DateTimeOffset? PreservedAtUtc { get; set; }
+
     public DateTimeOffset? QaProcessedAtUtc { get; set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; }

@@ -192,3 +192,48 @@ export async function createQaRule(phrase: string, severity: string, isActive: b
     body: JSON.stringify({ phrase, severity, isActive }),
   });
 }
+
+export async function getRecordingDownloadUrl(
+  recordingId: string
+): Promise<{ url: string; fileName: string }> {
+  return proxyFetch<{ url: string; fileName: string }>([
+    "recordings",
+    recordingId,
+    "download-url",
+  ]);
+}
+
+export async function preserveRecording(
+  recordingId: string
+): Promise<{ preserved: boolean }> {
+  return proxyFetch<{ preserved: boolean }>(
+    ["recordings", recordingId, "preserve"],
+    { method: "POST" }
+  );
+}
+
+export async function unpreserveRecording(
+  recordingId: string
+): Promise<{ preserved: boolean }> {
+  return proxyFetch<{ preserved: boolean }>(
+    ["recordings", recordingId, "unpreserve"],
+    { method: "POST" }
+  );
+}
+
+export async function updateRecordingDisplayName(
+  deviceId: string,
+  recordingDisplayName: string | null
+): Promise<{
+  deviceId: string;
+  actualDeviceName: string;
+  recordingDisplayName: string | null;
+}> {
+  return proxyFetch(
+    ["devices", deviceId, "recording-display-name"],
+    {
+      method: "PATCH",
+      body: JSON.stringify({ recordingDisplayName }),
+    }
+  );
+}

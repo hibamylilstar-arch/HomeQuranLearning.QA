@@ -9,6 +9,10 @@ public interface IStorageService
         string contentType,
         CancellationToken cancellationToken = default);
 
+    Task DeleteAsync(
+        string bucketName,
+        string objectKey,
+        CancellationToken cancellationToken = default);
     Task<string> GetPresignedUrlAsync(
         string bucketName,
         string objectKey,

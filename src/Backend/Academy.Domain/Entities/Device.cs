@@ -10,6 +10,10 @@ public sealed class Device
 
     public string DeviceName { get; set; } = string.Empty;
 
+    // Friendly name used only in recording/monitoring views.
+    // DeviceName remains the real Windows machine name.
+    public string? RecordingDisplayName { get; set; }
+
     public string AgentVersion { get; set; } = "0.1.0";
 
     public DeviceStatus Status { get; set; } = DeviceStatus.Unknown;

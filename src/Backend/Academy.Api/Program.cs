@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
 using Academy.Application.Abstractions;
@@ -32,6 +32,7 @@ builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<LiveKitTokenService>();
 
 builder.Services.AddHostedService<Academy.Api.SessionSchedulerWorker>();
+builder.Services.AddHostedService<Academy.Api.RecordingRetentionWorker>();
 
 builder.Services.AddSingleton(builder.Configuration["Storage:Bucket"] ?? "academy-recordings");
 
@@ -258,6 +259,76 @@ app.MapGet("/api/admin/devices", async (
     return Results.Ok(devices);
 }).RequireAuthorization();
 
+app.MapPatch("/api/admin/devices/{deviceId:guid}/recording-display-name", async (
+    ClaimsPrincipal user,
+    Guid deviceId,
+    UpdateRecordingDisplayNameRequest body,
+    IDeviceRepository deviceRepository,
+    IUnitOfWork unitOfWork,
+    CancellationToken cancellationToken) =>
+{
+    var (_, role) = GetUserInfo(user);
+
+    if (!string.Equals(
+            role,
+            "Owner",
+            StringComparison.OrdinalIgnoreCase) &&
+        !string.Equals(
+            role,
+            "Admin",
+            StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.Forbid();
+    }
+
+    var device =
+        await deviceRepository.GetByIdAsync(
+            deviceId,
+            cancellationToken);
+
+    if (device is null)
+    {
+        return Results.NotFound(
+            new { error = "Device not found." });
+    }
+
+    string? displayName =
+        string.IsNullOrWhiteSpace(
+            body.RecordingDisplayName)
+            ? null
+            : body.RecordingDisplayName.Trim();
+
+    if (displayName is not null &&
+        displayName.Length > 100)
+    {
+        return Results.BadRequest(
+            new
+            {
+                error =
+                    "Recording display name must be 100 characters or less."
+            });
+    }
+
+    device.RecordingDisplayName =
+        displayName;
+
+    device.UpdatedAtUtc =
+        DateTimeOffset.UtcNow;
+
+    deviceRepository.Update(device);
+
+    await unitOfWork.SaveChangesAsync(
+        cancellationToken);
+
+    return Results.Ok(new
+    {
+        deviceId = device.Id,
+        actualDeviceName = device.DeviceName,
+        recordingDisplayName =
+            device.RecordingDisplayName
+    });
+}).RequireAuthorization();
+
 app.MapGet("/api/admin/recordings", async (
     ClaimsPrincipal user,
     HttpRequest request,
@@ -282,6 +353,107 @@ app.MapGet("/api/admin/recordings/{recordingId:guid}/playback-url", async (
         cancellationToken);
 
     return Results.Ok(new { url });
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/recordings/{recordingId:guid}/download-url", async (
+    ClaimsPrincipal user,
+    Guid recordingId,
+    DashboardQueryService dashboardQueryService,
+    RecordingService recordingService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) = GetUserInfo(user);
+
+    var visibleRecordings =
+        await dashboardQueryService.GetVisibleRecordingsAsync(
+            userId,
+            role,
+            cancellationToken);
+
+    var recording =
+        visibleRecordings.FirstOrDefault(x => x.Id == recordingId);
+
+    if (recording is null)
+    {
+        return Results.Forbid();
+    }
+
+    if (!string.Equals(
+            recording.Status,
+            "Uploaded",
+            StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.BadRequest(
+            new { error = "Recording file is not available." });
+    }
+
+    var url =
+        await recordingService.GetPlaybackUrlAsync(
+            recordingId,
+            TimeSpan.FromMinutes(10),
+            cancellationToken);
+
+    return Results.Ok(new
+    {
+        url,
+        fileName = recording.FileName
+    });
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/recordings/{recordingId:guid}/preserve", async (
+    ClaimsPrincipal user,
+    Guid recordingId,
+    DashboardQueryService dashboardQueryService,
+    RecordingService recordingService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) = GetUserInfo(user);
+
+    var visibleRecordings =
+        await dashboardQueryService.GetVisibleRecordingsAsync(
+            userId,
+            role,
+            cancellationToken);
+
+    if (!visibleRecordings.Any(x => x.Id == recordingId))
+    {
+        return Results.Forbid();
+    }
+
+    await recordingService.SetPreservedAsync(
+        recordingId,
+        true,
+        cancellationToken);
+
+    return Results.Ok(new { preserved = true });
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/recordings/{recordingId:guid}/unpreserve", async (
+    ClaimsPrincipal user,
+    Guid recordingId,
+    DashboardQueryService dashboardQueryService,
+    RecordingService recordingService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) = GetUserInfo(user);
+
+    var visibleRecordings =
+        await dashboardQueryService.GetVisibleRecordingsAsync(
+            userId,
+            role,
+            cancellationToken);
+
+    if (!visibleRecordings.Any(x => x.Id == recordingId))
+    {
+        return Results.Forbid();
+    }
+
+    await recordingService.SetPreservedAsync(
+        recordingId,
+        false,
+        cancellationToken);
+
+    return Results.Ok(new { preserved = false });
 }).RequireAuthorization();
 
 app.MapGet("/api/admin/qa-rules", async (
@@ -798,3 +970,5 @@ static async Task SeedOwnerAsync(WebApplication app)
         await dbContext.SaveChangesAsync();
     }
 }
+
+

@@ -1,50 +1,191 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { getRecordings } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
+import {
+  getRecordings,
+  getRecordingDownloadUrl,
+  preserveRecording,
+  unpreserveRecording,
+} from "@/lib/api";
 import PlayButton from "./PlayButton";
 import type { RecordingListItem } from "@/types";
 
+function safeFilePart(value: string) {
+  return value
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function getRecordingTimestamp(fileName: string) {
+  const match =
+    fileName.match(/(\d{8}_\d{6})/);
+
+  return match?.[1] ?? "";
+}
+
+function friendlyRecordingFileName(
+  recording: RecordingListItem
+) {
+  const base =
+    recording.recordingDisplayName ||
+    recording.deviceName ||
+    "Recording";
+
+  const safeBase =
+    safeFilePart(base) || "Recording";
+
+  const timestamp =
+    getRecordingTimestamp(recording.fileName);
+
+  return timestamp
+    ? `${safeBase}_${timestamp}.mp4`
+    : `${safeBase}_${recording.id}.mp4`;
+}
+
 export default function RecordingsPage() {
-  const [recordings, setRecordings] = useState<RecordingListItem[]>([]);
+  const [recordings, setRecordings] =
+    useState<RecordingListItem[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [busyId, setBusyId] =
+    useState<string | null>(null);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [searchQuery, setSearchQuery] =
+    useState("");
+
+  const [statusFilter, setStatusFilter] =
+    useState("ALL");
+
+  async function refreshRecordings() {
+    const data = await getRecordings();
+    setRecordings(data);
+  }
 
   useEffect(() => {
-    getRecordings()
-      .then(setRecordings)
-      .catch((err) => setError(err instanceof Error ? err.message : "Error loading recordings"))
+    refreshRecordings()
+      .catch((err) =>
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Error loading recordings"
+        )
+      )
       .finally(() => setLoading(false));
   }, []);
 
   const filteredRecordings = useMemo(() => {
+    const query =
+      searchQuery.toLowerCase();
+
     return recordings.filter((rec) => {
-      const matchesSearch = 
-        (rec.fileName && rec.fileName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (rec.deviceName && rec.deviceName.toLowerCase().includes(searchQuery.toLowerCase()));
-      
-      const matchesStatus = 
-        statusFilter === "ALL" || (rec.status && rec.status.toUpperCase() === statusFilter.toUpperCase());
+      const friendly =
+        friendlyRecordingFileName(rec)
+          .toLowerCase();
+
+      const matchesSearch =
+        friendly.includes(query) ||
+        rec.fileName
+          ?.toLowerCase()
+          .includes(query) ||
+        rec.deviceName
+          ?.toLowerCase()
+          .includes(query) ||
+        rec.actualDeviceName
+          ?.toLowerCase()
+          .includes(query);
+
+      const matchesStatus =
+        statusFilter === "ALL" ||
+        rec.status?.toUpperCase() ===
+          statusFilter.toUpperCase();
 
       return matchesSearch && matchesStatus;
     });
-  }, [recordings, searchQuery, statusFilter]);
+  }, [
+    recordings,
+    searchQuery,
+    statusFilter,
+  ]);
+
+  async function handleDownload(
+    recording: RecordingListItem
+  ) {
+    try {
+      setBusyId(recording.id);
+      setError("");
+
+      const data =
+        await getRecordingDownloadUrl(
+          recording.id
+        );
+
+      const anchor =
+        document.createElement("a");
+
+      anchor.href = data.url;
+
+      // User-friendly name:
+      // Laptop_1_20260824_163743.mp4
+      anchor.download =
+        friendlyRecordingFileName(
+          recording
+        );
+
+      anchor.target = "_blank";
+      anchor.rel =
+        "noopener noreferrer";
+
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Download failed"
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handlePreserve(
+    recording: RecordingListItem
+  ) {
+    try {
+      setBusyId(recording.id);
+      setError("");
+
+      if (recording.isPreserved) {
+        await unpreserveRecording(
+          recording.id
+        );
+      } else {
+        await preserveRecording(
+          recording.id
+        );
+      }
+
+      await refreshRecordings();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Preserve action failed"
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-sm font-medium text-slate-500">Loading session recordings...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-xs font-medium text-rose-700">
-        {error}
+      <div className="flex h-64 items-center justify-center">
+        <p className="text-sm font-medium text-slate-500">
+          Loading session recordings...
+        </p>
       </div>
     );
   }
@@ -52,96 +193,242 @@ export default function RecordingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Session Recordings</h2>
-        <p className="text-xs text-slate-500 mt-0.5">Archived session recordings and playback streams from teacher devices</p>
+        <h2 className="text-xl font-bold tracking-tight text-slate-900">
+          Session Recordings
+        </h2>
+
+        <p className="mt-0.5 text-xs text-slate-500">
+          Normal recordings: 3 days - QA evidence: 7 days - Preserved recordings kept until unpreserved.
+        </p>
       </div>
 
-      {/* Search & Filter Toolbar */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="w-full sm:w-72">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Search File / Device</label>
+      {error && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-xs font-medium text-rose-700">
+          {error}
+        </div>
+      )}
+
+      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3">
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Search
+          </label>
+
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by file or device name..."
-            className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            onChange={(e) =>
+              setSearchQuery(e.target.value)
+            }
+            placeholder="Laptop 1, file or device..."
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs"
           />
         </div>
-        <div className="w-full sm:w-48">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Status Filter</label>
+
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Status
+          </label>
+
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            onChange={(e) =>
+              setStatusFilter(e.target.value)
+            }
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs"
           >
-            <option value="ALL">All Statuses</option>
-            <option value="UPLOADED">Uploaded</option>
-            <option value="PENDING">Pending</option>
+            <option value="ALL">
+              All Statuses
+            </option>
+            <option value="UPLOADED">
+              Uploaded
+            </option>
+            <option value="PENDING">
+              Pending
+            </option>
+            <option value="DELETED">
+              Deleted
+            </option>
           </select>
         </div>
-        <div className="w-full sm:w-auto text-right self-end sm:self-center">
-          <span className="text-xs font-medium text-slate-500">
-            Showing <strong className="text-slate-800">{filteredRecordings.length}</strong> of {recordings.length} recordings
+
+        <div className="flex items-end sm:justify-end">
+          <span className="text-xs text-slate-500">
+            Showing{" "}
+            <strong className="text-slate-800">
+              {filteredRecordings.length}
+            </strong>{" "}
+            of {recordings.length}
           </span>
         </div>
       </div>
 
-      {/* Recordings Table Card */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-200 bg-slate-50 px-6 py-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-800">Recorded Files</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-xs">
-            <thead className="bg-slate-50/75 text-left uppercase text-slate-500 font-semibold tracking-wider">
-              <tr>
-                <th className="px-6 py-3">File Name</th>
-                <th className="px-6 py-3">Device</th>
-                <th className="px-6 py-3">Started At (UTC)</th>
-                <th className="px-6 py-3">Duration</th>
-                <th className="px-6 py-3">Size</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
-              {filteredRecordings.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-slate-400">
-                    No recordings match your search criteria.
-                  </td>
-                </tr>
-              ) : (
-                filteredRecordings.map((recording) => {
-                  const statusVal = recording.status?.toLowerCase() || "";
-                  const isUploaded = statusVal === "uploaded" || statusVal === "ready" || statusVal === "completed" || true; // Always show play/inspect action for all rows
-                  return (
-                    <tr key={recording.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="px-6 py-4 font-medium text-slate-900 font-mono">{recording.fileName}</td>
-                      <td className="px-6 py-4 text-slate-600">{recording.deviceName}</td>
-                      <td className="px-6 py-4 text-slate-500">
-                        {new Date(recording.startedAtUtc).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 text-slate-600 font-mono">{recording.duration}</td>
-                      <td className="px-6 py-4 text-slate-600 font-mono">
-                        {(recording.sizeBytes / 1024 / 1024).toFixed(2)} MB
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={"inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase " + (statusVal === "uploaded" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-amber-50 text-amber-700 border border-amber-100")}>
-                          {recording.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <PlayButton recordingId={recording.id} />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="space-y-3">
+        {filteredRecordings.map(
+          (recording) => {
+            const status =
+              recording.status
+                ?.toLowerCase() || "";
+
+            const available =
+              status === "uploaded";
+
+            const busy =
+              busyId === recording.id;
+
+            const friendlyName =
+              friendlyRecordingFileName(
+                recording
+              );
+
+            return (
+              <div
+                key={recording.id}
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-base font-bold text-indigo-700">
+                      {recording.deviceName}
+                    </div>
+
+                    {recording.recordingDisplayName && (
+                      <div className="mt-0.5 text-[10px] font-mono text-slate-400">
+                        Actual:{" "}
+                        {recording.actualDeviceName}
+                      </div>
+                    )}
+
+                    <h3 className="mt-2 break-all font-mono text-sm font-semibold text-slate-900">
+                      {friendlyName}
+                    </h3>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <span
+                      className={
+                        "rounded border px-2 py-0.5 text-[10px] font-bold uppercase " +
+                        (status === "uploaded"
+                          ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+                          : status === "deleted"
+                            ? "border-slate-200 bg-slate-100 text-slate-500"
+                            : "border-amber-100 bg-amber-50 text-amber-700")
+                      }
+                    >
+                      {recording.status}
+                    </span>
+
+                    {recording.isPreserved && (
+                      <span className="rounded border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[10px] font-bold uppercase text-indigo-700">
+                        Preserved
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+                  <div>
+                    <div className="text-[10px] uppercase text-slate-400">
+                      Started
+                    </div>
+
+                    <div className="text-slate-700">
+                      {new Date(
+                        recording.startedAtUtc
+                      ).toLocaleString()}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] uppercase text-slate-400">
+                      Duration
+                    </div>
+
+                    <div className="font-mono text-slate-700">
+                      {recording.duration}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] uppercase text-slate-400">
+                      Size
+                    </div>
+
+                    <div className="font-mono text-slate-700">
+                      {(
+                        recording.sizeBytes /
+                        1024 /
+                        1024
+                      ).toFixed(2)}{" "}
+                      MB
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] uppercase text-slate-400">
+                      Retention
+                    </div>
+
+                    <div className="font-medium text-slate-700">
+                      {recording.isPreserved
+                        ? "Preserved"
+                        : "Automatic"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {available ? (
+                    <>
+                      <PlayButton
+                        recordingId={
+                          recording.id
+                        }
+                      />
+
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          handleDownload(
+                            recording
+                          )
+                        }
+                        className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        Download
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          handlePreserve(
+                            recording
+                          )
+                        }
+                        className={
+                          "w-full rounded-lg border px-4 py-2 text-xs font-semibold disabled:opacity-50 " +
+                          (recording.isPreserved
+                            ? "border-amber-200 bg-amber-50 text-amber-700"
+                            : "border-indigo-200 bg-indigo-50 text-indigo-700")
+                        }
+                      >
+                        {recording.isPreserved
+                          ? "Unpreserve"
+                          : "Preserve"}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="rounded-lg bg-slate-50 px-4 py-2 text-center text-xs text-slate-400 sm:col-span-3">
+                      Recording file is not currently available.
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }
+        )}
       </div>
     </div>
   );

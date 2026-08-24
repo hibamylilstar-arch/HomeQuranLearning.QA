@@ -29,6 +29,21 @@ builder.Services.AddSingleton<IDeviceIdentityProvider>(_ =>
     return new FileDeviceIdentityProvider(identityPath, Environment.MachineName);
 });
 
+builder.Services.AddSingleton(_ =>
+{
+    string attendancePath =
+        Path.Combine(
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.CommonApplicationData),
+            "AcademyAgent",
+            "attendance");
+
+    return new AttendanceEventJournal(
+        attendancePath);
+});
+
+builder.Services.AddHostedService<AttendanceEventDeliveryWorker>();
+
 builder.Services.AddHostedService<RecordingWorker>();
 builder.Services.AddHostedService<HeartbeatWorker>();
 builder.Services.AddHostedService<LiveStreamingWorker>();

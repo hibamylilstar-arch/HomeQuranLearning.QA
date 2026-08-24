@@ -1,3 +1,4 @@
+using Academy.Infrastructure.Repositories;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -29,6 +30,7 @@ builder.Services.AddScoped<StudentService>();
 builder.Services.AddScoped<CourseService>();
 builder.Services.AddScoped<ScheduleService>();
 builder.Services.AddScoped<SessionService>();
+builder.Services.AddScoped<ISessionEventRepository, SessionEventRepository>();
 builder.Services.AddScoped<LiveKitTokenService>();
 
 builder.Services.AddHostedService<Academy.Api.SessionSchedulerWorker>();
@@ -196,6 +198,65 @@ app.MapGet("/api/agent/sessions/active-stream", async (
         });
 });
 
+app.MapPost("/api/agent/session-events", async (
+    HttpRequest request,
+    AgentSessionEventRequest body,
+    SessionService sessionService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != agentApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        var result =
+            await sessionService.SubmitAgentSessionEventAsync(
+                body,
+                cancellationToken);
+
+        return Results.Ok(result);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(
+            new { error = ex.Message });
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return Results.Forbid();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(
+            new { error = ex.Message });
+    }
+});
+app.MapGet("/api/agent/class-window", async (
+    HttpRequest request,
+    SessionService sessionService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != agentApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!request.Query.TryGetValue("deviceId", out var deviceIdValue) ||
+        !Guid.TryParse(deviceIdValue.ToString(), out Guid deviceId))
+    {
+        return Results.BadRequest("deviceId is required.");
+    }
+
+    var window = await sessionService.GetAgentClassWindowAsync(
+        deviceId,
+        cancellationToken);
+
+    return Results.Ok(window);
+});
 app.MapPost("/api/agent/recordings", async (
     HttpRequest request,
     RecordingSubmittedRequest body,
@@ -970,5 +1031,8 @@ static async Task SeedOwnerAsync(WebApplication app)
         await dbContext.SaveChangesAsync();
     }
 }
+
+
+
 
 

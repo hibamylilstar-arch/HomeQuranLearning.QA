@@ -1,4 +1,4 @@
-namespace Academy.Domain.Entities;
+﻿namespace Academy.Domain.Entities;
 
 public sealed class Schedule
 {
@@ -27,6 +27,11 @@ public sealed class Schedule
     public TimeSpan EndTime { get; set; }
 
     public bool IsActive { get; set; } = true;
+
+    // Allows schedule changes without destroying historical class history.
+    public DateTimeOffset? EffectiveFromUtc { get; set; }
+
+    public DateTimeOffset? EffectiveToUtc { get; set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; }
 

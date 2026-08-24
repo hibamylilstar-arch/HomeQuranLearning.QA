@@ -1,4 +1,4 @@
-namespace Academy.Agent.Cloud;
+﻿namespace Academy.Agent.Cloud;
 
 public interface IAgentCloudClient
 {
@@ -6,6 +6,13 @@ public interface IAgentCloudClient
         HeartbeatRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<AgentClassWindowResponse> GetClassWindowAsync(
+        Guid deviceId,
+        CancellationToken cancellationToken = default);
+
+    Task<AgentSessionEventResponse> SubmitSessionEventAsync(
+        AgentSessionEventRequest request,
+        CancellationToken cancellationToken = default);
     Task<RecordingResponse> SubmitRecordingAsync(
         RecordingSubmittedRequest request,
         CancellationToken cancellationToken = default);

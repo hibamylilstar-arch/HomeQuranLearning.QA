@@ -22,6 +22,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Course> Courses => Set<Course>();
     public DbSet<Schedule> Schedules => Set<Schedule>();
     public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<SessionEvent> SessionEvents => Set<SessionEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -217,6 +218,39 @@ public sealed class AppDbContext : DbContext
             entity.HasOne(x => x.Device)
                 .WithMany()
                 .HasForeignKey(x => x.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SessionEvent>(entity =>
+        {
+            entity.ToTable("session_events");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.EventType)
+                .HasConversion<string>()
+                .HasMaxLength(64);
+
+            entity.Property(x => x.Source)
+                .HasMaxLength(64);
+
+            entity.Property(x => x.Details)
+                .HasMaxLength(2048);
+
+            entity.Property(x => x.IdempotencyKey)
+                .HasMaxLength(256);
+
+            entity.HasIndex(x => x.IdempotencyKey)
+                .IsUnique();
+
+            entity.HasIndex(x => new
+            {
+                x.SessionId,
+                x.OccurredAtUtc
+            });
+
+            entity.HasOne(x => x.Session)
+                .WithMany(x => x.Events)
+                .HasForeignKey(x => x.SessionId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

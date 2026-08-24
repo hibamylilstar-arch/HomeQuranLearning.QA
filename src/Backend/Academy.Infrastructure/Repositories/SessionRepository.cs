@@ -1,4 +1,4 @@
-using Academy.Application.Abstractions;
+﻿using Academy.Application.Abstractions;
 using Academy.Domain.Entities;
 using Academy.Domain.Enums;
 using Academy.Infrastructure.Persistence;
@@ -71,6 +71,24 @@ public sealed class SessionRepository : ISessionRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Session>> GetClassWindowSessionsForDeviceAsync(
+        Guid deviceId,
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Sessions
+            .AsNoTracking()
+            .Include(x => x.Teacher)
+            .Include(x => x.Student)
+            .Include(x => x.Course)
+            .Include(x => x.Device)
+            .Where(x => x.DeviceId == deviceId)
+            .Where(x => x.ScheduledEndUtc >= fromUtc)
+            .Where(x => x.ScheduledStartUtc <= toUtc)
+            .OrderBy(x => x.ScheduledStartUtc)
+            .ToListAsync(cancellationToken);
+    }
     public async Task AddAsync(Session session, CancellationToken cancellationToken = default)
     {
         await _dbContext.Sessions.AddAsync(session, cancellationToken);

@@ -1,4 +1,4 @@
-using Academy.Domain.Entities;
+﻿using Academy.Domain.Entities;
 
 namespace Academy.Application.Abstractions;
 
@@ -15,6 +15,12 @@ public interface ISessionRepository
         DateTimeOffset nowUtc,
         CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Session>> GetLiveSessionsAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Session>> GetClassWindowSessionsForDeviceAsync(
+        Guid deviceId,
+        DateTimeOffset fromUtc,
+        DateTimeOffset toUtc,
+        CancellationToken cancellationToken = default);
     Task AddAsync(Session session, CancellationToken cancellationToken = default);
     void Update(Session session);
 }

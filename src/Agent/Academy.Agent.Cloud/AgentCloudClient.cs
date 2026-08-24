@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -27,6 +27,47 @@ public sealed class AgentCloudClient : IAgentCloudClient
             cancellationToken);
     }
 
+    public async Task<AgentClassWindowResponse> GetClassWindowAsync(
+        Guid deviceId,
+        CancellationToken cancellationToken = default)
+    {
+        using var message = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/api/agent/class-window?deviceId={deviceId:D}");
+
+        message.Headers.Add(
+            "X-Api-Key",
+            _options.ApiKey);
+
+        using var response =
+            await _httpClient.SendAsync(
+                message,
+                cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+
+        string responseJson =
+            await response.Content.ReadAsStringAsync(
+                cancellationToken);
+
+        return JsonSerializer.Deserialize<AgentClassWindowResponse>(
+                   responseJson,
+                   JsonOptions)
+               ?? throw new InvalidOperationException(
+                   "Empty class-window response from cloud.");
+    }
+
+    public async Task<AgentSessionEventResponse> SubmitSessionEventAsync(
+        AgentSessionEventRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return await PostAsync<
+            AgentSessionEventRequest,
+            AgentSessionEventResponse>(
+                "/api/agent/session-events",
+                request,
+                cancellationToken);
+    }
     public async Task<RecordingResponse> SubmitRecordingAsync(
         RecordingSubmittedRequest request,
         CancellationToken cancellationToken = default)

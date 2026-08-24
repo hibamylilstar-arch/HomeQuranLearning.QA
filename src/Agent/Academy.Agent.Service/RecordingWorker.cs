@@ -175,6 +175,8 @@ public sealed class RecordingWorker : BackgroundService
             SizeBytes = e.SizeBytes
         };
 
+        // Submit metadata exactly once.
+        // Upload retries must not create duplicate recording rows.
         var response = await _cloudClient.SubmitRecordingAsync(
             request,
             cancellationToken);
@@ -185,20 +187,99 @@ public sealed class RecordingWorker : BackgroundService
             response.Accepted,
             response.StorageKey ?? "None");
 
-        if (response.Accepted && response.RecordingId != Guid.Empty)
+        if (!response.Accepted || response.RecordingId == Guid.Empty)
         {
-            _logger.LogInformation(
-                "Uploading recording segment {FileName}...",
-                e.FileName);
+            _logger.LogWarning(
+                "Recording metadata was not accepted. Local file preserved: {OutputPath}",
+                e.OutputPath);
 
-            await _cloudClient.UploadRecordingAsync(
-                response.RecordingId,
-                e.OutputPath,
-                cancellationToken);
-
-            _logger.LogInformation(
-                "Recording segment uploaded successfully: {FileName}",
-                e.FileName);
+            return;
         }
+
+        if (!File.Exists(e.OutputPath))
+        {
+            throw new FileNotFoundException(
+                "Recording file disappeared before upload.",
+                e.OutputPath);
+        }
+
+        const int maxUploadAttempts = 3;
+        Exception? lastUploadException = null;
+
+        for (int attempt = 1; attempt <= maxUploadAttempts; attempt++)
+        {
+            try
+            {
+                _logger.LogInformation(
+                    "Uploading recording segment {FileName}. Attempt {Attempt}/{MaxAttempts}...",
+                    e.FileName,
+                    attempt,
+                    maxUploadAttempts);
+
+                await _cloudClient.UploadRecordingAsync(
+                    response.RecordingId,
+                    e.OutputPath,
+                    cancellationToken);
+
+                _logger.LogInformation(
+                    "Recording segment uploaded successfully: {FileName}",
+                    e.FileName);
+
+                // Cloud upload is confirmed. Local copy is no longer needed.
+                try
+                {
+                    File.Delete(e.OutputPath);
+
+                    _logger.LogInformation(
+                        "Deleted uploaded local recording segment: {OutputPath}",
+                        e.OutputPath);
+                }
+                catch (Exception deleteEx)
+                {
+                    // Upload itself succeeded, so a local-delete failure
+                    // must not turn this into an upload failure.
+                    _logger.LogWarning(
+                        deleteEx,
+                        "Recording uploaded, but local cleanup failed: {OutputPath}",
+                        e.OutputPath);
+                }
+
+                return;
+            }
+            catch (Exception ex)
+            {
+                lastUploadException = ex;
+
+                _logger.LogWarning(
+                    ex,
+                    "Recording upload attempt {Attempt}/{MaxAttempts} failed for {FileName}.",
+                    attempt,
+                    maxUploadAttempts,
+                    e.FileName);
+
+                if (attempt < maxUploadAttempts)
+                {
+                    var retryDelay = TimeSpan.FromSeconds(attempt * 3);
+
+                    _logger.LogInformation(
+                        "Retrying recording upload in {DelaySeconds} seconds.",
+                        retryDelay.TotalSeconds);
+
+                    await Task.Delay(retryDelay, cancellationToken);
+                }
+            }
+        }
+
+        // Important: do NOT delete the local file when all uploads fail.
+        _logger.LogError(
+            lastUploadException,
+            "Recording upload failed after {MaxAttempts} attempts. Local file preserved for later recovery: {OutputPath}",
+            maxUploadAttempts,
+            e.OutputPath);
+
+        throw new InvalidOperationException(
+            $"Recording upload failed after {maxUploadAttempts} attempts. Local file preserved.",
+            lastUploadException);
     }
 }
+

@@ -10,5 +10,17 @@ public enum SessionEventType
     ActivityStopped = 5,
     TechnicalIssue = 6,
     AgentStarted = 7,
-    AgentStopped = 8
+    AgentStopped = 8,
+
+    // Raw operational evidence.
+    // These are intentionally separate from attendance conclusions.
+    CommunicationDetected = 9,
+    CommunicationStopped = 10,
+    AudioObserved = 11,
+    BackendConnectionLost = 12,
+    BackendConnectionRestored = 13,
+    RecordingStarted = 14,
+    RecordingStopped = 15,
+    LiveStreamStarted = 16,
+    LiveStreamStopped = 17
 }

@@ -1,4 +1,4 @@
-﻿using Academy.Agent.Cloud;
+using Academy.Agent.Cloud;
 
 namespace Academy.Agent.Service;
 
@@ -10,6 +10,9 @@ public sealed class ClassObserverWorker : BackgroundService
     private readonly AttendanceEventJournal _journal;
     private readonly CloudOptions _cloudOptions;
     private readonly IConfiguration _configuration;
+    private readonly AgentActivityState _activityState;
+
+    private readonly HashSet<Guid> _processedActivitySignalIds = new();
 
     // Unique for every Windows-service process lifetime.
     // If the Agent restarts during one class, backend receives
@@ -43,7 +46,8 @@ public sealed class ClassObserverWorker : BackgroundService
         IDeviceIdentityProvider identityProvider,
         AttendanceEventJournal journal,
         CloudOptions cloudOptions,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        AgentActivityState activityState)
     {
         _logger = logger;
         _cloudClient = cloudClient;
@@ -51,6 +55,7 @@ public sealed class ClassObserverWorker : BackgroundService
         _journal = journal;
         _cloudOptions = cloudOptions;
         _configuration = configuration;
+        _activityState = activityState;
     }
 
     protected override async Task ExecuteAsync(
@@ -263,6 +268,12 @@ public sealed class ClassObserverWorker : BackgroundService
         if (_observedSessionId == candidate.SessionId)
         {
             _observedClass = candidate;
+
+            await ProcessActivitySignalsAsync(
+                identity,
+                candidate,
+                cancellationToken);
+
             return;
         }
 
@@ -274,6 +285,8 @@ public sealed class ClassObserverWorker : BackgroundService
 
         _observedClass =
             candidate;
+
+        _processedActivitySignalIds.Clear();
 
         _logger.LogInformation(
             "Observing class. SessionId={SessionId}, Teacher={Teacher}, Student={Student}, Start={StartUtc}, End={EndUtc}, Cached={Cached}",
@@ -306,8 +319,113 @@ public sealed class ClassObserverWorker : BackgroundService
                 : "Agent began observing the scheduled class window.",
             $"agent-started:{identity.DeviceId}:{candidate.SessionId:D}:{_observerInstanceId:N}",
             cancellationToken);
+
+        await ProcessActivitySignalsAsync(
+            identity,
+            candidate,
+            cancellationToken);
     }
 
+    private async Task ProcessActivitySignalsAsync(
+        DeviceIdentity identity,
+        AgentClassWindowItem session,
+        CancellationToken cancellationToken)
+    {
+        // Include a small pre-class window because a teacher may open
+        // the communication application shortly before scheduled start.
+        var sinceUtc =
+            session.ScheduledStartUtc.AddMinutes(-5);
+
+        var signals =
+            _activityState.GetSignalsSince(
+                sinceUtc);
+
+        foreach (var signal in signals)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!_processedActivitySignalIds.Add(signal.Id))
+            {
+                continue;
+            }
+
+            // Never attach evidence from after the observation grace window.
+            if (signal.OccurredAtUtc >
+                session.ScheduledEndUtc + ObservationGrace)
+            {
+                continue;
+            }
+
+            string? eventType =
+                MapRawEvidenceEventType(
+                    signal.Type);
+
+            if (eventType is null)
+            {
+                continue;
+            }
+
+            string details =
+                string.IsNullOrWhiteSpace(signal.Details)
+                    ? $"Raw Agent signal: {signal.Type}."
+                    : $"Raw Agent signal: {signal.Type}. {signal.Details}";
+
+            await QueueEventAsync(
+                identity,
+                session,
+                eventType,
+                signal.OccurredAtUtc,
+                signal.Source,
+                details,
+                $"signal:{identity.DeviceId}:{session.SessionId:D}:{signal.Id:N}:{eventType}",
+                cancellationToken);
+        }
+    }
+
+    private static string? MapRawEvidenceEventType(
+        AgentActivitySignalType signalType)
+    {
+        return signalType switch
+        {
+            AgentActivitySignalType.RecordingStarted =>
+                "RecordingStarted",
+
+            AgentActivitySignalType.RecordingStopped =>
+                "RecordingStopped",
+
+            AgentActivitySignalType.LiveStreamStarted =>
+                "LiveStreamStarted",
+
+            AgentActivitySignalType.LiveStreamStopped =>
+                "LiveStreamStopped",
+
+            AgentActivitySignalType.AudioActivity =>
+                "AudioObserved",
+
+            AgentActivitySignalType.CommunicationProcessDetected =>
+                "CommunicationDetected",
+
+            AgentActivitySignalType.CommunicationProcessStopped =>
+                "CommunicationStopped",
+
+            AgentActivitySignalType.ConnectionLost =>
+                "BackendConnectionLost",
+
+            AgentActivitySignalType.ConnectionRestored =>
+                "BackendConnectionRestored",
+
+            AgentActivitySignalType.TechnicalIssue =>
+                "TechnicalIssue",
+
+            // Heartbeat DeviceOnline is intentionally not persisted
+            // every 30 seconds because it would flood session_events.
+            AgentActivitySignalType.DeviceOnline =>
+                null,
+
+            _ =>
+                null
+        };
+    }
     private AgentClassWindowItem? ResolveObservedClass(
         AgentClassWindowResponse window,
         DateTimeOffset nowUtc)

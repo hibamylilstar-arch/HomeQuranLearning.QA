@@ -30,6 +30,7 @@ builder.Services.AddScoped<StudentService>();
 builder.Services.AddScoped<CourseService>();
 builder.Services.AddScoped<ScheduleService>();
 builder.Services.AddScoped<SessionService>();
+builder.Services.AddScoped<AttendanceReducer>();
 builder.Services.AddScoped<ISessionEventRepository, SessionEventRepository>();
 builder.Services.AddScoped<LiveKitTokenService>();
 

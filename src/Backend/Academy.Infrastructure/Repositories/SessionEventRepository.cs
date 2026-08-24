@@ -1,4 +1,4 @@
-﻿using Academy.Application.Abstractions;
+using Academy.Application.Abstractions;
 using Academy.Domain.Entities;
 using Academy.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +25,18 @@ public sealed class SessionEventRepository : ISessionEventRepository
                 cancellationToken);
     }
 
+    public async Task<IReadOnlyList<SessionEvent>> GetForSessionAsync(
+        Guid sessionId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.SessionEvents
+            .AsNoTracking()
+            .Where(x => x.SessionId == sessionId)
+            .OrderBy(x => x.OccurredAtUtc)
+            .ThenBy(x => x.CreatedAtUtc)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+    }
     public async Task AddAsync(
         SessionEvent sessionEvent,
         CancellationToken cancellationToken = default)

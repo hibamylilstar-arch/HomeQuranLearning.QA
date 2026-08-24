@@ -10,17 +10,20 @@ public sealed class SessionService
     private readonly ISessionRepository _sessionRepository;
     private readonly ISessionEventRepository _sessionEventRepository;
     private readonly IDeviceRepository _deviceRepository;
+    private readonly AttendanceReducer _attendanceReducer;
     private readonly IUnitOfWork _unitOfWork;
 
     public SessionService(
         ISessionRepository sessionRepository,
         ISessionEventRepository sessionEventRepository,
         IDeviceRepository deviceRepository,
+        AttendanceReducer attendanceReducer,
         IUnitOfWork unitOfWork)
     {
         _sessionRepository = sessionRepository;
         _sessionEventRepository = sessionEventRepository;
         _deviceRepository = deviceRepository;
+        _attendanceReducer = attendanceReducer;
         _unitOfWork = unitOfWork;
     }
 
@@ -186,6 +189,25 @@ public sealed class SessionService
         await _sessionEventRepository.AddAsync(
             sessionEvent,
             cancellationToken);
+
+        await _unitOfWork.SaveChangesAsync(
+            cancellationToken);
+
+
+        var sessionEvents =
+            await _sessionEventRepository.GetForSessionAsync(
+                session.Id,
+                cancellationToken);
+
+        _attendanceReducer.Reduce(
+            session,
+            sessionEvents);
+
+        session.UpdatedAtUtc =
+            DateTimeOffset.UtcNow;
+
+        _sessionRepository.Update(
+            session);
 
         await _unitOfWork.SaveChangesAsync(
             cancellationToken);

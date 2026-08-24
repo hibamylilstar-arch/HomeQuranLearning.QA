@@ -16,6 +16,8 @@ public sealed class LiveStreamingWorker : BackgroundService
     private UdpClient? _udpSender;
     private CancellationTokenSource? _audioPumpCts;
     private string? _currentStreamKey;
+    private volatile bool _videoCaptureFailed;
+    private Task? _stderrMonitorTask;
 
     private const int AudioUdpPort = 5005;
 
@@ -85,12 +87,18 @@ public sealed class LiveStreamingWorker : BackgroundService
                         _ffmpegProcess is null ||
                         _ffmpegProcess.HasExited;
 
-                    if (streamKey != _currentStreamKey || ffmpegNotRunning)
+                    bool needsRecovery =
+                        ffmpegNotRunning ||
+                        _videoCaptureFailed;
+
+                    if (streamKey != _currentStreamKey || needsRecovery)
                     {
-                        if (ffmpegNotRunning && _currentStreamKey is not null)
+                        if (needsRecovery && _currentStreamKey is not null)
                         {
                             _logger.LogWarning(
-                                "Live FFmpeg stopped unexpectedly. Recreating live stream.");
+                                _videoCaptureFailed
+                                    ? "Live video capture failed. Recreating live stream."
+                                    : "Live FFmpeg stopped unexpectedly. Recreating live stream.");
 
                             await StopFfmpegAsync();
                         }
@@ -156,15 +164,21 @@ public sealed class LiveStreamingWorker : BackgroundService
                 $"-thread_queue_size 1024 -f {audioFormat} -ar {sampleRate} -ac {channels} -i \"udp://127.0.0.1:{AudioUdpPort}?fifo_size=500000&overrun_nonfatal=1\" " +
                 $"-vf \"hwdownload,format=bgra,setpts=N/(10*TB)\" " +
                 $"-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p " +
-                $"-profile:v baseline -level:v 3.1 -g 20 -bf 0 -b:v 800k " +
+                $"-profile:v baseline -level:v 4.0 -g 10 -bf 0 -b:v 800k -flush_packets 1 " +
                 $"-c:a aac -b:a 64k -ar 48000 -ac 2 -f flv \"{rtmpUrl}\"",
             RedirectStandardOutput = false,
-            RedirectStandardError = false,
-            UseShellExecute = true,
-            CreateNoWindow = false
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
         };
 
-        _ffmpegProcess = Process.Start(startInfo);
+        _videoCaptureFailed = false;
+
+        _ffmpegProcess = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Could not start live FFmpeg.");
+
+        _stderrMonitorTask = MonitorFfmpegStderrAsync(_ffmpegProcess);
+
         _audioService.DataAvailable += OnAudioDataAvailable;
 
         // Continuous silence pump disabled.
@@ -177,6 +191,39 @@ public sealed class LiveStreamingWorker : BackgroundService
         await Task.CompletedTask;
     }
 
+    private async Task MonitorFfmpegStderrAsync(Process process)
+    {
+        try
+        {
+            while (!process.HasExited)
+            {
+                string? line = await process.StandardError.ReadLineAsync();
+
+                if (line is null)
+                {
+                    break;
+                }
+
+                if (line.Contains("AcquireNextFrame failed", StringComparison.OrdinalIgnoreCase) ||
+                    line.Contains("Error during demuxing", StringComparison.OrdinalIgnoreCase) ||
+                    line.Contains("Generic error in an external library", StringComparison.OrdinalIgnoreCase))
+                {
+                    _videoCaptureFailed = true;
+
+                    _logger.LogWarning(
+                        "FFmpeg desktop capture error detected: {FfmpegError}",
+                        line);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!process.HasExited)
+            {
+                _logger.LogDebug(ex, "FFmpeg stderr monitor stopped.");
+            }
+        }
+    }
     private void OnAudioDataAvailable(object? sender, AudioDataAvailableEventArgs e)
     {
         try
@@ -262,9 +309,18 @@ public sealed class LiveStreamingWorker : BackgroundService
             _currentStreamKey = null;
         }
 
+        _videoCaptureFailed = false;
+        _stderrMonitorTask = null;
+
         _logger.LogInformation("FFmpeg screen + UDP audio stopped.");
     }
 }
+
+
+
+
+
+
 
 
 

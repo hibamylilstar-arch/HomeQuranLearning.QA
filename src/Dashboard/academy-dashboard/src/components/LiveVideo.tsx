@@ -39,11 +39,7 @@ export default function LiveVideo({ url, token }: LiveVideoProps) {
         r.on(RoomEvent.Connected, () => setConnected(true));
         r.on(RoomEvent.Disconnected, () => setConnected(false));
 
-        const connectOptions: any = {
-          forceTcp: true,
-        };
-
-        await r.connect(url, token, connectOptions);
+        await r.connect(url, token);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Live connection failed");
@@ -121,5 +117,6 @@ export default function LiveVideo({ url, token }: LiveVideoProps) {
     </div>
   );
 }
+
 
 

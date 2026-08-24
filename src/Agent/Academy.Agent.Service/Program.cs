@@ -1,4 +1,4 @@
-using Academy.Agent.Cloud;
+﻿using Academy.Agent.Cloud;
 using Academy.Agent.Service;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -43,6 +43,7 @@ builder.Services.AddSingleton(_ =>
 });
 
 builder.Services.AddHostedService<AttendanceEventDeliveryWorker>();
+builder.Services.AddHostedService<ClassObserverWorker>();
 
 builder.Services.AddHostedService<RecordingWorker>();
 builder.Services.AddHostedService<HeartbeatWorker>();

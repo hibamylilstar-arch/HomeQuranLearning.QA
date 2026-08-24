@@ -13,6 +13,7 @@ var cloudOptions = builder.Configuration
     .Get<CloudOptions>() ?? new CloudOptions();
 
 builder.Services.AddSingleton(cloudOptions);
+builder.Services.AddSingleton<AgentActivityState>();
 
 builder.Services.AddHttpClient<IAgentCloudClient, AgentCloudClient>(client =>
 {
@@ -44,6 +45,7 @@ builder.Services.AddSingleton(_ =>
 
 builder.Services.AddHostedService<AttendanceEventDeliveryWorker>();
 builder.Services.AddHostedService<ClassObserverWorker>();
+builder.Services.AddHostedService<CommunicationProcessMonitorWorker>();
 
 builder.Services.AddHostedService<RecordingWorker>();
 builder.Services.AddHostedService<HeartbeatWorker>();
@@ -52,3 +54,5 @@ builder.Services.AddHostedService<LiveStreamingWorker>();
 var host = builder.Build();
 
 host.Run();
+
+

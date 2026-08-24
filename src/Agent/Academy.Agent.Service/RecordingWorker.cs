@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Academy.Agent.Cloud;
 using Academy.Agent.Media;
 
@@ -11,6 +11,7 @@ public sealed class RecordingWorker : BackgroundService
     private readonly IAgentCloudClient _cloudClient;
     private readonly IDeviceIdentityProvider _identityProvider;
     private readonly CloudOptions _cloudOptions;
+    private readonly AgentActivityState _activityState;
 
     private static readonly JsonSerializerOptions PendingJsonOptions =
         new()
@@ -23,13 +24,15 @@ public sealed class RecordingWorker : BackgroundService
         IConfiguration configuration,
         IAgentCloudClient cloudClient,
         IDeviceIdentityProvider identityProvider,
-        CloudOptions cloudOptions)
+        CloudOptions cloudOptions,
+        AgentActivityState activityState)
     {
         _logger = logger;
         _configuration = configuration;
         _cloudClient = cloudClient;
         _identityProvider = identityProvider;
         _cloudOptions = cloudOptions;
+        _activityState = activityState;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -144,6 +147,14 @@ public sealed class RecordingWorker : BackgroundService
                     options,
                     stoppingToken);
 
+                _activityState.Publish(new AgentActivitySignal
+                {
+                    Type = AgentActivitySignalType.RecordingStarted,
+                    OccurredAtUtc = DateTimeOffset.UtcNow,
+                    Source = "RecordingWorker",
+                    Details = Path.GetFileName(outputPath)
+                });
+
                 using var segmentCts =
                     CancellationTokenSource.CreateLinkedTokenSource(
                         stoppingToken);
@@ -168,6 +179,14 @@ public sealed class RecordingWorker : BackgroundService
 
                 await service.StopAsync(
                     CancellationToken.None);
+
+                _activityState.Publish(new AgentActivitySignal
+                {
+                    Type = AgentActivitySignalType.RecordingStopped,
+                    OccurredAtUtc = DateTimeOffset.UtcNow,
+                    Source = "RecordingWorker",
+                    Details = Path.GetFileName(outputPath)
+                });
 
                 if (completedRecording is not null &&
                     _cloudOptions.Enabled &&
@@ -580,3 +599,4 @@ public sealed class RecordingWorker : BackgroundService
         public long SizeBytes { get; set; }
     }
 }
+

@@ -1,4 +1,4 @@
-using Academy.Agent.Cloud;
+﻿using Academy.Agent.Cloud;
 
 namespace Academy.Agent.Service;
 
@@ -8,24 +8,32 @@ public sealed class HeartbeatWorker : BackgroundService
     private readonly IAgentCloudClient _cloudClient;
     private readonly IDeviceIdentityProvider _identityProvider;
     private readonly CloudOptions _cloudOptions;
+    private readonly AgentActivityState _activityState;
+
+    private bool _connectionFailureObserved;
 
     public HeartbeatWorker(
         ILogger<HeartbeatWorker> logger,
         IAgentCloudClient cloudClient,
         IDeviceIdentityProvider identityProvider,
-        CloudOptions cloudOptions)
+        CloudOptions cloudOptions,
+        AgentActivityState activityState)
     {
         _logger = logger;
         _cloudClient = cloudClient;
         _identityProvider = identityProvider;
         _cloudOptions = cloudOptions;
+        _activityState = activityState;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(
+        CancellationToken stoppingToken)
     {
         if (!_cloudOptions.Enabled)
         {
-            _logger.LogInformation("Cloud heartbeat is disabled.");
+            _logger.LogInformation(
+                "Cloud heartbeat is disabled.");
+
             return;
         }
 
@@ -34,7 +42,9 @@ public sealed class HeartbeatWorker : BackgroundService
             _cloudOptions.BaseUrl,
             _cloudOptions.HeartbeatIntervalSeconds);
 
-        var identity = await _identityProvider.GetOrCreateIdentityAsync(stoppingToken);
+        var identity =
+            await _identityProvider.GetOrCreateIdentityAsync(
+                stoppingToken);
 
         _logger.LogInformation(
             "Device identity loaded: {DeviceId} ({DeviceName})",
@@ -45,13 +55,63 @@ public sealed class HeartbeatWorker : BackgroundService
         {
             try
             {
-                var request = new HeartbeatRequest
-                {
-                    DeviceId = identity.DeviceId,
-                    DeviceName = identity.DeviceName
-                };
+                var request =
+                    new HeartbeatRequest
+                    {
+                        DeviceId =
+                            identity.DeviceId,
 
-                var response = await _cloudClient.SendHeartbeatAsync(request, stoppingToken);
+                        DeviceName =
+                            identity.DeviceName
+                    };
+
+                var response =
+                    await _cloudClient.SendHeartbeatAsync(
+                        request,
+                        stoppingToken);
+
+                var nowUtc =
+                    DateTimeOffset.UtcNow;
+
+                _activityState.Publish(
+                    new AgentActivitySignal
+                    {
+                        Type =
+                            AgentActivitySignalType.DeviceOnline,
+
+                        OccurredAtUtc =
+                            nowUtc,
+
+                        Source =
+                            "Heartbeat",
+
+                        Details =
+                            response.Command is null
+                                ? "Heartbeat acknowledged."
+                                : $"Heartbeat acknowledged. Command={response.Command}"
+                    });
+
+                if (_connectionFailureObserved)
+                {
+                    _activityState.Publish(
+                        new AgentActivitySignal
+                        {
+                            Type =
+                                AgentActivitySignalType.ConnectionRestored,
+
+                            OccurredAtUtc =
+                                nowUtc,
+
+                            Source =
+                                "Heartbeat",
+
+                            Details =
+                                "Backend connectivity restored."
+                        });
+
+                    _connectionFailureObserved =
+                        false;
+                }
 
                 _logger.LogInformation(
                     "Heartbeat sent. Received={Received}, Command={Command}",
@@ -59,21 +119,48 @@ public sealed class HeartbeatWorker : BackgroundService
                     response.Command ?? "None");
             }
             catch (OperationCanceledException)
+                when (stoppingToken.IsCancellationRequested)
             {
                 break;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Heartbeat failed. Will retry.");
+                if (!_connectionFailureObserved)
+                {
+                    _connectionFailureObserved =
+                        true;
+
+                    _activityState.Publish(
+                        new AgentActivitySignal
+                        {
+                            Type =
+                                AgentActivitySignalType.ConnectionLost,
+
+                            OccurredAtUtc =
+                                DateTimeOffset.UtcNow,
+
+                            Source =
+                                "Heartbeat",
+
+                            Details =
+                                "Backend heartbeat failed."
+                        });
+                }
+
+                _logger.LogWarning(
+                    ex,
+                    "Heartbeat failed. Will retry.");
             }
 
             try
             {
                 await Task.Delay(
-                    TimeSpan.FromSeconds(_cloudOptions.HeartbeatIntervalSeconds),
+                    TimeSpan.FromSeconds(
+                        _cloudOptions.HeartbeatIntervalSeconds),
                     stoppingToken);
             }
             catch (OperationCanceledException)
+                when (stoppingToken.IsCancellationRequested)
             {
                 break;
             }

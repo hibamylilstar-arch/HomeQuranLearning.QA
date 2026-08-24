@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text.Json;
 using Academy.Agent.Audio;
@@ -10,6 +10,7 @@ public sealed class LiveStreamingWorker : BackgroundService
 {
     private readonly ILogger<LiveStreamingWorker> _logger;
     private readonly IConfiguration _configuration;
+    private readonly AgentActivityState _activityState;
 
     private Process? _ffmpegProcess;
     private AudioCaptureService? _audioService;
@@ -18,15 +19,18 @@ public sealed class LiveStreamingWorker : BackgroundService
     private string? _currentStreamKey;
     private volatile bool _videoCaptureFailed;
     private Task? _stderrMonitorTask;
+    private DateTimeOffset _lastAudioActivitySignalUtc = DateTimeOffset.MinValue;
 
     private const int AudioUdpPort = 5005;
 
     public LiveStreamingWorker(
         ILogger<LiveStreamingWorker> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        AgentActivityState activityState)
     {
         _logger = logger;
         _configuration = configuration;
+        _activityState = activityState;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -186,6 +190,13 @@ public sealed class LiveStreamingWorker : BackgroundService
 
         _currentStreamKey = streamKey;
 
+        _activityState.Publish(new AgentActivitySignal
+        {
+            Type = AgentActivitySignalType.LiveStreamStarted,
+            OccurredAtUtc = DateTimeOffset.UtcNow,
+            Source = "LiveStreamingWorker"
+        });
+
         _logger.LogInformation("FFmpeg live stream started for stream key: {StreamKey}", streamKey);
 
         await Task.CompletedTask;
@@ -210,6 +221,14 @@ public sealed class LiveStreamingWorker : BackgroundService
                 {
                     _videoCaptureFailed = true;
 
+                    _activityState.Publish(new AgentActivitySignal
+                    {
+                        Type = AgentActivitySignalType.TechnicalIssue,
+                        OccurredAtUtc = DateTimeOffset.UtcNow,
+                        Source = "LiveStreamingWorker",
+                        Details = line
+                    });
+
                     _logger.LogWarning(
                         "FFmpeg desktop capture error detected: {FfmpegError}",
                         line);
@@ -231,6 +250,23 @@ public sealed class LiveStreamingWorker : BackgroundService
             if (_udpSender is not null && e.BytesRecorded > 0)
             {
                 _udpSender.Send(e.Buffer, e.BytesRecorded);
+
+                var nowUtc = DateTimeOffset.UtcNow;
+
+                // Throttle raw audio evidence so the shared signal buffer
+                // is not flooded by WASAPI callbacks.
+                if (nowUtc - _lastAudioActivitySignalUtc >= TimeSpan.FromSeconds(5))
+                {
+                    _lastAudioActivitySignalUtc = nowUtc;
+
+                    _activityState.Publish(new AgentActivitySignal
+                    {
+                        Type = AgentActivitySignalType.AudioActivity,
+                        OccurredAtUtc = nowUtc,
+                        Source = "LiveAudio",
+                        Details = $"Bytes={e.BytesRecorded}"
+                    });
+                }
             }
         }
         catch
@@ -312,9 +348,17 @@ public sealed class LiveStreamingWorker : BackgroundService
         _videoCaptureFailed = false;
         _stderrMonitorTask = null;
 
+        _activityState.Publish(new AgentActivitySignal
+        {
+            Type = AgentActivitySignalType.LiveStreamStopped,
+            OccurredAtUtc = DateTimeOffset.UtcNow,
+            Source = "LiveStreamingWorker"
+        });
+
         _logger.LogInformation("FFmpeg screen + UDP audio stopped.");
     }
 }
+
 
 
 

@@ -1,0 +1,262 @@
+﻿using System.Diagnostics;
+
+namespace Academy.Agent.Service;
+
+public sealed class CommunicationProcessMonitorWorker : BackgroundService
+{
+    private readonly ILogger<CommunicationProcessMonitorWorker> _logger;
+    private readonly AgentActivityState _activityState;
+    private readonly IConfiguration _configuration;
+
+    private bool _wasCommunicationActive;
+    private string? _lastDetectedApplication;
+
+    private static readonly HashSet<string> NativeCommunicationProcesses =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Teams",
+            "ms-teams",
+            "Zoom",
+            "ZoomClient",
+            "Skype",
+            "SkypeApp"
+        };
+
+    private static readonly HashSet<string> BrowserProcesses =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "chrome",
+            "msedge",
+            "firefox",
+            "brave",
+            "opera"
+        };
+
+    private static readonly string[] MeetingWindowMarkers =
+    {
+        "meet.google.com",
+        "Google Meet",
+        "Microsoft Teams",
+        "Zoom Meeting",
+        "Zoom Workplace"
+    };
+
+    private TimeSpan PollInterval =>
+        TimeSpan.FromSeconds(
+            Math.Clamp(
+                _configuration.GetValue<int?>(
+                    "Attendance:CommunicationProcessPollSeconds") ?? 5,
+                2,
+                30));
+
+    public CommunicationProcessMonitorWorker(
+        ILogger<CommunicationProcessMonitorWorker> logger,
+        AgentActivityState activityState,
+        IConfiguration configuration)
+    {
+        _logger = logger;
+        _activityState = activityState;
+        _configuration = configuration;
+    }
+
+    protected override async Task ExecuteAsync(
+        CancellationToken stoppingToken)
+    {
+        _logger.LogInformation(
+            "Communication process monitor started. Poll={PollSeconds}s",
+            PollInterval.TotalSeconds);
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                ObserveProcesses();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Communication process observation failed.");
+            }
+
+            try
+            {
+                await Task.Delay(
+                    PollInterval,
+                    stoppingToken);
+            }
+            catch (OperationCanceledException)
+                when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+        }
+
+        if (_wasCommunicationActive)
+        {
+            PublishStopped(
+                _lastDetectedApplication,
+                "Agent communication monitor stopped.");
+        }
+
+        _logger.LogInformation(
+            "Communication process monitor stopped.");
+    }
+
+    private void ObserveProcesses()
+    {
+        var detection =
+            DetectCommunicationApplication();
+
+        if (detection is not null)
+        {
+            if (!_wasCommunicationActive)
+            {
+                _wasCommunicationActive = true;
+                _lastDetectedApplication = detection;
+
+                _activityState.Publish(
+                    new AgentActivitySignal
+                    {
+                        Type =
+                            AgentActivitySignalType.CommunicationProcessDetected,
+
+                        OccurredAtUtc =
+                            DateTimeOffset.UtcNow,
+
+                        Source =
+                            "CommunicationProcessMonitor",
+
+                        Details =
+                            $"Communication application detected: {detection}."
+                    });
+
+                _logger.LogInformation(
+                    "Communication application detected: {Application}",
+                    detection);
+
+                return;
+            }
+
+            _lastDetectedApplication =
+                detection;
+
+            return;
+        }
+
+        if (_wasCommunicationActive)
+        {
+            PublishStopped(
+                _lastDetectedApplication,
+                "Communication application is no longer detected.");
+        }
+    }
+
+    private string? DetectCommunicationApplication()
+    {
+        Process[] processes;
+
+        try
+        {
+            processes =
+                Process.GetProcesses();
+        }
+        catch
+        {
+            return null;
+        }
+
+        foreach (var process in processes)
+        {
+            try
+            {
+                var processName =
+                    process.ProcessName;
+
+                if (NativeCommunicationProcesses.Contains(
+                        processName))
+                {
+                    return processName;
+                }
+
+                if (!BrowserProcesses.Contains(
+                        processName))
+                {
+                    continue;
+                }
+
+                string title;
+
+                try
+                {
+                    title =
+                        process.MainWindowTitle ?? string.Empty;
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    continue;
+                }
+
+                foreach (var marker in MeetingWindowMarkers)
+                {
+                    if (title.Contains(
+                            marker,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        return
+                            $"{processName}:{marker}";
+                    }
+                }
+            }
+            catch
+            {
+                // A process can disappear or deny metadata access
+                // while the snapshot is being inspected.
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+
+        return null;
+    }
+
+    private void PublishStopped(
+        string? application,
+        string reason)
+    {
+        _wasCommunicationActive =
+            false;
+
+        _activityState.Publish(
+            new AgentActivitySignal
+            {
+                Type =
+                    AgentActivitySignalType.CommunicationProcessStopped,
+
+                OccurredAtUtc =
+                    DateTimeOffset.UtcNow,
+
+                Source =
+                    "CommunicationProcessMonitor",
+
+                Details =
+                    application is null
+                        ? reason
+                        : $"{reason} LastApplication={application}"
+            });
+
+        _logger.LogInformation(
+            "Communication application stopped. LastApplication={Application}",
+            application ?? "Unknown");
+
+        _lastDetectedApplication =
+            null;
+    }
+}

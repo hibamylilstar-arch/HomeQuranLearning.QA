@@ -39,6 +39,22 @@ public sealed class RecordingService
 
         var duration = request.EndedAtUtc - request.StartedAtUtc;
 
+        var existingRecording =
+            await _recordingRepository.GetByDeviceAndFileNameAsync(
+                device.Id,
+                request.FileName,
+                cancellationToken);
+
+        if (existingRecording is not null)
+        {
+            return new RecordingResponse
+            {
+                RecordingId = existingRecording.Id,
+                Accepted = true,
+                StorageKey = existingRecording.StorageKey
+            };
+        }
+
         var storageKey = $"recordings/{device.DeviceId}/{request.FileName}";
 
         var recording = new Recording

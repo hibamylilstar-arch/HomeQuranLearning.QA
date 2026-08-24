@@ -57,8 +57,21 @@ public sealed class RecordingRepository : IRecordingRepository
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
+    public async Task<Recording?> GetByDeviceAndFileNameAsync(
+        Guid deviceId,
+        string fileName,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Recordings
+            .FirstOrDefaultAsync(
+                x => x.DeviceId == deviceId &&
+                     x.FileName == fileName,
+                cancellationToken);
+    }
+
     public void Update(Recording recording)
     {
         _dbContext.Recordings.Update(recording);
     }
 }
+

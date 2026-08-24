@@ -42,11 +42,7 @@ public sealed class RecordingWorker : BackgroundService
 
         var options = section.Get<RecordingOptions>() ?? new RecordingOptions();
 
-        string outputPath = Path.Combine(
-            outputDirectory,
-            $"Academy_Recording_{DateTime.Now:yyyyMMdd_HHmmss}.mp4");
-
-        var service = new RecordingService(options);
+        int segmentMinutes = Math.Max(1, options.SegmentMinutes);
 
         DeviceIdentity? deviceIdentity = null;
 
@@ -55,62 +51,120 @@ public sealed class RecordingWorker : BackgroundService
             deviceIdentity = await _identityProvider.GetOrCreateIdentityAsync(stoppingToken);
         }
 
-        service.RecordingCompleted += (_, e) =>
-        {
-            _logger.LogInformation(
-                "Recording completed: {OutputPath}, Duration: {Duration}",
-                e.OutputPath,
-                e.Duration);
+        _logger.LogInformation(
+            "Segmented recording enabled. SegmentMinutes={SegmentMinutes}, OutputDirectory={OutputDirectory}",
+            segmentMinutes,
+            outputDirectory);
 
-            if (_cloudOptions.Enabled && deviceIdentity is not null)
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            string outputPath = Path.Combine(
+                outputDirectory,
+                $"Academy_Recording_{DateTime.Now:yyyyMMdd_HHmmss}.mp4");
+
+            var service = new RecordingService(options);
+
+            RecordingCompletedEventArgs? completedRecording = null;
+
+            service.RecordingCompleted += (_, e) =>
             {
-                try
-                {
-                    SubmitRecordingAndUploadAsync(deviceIdentity, e).GetAwaiter().GetResult();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to submit/upload recording.");
-                }
-            }
-        };
+                completedRecording = e;
 
-        service.RecordingFailed += (_, e) =>
-        {
-            _logger.LogError(e.Exception, "Recording failed.");
-        };
+                _logger.LogInformation(
+                    "Recording segment completed: {OutputPath}, Duration: {Duration}, SizeBytes: {SizeBytes}",
+                    e.OutputPath,
+                    e.Duration,
+                    e.SizeBytes);
+            };
 
-        _logger.LogInformation("Starting recording to {OutputPath}", outputPath);
-
-        await service.StartAsync(outputPath, options, stoppingToken);
-
-        try
-        {
-            await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Shutdown requested.");
-        }
-        finally
-        {
-            _logger.LogInformation("Stopping recording...");
+            service.RecordingFailed += (_, e) =>
+            {
+                _logger.LogError(e.Exception, "Recording segment failed.");
+            };
 
             try
             {
+                _logger.LogInformation(
+                    "Starting recording segment: {OutputPath}",
+                    outputPath);
+
+                await service.StartAsync(outputPath, options, stoppingToken);
+
+                using var segmentCts =
+                    CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+
+                segmentCts.CancelAfter(TimeSpan.FromMinutes(segmentMinutes));
+
+                try
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, segmentCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+
+                _logger.LogInformation(
+                    stoppingToken.IsCancellationRequested
+                        ? "Shutdown requested. Finalizing current recording segment..."
+                        : "Recording segment duration reached. Finalizing segment...");
+
                 await service.StopAsync(CancellationToken.None);
-                _logger.LogInformation("Recording stopped.");
+
+                if (completedRecording is not null &&
+                    _cloudOptions.Enabled &&
+                    deviceIdentity is not null)
+                {
+                    try
+                    {
+                        await SubmitRecordingAndUploadAsync(
+                            deviceIdentity,
+                            completedRecording,
+                            CancellationToken.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Failed to submit/upload recording segment {FileName}.",
+                            completedRecording.FileName);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error while stopping recording.");
+                _logger.LogError(ex, "Recording segment loop failed.");
+
+                try
+                {
+                    await service.StopAsync(CancellationToken.None);
+                }
+                catch
+                {
+                }
+
+                if (!stoppingToken.IsCancellationRequested)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                }
+            }
+
+            if (stoppingToken.IsCancellationRequested)
+            {
+                break;
             }
         }
+
+        _logger.LogInformation("Recording worker stopped.");
     }
 
     private async Task SubmitRecordingAndUploadAsync(
         DeviceIdentity deviceIdentity,
-        RecordingCompletedEventArgs e)
+        RecordingCompletedEventArgs e,
+        CancellationToken cancellationToken)
     {
         var request = new RecordingSubmittedRequest
         {
@@ -121,7 +175,9 @@ public sealed class RecordingWorker : BackgroundService
             SizeBytes = e.SizeBytes
         };
 
-        var response = await _cloudClient.SubmitRecordingAsync(request);
+        var response = await _cloudClient.SubmitRecordingAsync(
+            request,
+            cancellationToken);
 
         _logger.LogInformation(
             "Recording metadata submitted. RecordingId={RecordingId}, Accepted={Accepted}, StorageKey={StorageKey}",
@@ -131,11 +187,18 @@ public sealed class RecordingWorker : BackgroundService
 
         if (response.Accepted && response.RecordingId != Guid.Empty)
         {
-            _logger.LogInformation("Uploading recording file {FileName}...", e.FileName);
+            _logger.LogInformation(
+                "Uploading recording segment {FileName}...",
+                e.FileName);
 
-            await _cloudClient.UploadRecordingAsync(response.RecordingId, e.OutputPath);
+            await _cloudClient.UploadRecordingAsync(
+                response.RecordingId,
+                e.OutputPath,
+                cancellationToken);
 
-            _logger.LogInformation("Recording file uploaded successfully.");
+            _logger.LogInformation(
+                "Recording segment uploaded successfully: {FileName}",
+                e.FileName);
         }
     }
 }

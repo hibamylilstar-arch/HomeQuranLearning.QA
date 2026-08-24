@@ -87,6 +87,9 @@
 
   ingress-manager:
     image: academy-ingress-manager:latest
+    build:
+      context: ../../src/LiveKitIngressManager
+      dockerfile: Dockerfile
     container_name: academy-ingress-manager
     restart: unless-stopped
     environment:

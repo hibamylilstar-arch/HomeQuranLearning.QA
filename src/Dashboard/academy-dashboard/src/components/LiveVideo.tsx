@@ -10,7 +10,10 @@ interface LiveVideoProps {
 
 export default function LiveVideo({ url, token }: LiveVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
   const [connected, setConnected] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -26,6 +29,10 @@ export default function LiveVideo({ url, token }: LiveVideoProps) {
           if (track.kind === Track.Kind.Video && videoRef.current) {
             track.attach(videoRef.current);
             videoRef.current.play().catch(() => {});
+          }
+
+          if (track.kind === Track.Kind.Audio && audioRef.current) {
+            track.attach(audioRef.current);
           }
         });
 
@@ -48,12 +55,33 @@ export default function LiveVideo({ url, token }: LiveVideoProps) {
 
     return () => {
       cancelled = true;
+
       if (room) {
         room.disconnect();
       }
+
       room = null;
     };
   }, [url, token]);
+
+  async function toggleAudio() {
+    if (!audioRef.current) return;
+
+    if (audioEnabled) {
+      audioRef.current.muted = true;
+      setAudioEnabled(false);
+      return;
+    }
+
+    audioRef.current.muted = false;
+
+    try {
+      await audioRef.current.play();
+      setAudioEnabled(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start audio");
+    }
+  }
 
   return (
     <div className="space-y-2">
@@ -65,9 +93,33 @@ export default function LiveVideo({ url, token }: LiveVideoProps) {
           muted
           className="h-full w-full object-contain"
         />
+
+        <audio
+          ref={audioRef}
+          autoPlay
+          muted={!audioEnabled}
+        />
       </div>
-      {!connected && !error && <p className="text-sm text-slate-500">Connecting...</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {connected && (
+        <button
+          type="button"
+          onClick={toggleAudio}
+          className="rounded bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+        >
+          {audioEnabled ? "Disable Audio" : "Enable Audio"}
+        </button>
+      )}
+
+      {!connected && !error && (
+        <p className="text-sm text-slate-500">Connecting...</p>
+      )}
+
+      {error && (
+        <p className="text-sm text-red-600">{error}</p>
+      )}
     </div>
   );
 }
+
+

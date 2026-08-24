@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { getLiveSessions, getLiveKitToken } from "@/lib/api";
@@ -19,7 +19,7 @@ export default function LiveMonitoringPage() {
 
         const tokenMap: Record<string, { url: string; token: string }> = {};
         for (const session of liveSessions) {
-          const identity = "viewer-" + session.id;
+          const identity = `viewer-${session.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
           const roomName = "session-" + session.id;
           const data = await getLiveKitToken(roomName, identity, false, true);
           tokenMap[session.id] = data;
@@ -104,3 +104,4 @@ export default function LiveMonitoringPage() {
     </div>
   );
 }
+

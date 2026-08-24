@@ -81,9 +81,24 @@ public sealed class LiveStreamingWorker : BackgroundService
                 {
                     string streamKey = doc.RootElement.GetProperty("streamKey").GetString() ?? string.Empty;
 
-                    if (streamKey != _currentStreamKey)
+                    bool ffmpegNotRunning =
+                        _ffmpegProcess is null ||
+                        _ffmpegProcess.HasExited;
+
+                    if (streamKey != _currentStreamKey || ffmpegNotRunning)
                     {
-                        _logger.LogInformation("Starting screen + UDP audio stream with silence pump for key: {StreamKey}", streamKey);
+                        if (ffmpegNotRunning && _currentStreamKey is not null)
+                        {
+                            _logger.LogWarning(
+                                "Live FFmpeg stopped unexpectedly. Recreating live stream.");
+
+                            await StopFfmpegAsync();
+                        }
+
+                        _logger.LogInformation(
+                            "Starting screen + audio live stream for key: {StreamKey}",
+                            streamKey);
+
                         await StartFfmpegAsync(streamKey, ffmpegPath);
                     }
                 }
@@ -122,6 +137,14 @@ public sealed class LiveStreamingWorker : BackgroundService
         int sampleRate = captureFormat.SampleRate;
         int channels = captureFormat.Channels;
 
+        string audioFormat = captureFormat.Encoding switch
+        {
+            WaveFormatEncoding.IeeeFloat => "f32le",
+            WaveFormatEncoding.Pcm when captureFormat.BitsPerSample == 16 => "s16le",
+            _ => throw new NotSupportedException(
+                $"Unsupported live audio format: {captureFormat.Encoding}, {captureFormat.BitsPerSample}-bit")
+        };
+
         string rtmpUrl = $"rtmp://localhost:1935/live/{streamKey}";
 
         var startInfo = new ProcessStartInfo
@@ -129,11 +152,11 @@ public sealed class LiveStreamingWorker : BackgroundService
             FileName = ffmpegPath,
             Arguments =
                 $"-fflags nobuffer -flags low_delay " +
-                $"-f lavfi -i ddagrab=framerate=15 " +
-                $"-thread_queue_size 1024 -f s16le -ar {sampleRate} -ac {channels} -i \"udp://127.0.0.1:{AudioUdpPort}?fifo_size=500000&overrun_nonfatal=1\" " +
-                $"-vf \"hwdownload,format=bgra\" " +
+                $"-f lavfi -i ddagrab=framerate=10:dup_frames=1 " +
+                $"-thread_queue_size 1024 -f {audioFormat} -ar {sampleRate} -ac {channels} -i \"udp://127.0.0.1:{AudioUdpPort}?fifo_size=500000&overrun_nonfatal=1\" " +
+                $"-vf \"hwdownload,format=bgra,setpts=N/(10*TB)\" " +
                 $"-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p " +
-                $"-profile:v baseline -level:v 3.1 -g 30 -bf 0 -b:v 800k " +
+                $"-profile:v baseline -level:v 3.1 -g 20 -bf 0 -b:v 800k " +
                 $"-c:a aac -b:a 64k -ar 48000 -ac 2 -f flv \"{rtmpUrl}\"",
             RedirectStandardOutput = false,
             RedirectStandardError = false,
@@ -144,13 +167,12 @@ public sealed class LiveStreamingWorker : BackgroundService
         _ffmpegProcess = Process.Start(startInfo);
         _audioService.DataAvailable += OnAudioDataAvailable;
 
-        // Start continuous silence pump to guarantee FFmpeg never starves on startup
-        _audioPumpCts = new CancellationTokenSource();
-        _ = StartSilencePumpAsync(_audioPumpCts.Token);
+        // Continuous silence pump disabled.
+        // It must not write simultaneously with real WASAPI audio.
 
         _currentStreamKey = streamKey;
 
-        _logger.LogInformation("FFmpeg started with UDP silence pump for stream key: {StreamKey}", streamKey);
+        _logger.LogInformation("FFmpeg live stream started for stream key: {StreamKey}", streamKey);
 
         await Task.CompletedTask;
     }
@@ -215,6 +237,7 @@ public sealed class LiveStreamingWorker : BackgroundService
 
         if (_ffmpegProcess is null || _ffmpegProcess.HasExited)
         {
+            _ffmpegProcess?.Dispose();
             _ffmpegProcess = null;
             _currentStreamKey = null;
             return;
@@ -242,3 +265,8 @@ public sealed class LiveStreamingWorker : BackgroundService
         _logger.LogInformation("FFmpeg screen + UDP audio stopped.");
     }
 }
+
+
+
+
+

@@ -1,4 +1,4 @@
-﻿using Academy.Application.Abstractions;
+using Academy.Application.Abstractions;
 using Academy.Application.Contracts;
 using Academy.Application.Services;
 using Academy.Domain.Entities;
@@ -291,6 +291,13 @@ public sealed class FakeStorageService : IStorageService
         return Task.CompletedTask;
     }
 
+    public Task DeleteAsync(
+        string bucketName,
+        string objectKey,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
     public Task<string> GetPresignedUrlAsync(string bucketName, string objectKey, TimeSpan expiry, CancellationToken cancellationToken = default)
     {
         return Task.FromResult("https://fake.url");

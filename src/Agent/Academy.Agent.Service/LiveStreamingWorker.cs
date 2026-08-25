@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
+using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
 using Academy.Agent.Audio;
@@ -21,7 +22,10 @@ public sealed class LiveStreamingWorker : BackgroundService
     private Task? _stderrMonitorTask;
     private DateTimeOffset _lastAudioActivitySignalUtc = DateTimeOffset.MinValue;
 
-    private const int AudioUdpPort = 5005;
+    private readonly object _ffmpegDiagnosticLock = new();
+    private readonly Queue<string> _ffmpegStderrTail = new();
+
+    private const int FfmpegStderrTailLimit = 20;
 
     public LiveStreamingWorker(
         ILogger<LiveStreamingWorker> logger,
@@ -124,12 +128,36 @@ public sealed class LiveStreamingWorker : BackgroundService
                 _logger.LogWarning(ex, "Live streaming loop error.");
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            try
+            {
+                await Task.Delay(
+                    TimeSpan.FromSeconds(5),
+                    stoppingToken);
+            }
+            catch (OperationCanceledException)
+                when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
         }
 
+        // Always clean up the child FFmpeg process before
+        // the BackgroundService finishes during graceful shutdown.
         await StopFfmpegAsync();
     }
 
+    private static int GetAvailableLoopbackUdpPort()
+    {
+        using var probe =
+            new UdpClient(
+                new IPEndPoint(
+                    IPAddress.Loopback,
+                    0));
+
+        return
+            ((IPEndPoint)probe.Client.LocalEndPoint!)
+            .Port;
+    }
     private async Task StartFfmpegAsync(string streamKey, string ffmpegPath)
     {
         if (_ffmpegProcess is not null && !_ffmpegProcess.HasExited)
@@ -137,8 +165,17 @@ public sealed class LiveStreamingWorker : BackgroundService
             return;
         }
 
+        int audioUdpPort =
+            GetAvailableLoopbackUdpPort();
+
         _udpSender = new UdpClient();
-        _udpSender.Connect("127.0.0.1", AudioUdpPort);
+        _udpSender.Connect(
+            IPAddress.Loopback,
+            audioUdpPort);
+
+        _logger.LogInformation(
+            "Allocated live audio UDP port {AudioUdpPort}.",
+            audioUdpPort);
 
         _audioService = new AudioCaptureService();
         _audioService.Start();
@@ -165,7 +202,7 @@ public sealed class LiveStreamingWorker : BackgroundService
             Arguments =
                 $"-fflags nobuffer -flags low_delay " +
                 $"-f lavfi -i ddagrab=framerate=10:dup_frames=1 " +
-                $"-thread_queue_size 1024 -f {audioFormat} -ar {sampleRate} -ac {channels} -i \"udp://127.0.0.1:{AudioUdpPort}?fifo_size=500000&overrun_nonfatal=1\" " +
+                $"-thread_queue_size 1024 -f {audioFormat} -ar {sampleRate} -ac {channels} -i \"udp://127.0.0.1:{audioUdpPort}?fifo_size=500000&overrun_nonfatal=1\" " +
                 $"-vf \"hwdownload,format=bgra,setpts=N/(10*TB)\" " +
                 $"-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p " +
                 $"-profile:v baseline -level:v 4.0 -g 10 -bf 0 -b:v 800k -flush_packets 1 " +
@@ -177,6 +214,11 @@ public sealed class LiveStreamingWorker : BackgroundService
         };
 
         _videoCaptureFailed = false;
+
+        lock (_ffmpegDiagnosticLock)
+        {
+            _ffmpegStderrTail.Clear();
+        }
 
         _ffmpegProcess = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start live FFmpeg.");
@@ -206,40 +248,115 @@ public sealed class LiveStreamingWorker : BackgroundService
     {
         try
         {
-            while (!process.HasExited)
+            while (true)
             {
-                string? line = await process.StandardError.ReadLineAsync();
+                string? line =
+                    await process.StandardError.ReadLineAsync();
 
                 if (line is null)
                 {
                     break;
                 }
 
-                if (line.Contains("AcquireNextFrame failed", StringComparison.OrdinalIgnoreCase) ||
-                    line.Contains("Error during demuxing", StringComparison.OrdinalIgnoreCase) ||
-                    line.Contains("Generic error in an external library", StringComparison.OrdinalIgnoreCase))
+                lock (_ffmpegDiagnosticLock)
+                {
+                    _ffmpegStderrTail.Enqueue(line);
+
+                    while (_ffmpegStderrTail.Count >
+                           FfmpegStderrTailLimit)
+                    {
+                        _ffmpegStderrTail.Dequeue();
+                    }
+                }
+
+                if (line.Contains(
+                        "AcquireNextFrame failed",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    line.Contains(
+                        "Error during demuxing",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    line.Contains(
+                        "Generic error in an external library",
+                        StringComparison.OrdinalIgnoreCase))
                 {
                     _videoCaptureFailed = true;
 
-                    _activityState.Publish(new AgentActivitySignal
-                    {
-                        Type = AgentActivitySignalType.TechnicalIssue,
-                        OccurredAtUtc = DateTimeOffset.UtcNow,
-                        Source = "LiveStreamingWorker",
-                        Details = line
-                    });
+                    _activityState.Publish(
+                        new AgentActivitySignal
+                        {
+                            Type =
+                                AgentActivitySignalType.TechnicalIssue,
+
+                            OccurredAtUtc =
+                                DateTimeOffset.UtcNow,
+
+                            Source =
+                                "LiveStreamingWorker",
+
+                            Details =
+                                line
+                        });
 
                     _logger.LogWarning(
                         "FFmpeg desktop capture error detected: {FfmpegError}",
                         line);
                 }
             }
+
+            if (!process.HasExited)
+            {
+                await process.WaitForExitAsync();
+            }
+
+            int exitCode =
+                process.ExitCode;
+
+            string stderrTail;
+
+            lock (_ffmpegDiagnosticLock)
+            {
+                stderrTail =
+                    _ffmpegStderrTail.Count == 0
+                        ? "(no stderr captured)"
+                        : string.Join(
+                            Environment.NewLine,
+                            _ffmpegStderrTail);
+            }
+
+            if (exitCode == 0)
+            {
+                _logger.LogInformation(
+                    "FFmpeg process exited normally. ExitCode={ExitCode}",
+                    exitCode);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "FFmpeg process exited. ExitCode={ExitCode}. RecentStderr={RecentStderr}",
+                    exitCode,
+                    stderrTail);
+            }
         }
         catch (Exception ex)
         {
-            if (!process.HasExited)
+            bool processExited;
+
+            try
             {
-                _logger.LogDebug(ex, "FFmpeg stderr monitor stopped.");
+                processExited =
+                    process.HasExited;
+            }
+            catch
+            {
+                processExited =
+                    true;
+            }
+
+            if (!processExited)
+            {
+                _logger.LogDebug(
+                    ex,
+                    "FFmpeg stderr monitor stopped.");
             }
         }
     }
@@ -318,11 +435,28 @@ public sealed class LiveStreamingWorker : BackgroundService
             _udpSender = null;
         }
 
-        if (_ffmpegProcess is null || _ffmpegProcess.HasExited)
+        if (_ffmpegProcess is null ||
+            _ffmpegProcess.HasExited)
         {
+            if (_stderrMonitorTask is not null)
+            {
+                try
+                {
+                    await _stderrMonitorTask;
+                }
+                catch
+                {
+                    // Diagnostic monitor failures must not
+                    // block live-stream recovery.
+                }
+            }
+
             _ffmpegProcess?.Dispose();
             _ffmpegProcess = null;
             _currentStreamKey = null;
+            _stderrMonitorTask = null;
+            _videoCaptureFailed = false;
+
             return;
         }
 

@@ -35,8 +35,25 @@ public sealed class AgentActivityState
 
     public bool IsCommunicationProcessActive { get; private set; }
 
+    public int? CommunicationProcessId { get; private set; }
+
+    public string? CommunicationApplication { get; private set; }
+
     public bool IsConnectionHealthy { get; private set; } = true;
 
+    public void SetCommunicationTarget(
+        int? processId,
+        string? application)
+    {
+        lock (_sync)
+        {
+            CommunicationProcessId =
+                processId;
+
+            CommunicationApplication =
+                application;
+        }
+    }
     public void Publish(
         AgentActivitySignal signal)
     {
@@ -162,6 +179,12 @@ public sealed class AgentActivityState
 
                 IsCommunicationProcessActive =
                     IsCommunicationProcessActive,
+
+                CommunicationProcessId =
+                    CommunicationProcessId,
+
+                CommunicationApplication =
+                    CommunicationApplication,
 
                 IsConnectionHealthy =
                     IsConnectionHealthy

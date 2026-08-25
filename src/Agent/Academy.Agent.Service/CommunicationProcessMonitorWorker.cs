@@ -1,9 +1,13 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 
 namespace Academy.Agent.Service;
 
 public sealed class CommunicationProcessMonitorWorker : BackgroundService
 {
+    private sealed record CommunicationProcessDetection(
+        int ProcessId,
+        string Application);
+
     private readonly ILogger<CommunicationProcessMonitorWorker> _logger;
     private readonly AgentActivityState _activityState;
     private readonly IConfiguration _configuration;
@@ -115,10 +119,14 @@ public sealed class CommunicationProcessMonitorWorker : BackgroundService
         {
             _consecutiveMissedPolls = 0;
 
+            _activityState.SetCommunicationTarget(
+                detection.ProcessId,
+                detection.Application);
+
             if (!_wasCommunicationActive)
             {
                 _wasCommunicationActive = true;
-                _lastDetectedApplication = detection;
+                _lastDetectedApplication = detection.Application;
 
                 _activityState.Publish(
                     new AgentActivitySignal
@@ -133,18 +141,19 @@ public sealed class CommunicationProcessMonitorWorker : BackgroundService
                             "CommunicationProcessMonitor",
 
                         Details =
-                            $"Communication application detected: {detection}."
+                            $"Communication application detected: {detection.Application}. PID={detection.ProcessId}."
                     });
 
                 _logger.LogInformation(
-                    "Communication application detected: {Application}",
-                    detection);
+                    "Communication application detected: {Application}, PID={ProcessId}",
+                    detection.Application,
+                    detection.ProcessId);
 
                 return;
             }
 
             _lastDetectedApplication =
-                detection;
+                detection.Application;
 
             return;
         }
@@ -169,7 +178,7 @@ public sealed class CommunicationProcessMonitorWorker : BackgroundService
         }
     }
 
-    private string? DetectCommunicationApplication()
+    private CommunicationProcessDetection? DetectCommunicationApplication()
     {
         Process[] processes;
 
@@ -193,7 +202,64 @@ public sealed class CommunicationProcessMonitorWorker : BackgroundService
                 if (NativeCommunicationProcesses.Contains(
                         processName))
                 {
-                    return processName;
+                    if (processName.Equals(
+                            "ms-teams",
+                            StringComparison.OrdinalIgnoreCase) ||
+                        processName.Equals(
+                            "Teams",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        var slimCoreProcess =
+                            processes
+                                .Where(candidate =>
+                                {
+                                    try
+                                    {
+                                        if (!candidate.ProcessName.Equals(
+                                                "ms-teams",
+                                                StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            return false;
+                                        }
+
+                                        using var searcher =
+                                            new System.Management.ManagementObjectSearcher(
+                                                $"SELECT CommandLine FROM Win32_Process WHERE ProcessId = {candidate.Id}");
+
+                                        foreach (System.Management.ManagementObject item in
+                                                 searcher.Get())
+                                        {
+                                            var commandLine =
+                                                item["CommandLine"]?.ToString();
+
+                                            if (commandLine?.Contains(
+                                                    "--module_name=SlimCore",
+                                                    StringComparison.OrdinalIgnoreCase) ==
+                                                true)
+                                            {
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                    catch
+                                    {
+                                    }
+
+                                    return false;
+                                })
+                                .FirstOrDefault();
+
+                        if (slimCoreProcess is not null)
+                        {
+                            return new CommunicationProcessDetection(
+                                slimCoreProcess.Id,
+                                "ms-teams:SlimCore");
+                        }
+                    }
+
+                    return new CommunicationProcessDetection(
+                        process.Id,
+                        processName);
                 }
 
                 if (!BrowserProcesses.Contains(
@@ -225,8 +291,9 @@ public sealed class CommunicationProcessMonitorWorker : BackgroundService
                             marker,
                             StringComparison.OrdinalIgnoreCase))
                     {
-                        return
-                            $"{processName}:{marker}";
+                        return new CommunicationProcessDetection(
+                            process.Id,
+                            $"{processName}:{marker}");
                     }
                 }
             }
@@ -252,6 +319,10 @@ public sealed class CommunicationProcessMonitorWorker : BackgroundService
             false;
 
         _consecutiveMissedPolls = 0;
+
+        _activityState.SetCommunicationTarget(
+            null,
+            null);
 
         _activityState.Publish(
             new AgentActivitySignal

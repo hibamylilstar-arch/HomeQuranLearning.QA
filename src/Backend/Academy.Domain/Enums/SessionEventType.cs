@@ -22,5 +22,9 @@ public enum SessionEventType
     RecordingStarted = 14,
     RecordingStopped = 15,
     LiveStreamStarted = 16,
-    LiveStreamStopped = 17
+    LiveStreamStopped = 17,
+
+    // Explicit remote/student participation evidence produced only
+    // from non-silent loopback audio during an active communication app.
+    StudentAudioDetected = 18
 }

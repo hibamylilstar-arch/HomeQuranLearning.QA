@@ -28,5 +28,9 @@ public sealed class AgentActivitySnapshot
 
     public bool IsCommunicationProcessActive { get; init; }
 
+    public int? CommunicationProcessId { get; init; }
+
+    public string? CommunicationApplication { get; init; }
+
     public bool IsConnectionHealthy { get; init; }
 }

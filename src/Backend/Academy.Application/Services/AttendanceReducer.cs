@@ -331,14 +331,22 @@ public sealed class AttendanceReducer
         Session session,
         IReadOnlyList<SessionEvent> events)
     {
-        // Current evidence cannot reliably distinguish teacher speech/audio
-        // from student participation. Only explicit ActivityStarted is treated
-        // as strong student/class participation evidence for now.
+        // Student attendance requires explicit participation evidence.
+        //
+        // ActivityStarted remains supported for manually/synthetically
+        // supplied evidence. StudentAudioDetected is emitted only when
+        // non-silent system-output audio is observed while a supported
+        // communication application is active.
+        //
+        // Generic CommunicationDetected and AudioObserved must never by
+        // themselves mark a student present.
         var explicitActivity =
             events.FirstOrDefault(
                 x =>
                     x.EventType ==
-                    SessionEventType.ActivityStarted);
+                        SessionEventType.ActivityStarted ||
+                    x.EventType ==
+                        SessionEventType.StudentAudioDetected);
 
         if (explicitActivity is not null)
         {

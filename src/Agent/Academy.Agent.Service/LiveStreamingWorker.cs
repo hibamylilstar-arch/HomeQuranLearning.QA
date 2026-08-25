@@ -20,13 +20,13 @@ public sealed class LiveStreamingWorker : BackgroundService
     private string? _currentStreamKey;
     private volatile bool _videoCaptureFailed;
     private Task? _stderrMonitorTask;
-    private DateTimeOffset _lastAudioActivitySignalUtc = DateTimeOffset.MinValue;
-
     private readonly object _ffmpegDiagnosticLock = new();
     private readonly Queue<string> _ffmpegStderrTail = new();
 
     private const int FfmpegStderrTailLimit = 20;
 
+    // Approximately -46 dBFS. This intentionally ignores very low-level
+    // loopback noise while remaining sensitive to normal remote speech.
     public LiveStreamingWorker(
         ILogger<LiveStreamingWorker> logger,
         IConfiguration configuration,
@@ -362,23 +362,6 @@ public sealed class LiveStreamingWorker : BackgroundService
             if (_udpSender is not null && e.BytesRecorded > 0)
             {
                 _udpSender.Send(e.Buffer, e.BytesRecorded);
-
-                var nowUtc = DateTimeOffset.UtcNow;
-
-                // Throttle raw audio evidence so the shared signal buffer
-                // is not flooded by WASAPI callbacks.
-                if (nowUtc - _lastAudioActivitySignalUtc >= TimeSpan.FromSeconds(5))
-                {
-                    _lastAudioActivitySignalUtc = nowUtc;
-
-                    _activityState.Publish(new AgentActivitySignal
-                    {
-                        Type = AgentActivitySignalType.AudioActivity,
-                        OccurredAtUtc = nowUtc,
-                        Source = "LiveAudio",
-                        Details = $"Bytes={e.BytesRecorded}"
-                    });
-                }
             }
         }
         catch

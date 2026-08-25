@@ -563,6 +563,110 @@ public sealed class AttendanceReducerTests
             "Student attendance is still pending",
             session.AttendanceNotes ?? string.Empty);
     }
+    [Fact]
+    public void StudentAudioDetected_WithinGrace_MarksStudentPresent()
+    {
+        var start =
+            DateTimeOffset.UtcNow.AddHours(-2);
+
+        var session =
+            CreateCompletedSession(start);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.CommunicationDetected,
+                start),
+
+            Event(
+                session,
+                SessionEventType.StudentAudioDetected,
+                start.AddMinutes(2))
+        };
+
+        _reducer.Reduce(
+            session,
+            events);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.StudentAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceReviewStatus.AutoResolved,
+            session.AttendanceReviewStatus);
+    }
+
+    [Fact]
+    public void StudentAudioDetected_AfterGrace_MarksStudentLate()
+    {
+        var start =
+            DateTimeOffset.UtcNow.AddHours(-2);
+
+        var session =
+            CreateCompletedSession(start);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.CommunicationDetected,
+                start),
+
+            Event(
+                session,
+                SessionEventType.StudentAudioDetected,
+                start.AddMinutes(5))
+        };
+
+        _reducer.Reduce(
+            session,
+            events);
+
+        Assert.Equal(
+            AttendanceStatus.Late,
+            session.StudentAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceReviewStatus.AutoResolved,
+            session.AttendanceReviewStatus);
+    }
+
+    [Fact]
+    public void GenericAudioObserved_DoesNotMarkStudentPresent()
+    {
+        var start =
+            DateTimeOffset.UtcNow.AddHours(-2);
+
+        var session =
+            CreateCompletedSession(start);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.CommunicationDetected,
+                start),
+
+            Event(
+                session,
+                SessionEventType.AudioObserved,
+                start.AddMinutes(1))
+        };
+
+        _reducer.Reduce(
+            session,
+            events);
+
+        Assert.NotEqual(
+            AttendanceStatus.Present,
+            session.StudentAttendanceStatus);
+
+        Assert.NotEqual(
+            AttendanceStatus.Late,
+            session.StudentAttendanceStatus);
+    }
     private static Session CreateCompletedSession(
         DateTimeOffset start)
     {

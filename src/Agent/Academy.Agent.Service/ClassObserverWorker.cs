@@ -135,6 +135,24 @@ public sealed class ClassObserverWorker : BackgroundService
             // but the next process instance will emit a fresh AgentStarted.
             if (_observedClass is not null)
             {
+                // Producers such as LiveStreamingWorker may publish their
+                // final stopped signal during host shutdown. Process any
+                // activity signals not seen by the normal polling loop
+                // before queuing AgentStopped.
+                try
+                {
+                    await ProcessActivitySignalsAsync(
+                        identity,
+                        _observedClass,
+                        CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Could not process final Agent activity signals during shutdown.");
+                }
+
                 try
                 {
                     await QueueEventAsync(

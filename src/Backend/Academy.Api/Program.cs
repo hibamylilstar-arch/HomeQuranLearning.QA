@@ -181,22 +181,33 @@ app.MapGet("/api/agent/sessions/active-stream", async (
     }
 
     if (!request.Query.TryGetValue("deviceId", out var deviceIdValue) ||
-        !Guid.TryParse(deviceIdValue.ToString(), out Guid deviceId))
+        string.IsNullOrWhiteSpace(deviceIdValue.ToString()))
     {
         return Results.BadRequest("deviceId is required.");
     }
 
-    var info = await sessionService.GetAgentLiveStreamInfoAsync(deviceId, cancellationToken);
+    try
+    {
+        var info =
+            await sessionService.GetAgentLiveStreamInfoAsync(
+                deviceIdValue.ToString(),
+                cancellationToken);
 
-    return info is null
-        ? Results.Ok(new { hasStream = false })
-        : Results.Ok(new
-        {
-            hasStream = true,
-            sessionId = info.SessionId,
-            roomName = info.RoomName,
-            streamKey = info.StreamKey
-        });
+        return info is null
+            ? Results.Ok(new { hasStream = false })
+            : Results.Ok(new
+            {
+                hasStream = true,
+                sessionId = info.SessionId,
+                roomName = info.RoomName,
+                streamKey = info.StreamKey
+            });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(
+            new { error = ex.Message });
+    }
 });
 
 app.MapPost("/api/agent/session-events", async (

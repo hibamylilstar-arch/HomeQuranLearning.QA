@@ -57,13 +57,26 @@ public sealed class SessionService
     }
 
     public async Task<AgentLiveStreamInfo?> GetAgentLiveStreamInfoAsync(
-        Guid deviceId,
+        string deviceId,
         CancellationToken cancellationToken = default)
     {
-        var session = await _sessionRepository.GetActiveSessionForDeviceAsync(
-            deviceId,
-            DateTimeOffset.UtcNow,
-            cancellationToken);
+        if (string.IsNullOrWhiteSpace(deviceId))
+        {
+            throw new ArgumentException("DeviceId is required.");
+        }
+
+        var device =
+            await _deviceRepository.GetByDeviceIdAsync(
+                deviceId,
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Unknown device.");
+
+        var session =
+            await _sessionRepository.GetActiveSessionForDeviceAsync(
+                device.Id,
+                DateTimeOffset.UtcNow,
+                cancellationToken);
 
         if (session is null || string.IsNullOrWhiteSpace(session.LiveKitStreamKey))
         {

@@ -42,25 +42,62 @@ public sealed class AttendanceEventDeliveryWorker : BackgroundService
             new PeriodicTimer(
                 Interval);
 
-        while (
-            await timer.WaitForNextTickAsync(
-                stoppingToken))
+        try
         {
+            while (
+                await timer.WaitForNextTickAsync(
+                    stoppingToken))
+            {
+                try
+                {
+                    await ProcessPendingAsync(
+                        stoppingToken);
+                }
+                catch (OperationCanceledException)
+                    when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Attendance pending-event delivery pass failed.");
+                }
+            }
+        }
+        catch (OperationCanceledException)
+            when (stoppingToken.IsCancellationRequested)
+        {
+            // Normal graceful host shutdown.
+        }
+        finally
+        {
+            // This worker is registered first and therefore stops last.
+            // Other Agent workers may queue final attendance evidence while
+            // shutting down, so make one bounded delivery pass after them.
             try
             {
+                using var finalDrainCts =
+                    new CancellationTokenSource(
+                        TimeSpan.FromSeconds(10));
+
                 await ProcessPendingAsync(
-                    stoppingToken);
+                    finalDrainCts.Token);
+
+                _logger.LogInformation(
+                    "Final attendance pending-event delivery pass completed.");
             }
             catch (OperationCanceledException)
-                when (stoppingToken.IsCancellationRequested)
             {
-                break;
+                _logger.LogWarning(
+                    "Final attendance pending-event delivery pass timed out. Pending events remain journaled for retry.");
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(
                     ex,
-                    "Attendance pending-event delivery pass failed.");
+                    "Final attendance pending-event delivery pass failed. Pending events remain journaled for retry.");
             }
         }
     }

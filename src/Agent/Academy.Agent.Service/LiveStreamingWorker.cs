@@ -108,7 +108,7 @@ public sealed class LiveStreamingWorker : BackgroundService
                                     ? "Live video capture failed. Recreating live stream."
                                     : "Live FFmpeg stopped unexpectedly. Recreating live stream.");
 
-                            await StopFfmpegAsync();
+                            await StopFfmpegAsync(publishStopEvidence: false);
                         }
 
                         _logger.LogInformation(
@@ -232,12 +232,7 @@ public sealed class LiveStreamingWorker : BackgroundService
 
         _currentStreamKey = streamKey;
 
-        _activityState.Publish(new AgentActivitySignal
-        {
-            Type = AgentActivitySignalType.LiveStreamStarted,
-            OccurredAtUtc = DateTimeOffset.UtcNow,
-            Source = "LiveStreamingWorker"
-        });
+        PublishLiveStreamStartedIfInactive();
 
         _logger.LogInformation("FFmpeg live stream started for stream key: {StreamKey}", streamKey);
 
@@ -413,7 +408,61 @@ public sealed class LiveStreamingWorker : BackgroundService
         }
     }
 
-    private async Task StopFfmpegAsync()
+    private void PublishLiveStreamStartedIfInactive()
+    {
+        var snapshot =
+            _activityState.GetSnapshot();
+
+        if (snapshot.IsLiveStreamingActive)
+        {
+            _logger.LogDebug(
+                "Live stream start signal suppressed because logical stream state is already active.");
+
+            return;
+        }
+
+        _activityState.Publish(
+            new AgentActivitySignal
+            {
+                Type =
+                    AgentActivitySignalType.LiveStreamStarted,
+
+                OccurredAtUtc =
+                    DateTimeOffset.UtcNow,
+
+                Source =
+                    "LiveStreamingWorker"
+            });
+    }
+
+    private void PublishLiveStreamStoppedIfActive()
+    {
+        var snapshot =
+            _activityState.GetSnapshot();
+
+        if (!snapshot.IsLiveStreamingActive)
+        {
+            _logger.LogDebug(
+                "Live stream stop signal suppressed because logical stream state is already inactive.");
+
+            return;
+        }
+
+        _activityState.Publish(
+            new AgentActivitySignal
+            {
+                Type =
+                    AgentActivitySignalType.LiveStreamStopped,
+
+                OccurredAtUtc =
+                    DateTimeOffset.UtcNow,
+
+                Source =
+                    "LiveStreamingWorker"
+            });
+    }
+    private async Task StopFfmpegAsync(
+        bool publishStopEvidence = true)
     {
         if (_audioPumpCts is not null)
         {
@@ -457,6 +506,11 @@ public sealed class LiveStreamingWorker : BackgroundService
             _stderrMonitorTask = null;
             _videoCaptureFailed = false;
 
+            if (publishStopEvidence)
+            {
+                PublishLiveStreamStoppedIfActive();
+            }
+
             return;
         }
 
@@ -482,12 +536,10 @@ public sealed class LiveStreamingWorker : BackgroundService
         _videoCaptureFailed = false;
         _stderrMonitorTask = null;
 
-        _activityState.Publish(new AgentActivitySignal
+        if (publishStopEvidence)
         {
-            Type = AgentActivitySignalType.LiveStreamStopped,
-            OccurredAtUtc = DateTimeOffset.UtcNow,
-            Source = "LiveStreamingWorker"
-        });
+            PublishLiveStreamStoppedIfActive();
+        }
 
         _logger.LogInformation("FFmpeg screen + UDP audio stopped.");
     }

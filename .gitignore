@@ -79,3 +79,8 @@ spikes/SttSpike/*.mp4
 
 # Backup artifacts
 backups/
+
+# Local QA runtime artifacts
+.e2e-6b-*.txt
+*.backup-*
+.dev-runtime/*.backup-*

@@ -1,4 +1,5 @@
 using Academy.Application.Abstractions;
+using Academy.Application.Services;
 using Academy.Domain.Entities;
 using Academy.Domain.Enums;
 
@@ -87,6 +88,14 @@ public sealed class SessionSchedulerWorker : BackgroundService
         var sessionRepo =
             scope.ServiceProvider
                 .GetRequiredService<ISessionRepository>();
+
+        var sessionEventRepo =
+            scope.ServiceProvider
+                .GetRequiredService<ISessionEventRepository>();
+
+        var attendanceReducer =
+            scope.ServiceProvider
+                .GetRequiredService<AttendanceReducer>();
 
         var uow =
             scope.ServiceProvider
@@ -285,6 +294,17 @@ public sealed class SessionSchedulerWorker : BackgroundService
             {
                 session.Status =
                     SessionStatus.Completed;
+
+
+                var sessionEvents =
+                    await sessionEventRepo
+                        .GetForSessionAsync(
+                            session.Id,
+                            ct);
+
+                attendanceReducer.Reduce(
+                    session,
+                    sessionEvents);
 
                 session.UpdatedAtUtc =
                     nowUtc;

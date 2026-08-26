@@ -112,4 +112,11 @@ export interface SessionListItem {
   startedAtUtc: string;
   endedAtUtc?: string | null;
   status: string;
+  teacherAttendanceStatus: string;
+  studentAttendanceStatus: string;
+  attendanceReviewStatus: string;
+  attendanceNotes?: string | null;
+  activeSeconds: number;
+  disconnectCount: number;
+  disconnectSeconds: number;
 }

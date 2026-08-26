@@ -156,6 +156,25 @@ export async function getSessions(): Promise<SessionListItem[]> {
   return proxyFetch<SessionListItem[]>(["sessions"]);
 }
 
+export async function reviewSessionAttendance(
+  sessionId: string,
+  teacherAttendanceStatus: string,
+  studentAttendanceStatus: string,
+  notes: string | null
+): Promise<{ updated: boolean }> {
+  return proxyFetch<{ updated: boolean }>(
+    ["sessions", sessionId, "attendance-review"],
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        teacherAttendanceStatus,
+        studentAttendanceStatus,
+        notes,
+      }),
+    }
+  );
+}
+
 export async function getLiveSessions(): Promise<SessionListItem[]> {
   return proxyFetch<SessionListItem[]>(["live-sessions"]);
 }

@@ -54,32 +54,17 @@ public sealed class ScheduleService
         CreateScheduleRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (request.StartTime == request.EndTime)
-        {
-            throw new ArgumentException(
-                "Schedule start and end time cannot be the same.");
-        }
+        ValidateWindow(
+            request.StartTime,
+            request.EndTime);
 
-        var deviceSchedules =
-            await _scheduleRepository.GetActiveSchedulesForDeviceAsync(
-                request.DeviceId,
-                cancellationToken);
-
-        var conflict =
-            deviceSchedules.FirstOrDefault(
-                x => WeeklyWindowsOverlap(
-                    request.DayOfWeek,
-                    request.StartTime,
-                    request.EndTime,
-                    x.DayOfWeek,
-                    x.StartTime,
-                    x.EndTime));
-
-        if (conflict is not null)
-        {
-            throw new InvalidOperationException(
-                $"Device schedule conflict. Device {request.DeviceId} already has active schedule {conflict.Id} during the requested class window.");
-        }
+        await EnsureDeviceWindowAvailableAsync(
+            request.DeviceId,
+            request.DayOfWeek,
+            request.StartTime,
+            request.EndTime,
+            excludedScheduleId: null,
+            cancellationToken);
 
         var now =
             DateTimeOffset.UtcNow;
@@ -95,6 +80,12 @@ public sealed class ScheduleService
             StartTime = request.StartTime,
             EndTime = request.EndTime,
             IsActive = true,
+
+            // New schedules become effective from creation time.
+            // Historical schedules created before this foundation may
+            // legitimately have null EffectiveFromUtc.
+            EffectiveFromUtc = now,
+
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
@@ -106,17 +97,210 @@ public sealed class ScheduleService
         await _unitOfWork.SaveChangesAsync(
             cancellationToken);
 
+        return MapSchedule(schedule);
+    }
+
+    public async Task<ScheduleDto> ReplaceScheduleAsync(
+        Guid scheduleId,
+        UpdateScheduleRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (scheduleId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "ScheduleId is required.");
+        }
+
+        ValidateWindow(
+            request.StartTime,
+            request.EndTime);
+
+        var current =
+            await _scheduleRepository.GetByIdAsync(
+                scheduleId,
+                cancellationToken)
+            ?? throw new KeyNotFoundException(
+                "Schedule not found.");
+
+        if (!current.IsActive)
+        {
+            throw new InvalidOperationException(
+                "Only an active schedule can be changed.");
+        }
+
+        await EnsureDeviceWindowAvailableAsync(
+            request.DeviceId,
+            request.DayOfWeek,
+            request.StartTime,
+            request.EndTime,
+            excludedScheduleId: current.Id,
+            cancellationToken);
+
+        var now =
+            DateTimeOffset.UtcNow;
+
+        // Historical-safe change:
+        // never rewrite the old schedule identity/window.
+        // Expire it and create a new schedule version.
+        current.IsActive =
+            false;
+
+        current.EffectiveToUtc =
+            now;
+
+        current.UpdatedAtUtc =
+            now;
+
+        _scheduleRepository.Update(
+            current);
+
+        var replacement =
+            new Schedule
+            {
+                Id =
+                    Guid.NewGuid(),
+
+                TeacherId =
+                    request.TeacherId,
+
+                StudentId =
+                    request.StudentId,
+
+                CourseId =
+                    request.CourseId,
+
+                DeviceId =
+                    request.DeviceId,
+
+                DayOfWeek =
+                    request.DayOfWeek,
+
+                StartTime =
+                    request.StartTime,
+
+                EndTime =
+                    request.EndTime,
+
+                IsActive =
+                    true,
+
+                EffectiveFromUtc =
+                    now,
+
+                EffectiveToUtc =
+                    null,
+
+                CreatedAtUtc =
+                    now,
+
+                UpdatedAtUtc =
+                    now
+            };
+
+        await _scheduleRepository.AddAsync(
+            replacement,
+            cancellationToken);
+
+        // Old-version expiry and new-version creation are persisted
+        // together in one SaveChanges transaction.
+        await _unitOfWork.SaveChangesAsync(
+            cancellationToken);
+
+        return MapSchedule(
+            replacement);
+    }
+
+    private async Task EnsureDeviceWindowAvailableAsync(
+        Guid deviceId,
+        DayOfWeek dayOfWeek,
+        TimeSpan startTime,
+        TimeSpan endTime,
+        Guid? excludedScheduleId,
+        CancellationToken cancellationToken)
+    {
+        var deviceSchedules =
+            await _scheduleRepository
+                .GetActiveSchedulesForDeviceAsync(
+                    deviceId,
+                    cancellationToken);
+
+        var conflict =
+            deviceSchedules.FirstOrDefault(
+                x =>
+                    x.Id != excludedScheduleId &&
+                    WeeklyWindowsOverlap(
+                        dayOfWeek,
+                        startTime,
+                        endTime,
+                        x.DayOfWeek,
+                        x.StartTime,
+                        x.EndTime));
+
+        if (conflict is not null)
+        {
+            throw new InvalidOperationException(
+                $"Device schedule conflict. Device {deviceId} already has active schedule {conflict.Id} during the requested class window.");
+        }
+    }
+
+    private static void ValidateWindow(
+        TimeSpan startTime,
+        TimeSpan endTime)
+    {
+        if (startTime == endTime)
+        {
+            throw new ArgumentException(
+                "Schedule start and end time cannot be the same.");
+        }
+    }
+
+    private static ScheduleDto MapSchedule(
+        Schedule schedule)
+    {
         return new ScheduleDto
         {
-            Id = schedule.Id,
-            TeacherId = schedule.TeacherId,
-            StudentId = schedule.StudentId,
-            CourseId = schedule.CourseId,
-            DeviceId = schedule.DeviceId,
-            DayOfWeek = schedule.DayOfWeek,
-            StartTime = schedule.StartTime,
-            EndTime = schedule.EndTime,
-            IsActive = schedule.IsActive
+            Id =
+                schedule.Id,
+
+            TeacherId =
+                schedule.TeacherId,
+
+            TeacherFullName =
+                schedule.Teacher?.FullName ??
+                string.Empty,
+
+            StudentId =
+                schedule.StudentId,
+
+            StudentFullName =
+                schedule.Student?.FullName ??
+                string.Empty,
+
+            CourseId =
+                schedule.CourseId,
+
+            CourseName =
+                schedule.Course?.Name ??
+                string.Empty,
+
+            DeviceId =
+                schedule.DeviceId,
+
+            DeviceName =
+                schedule.Device?.DeviceName ??
+                string.Empty,
+
+            DayOfWeek =
+                schedule.DayOfWeek,
+
+            StartTime =
+                schedule.StartTime,
+
+            EndTime =
+                schedule.EndTime,
+
+            IsActive =
+                schedule.IsActive
         };
     }
 

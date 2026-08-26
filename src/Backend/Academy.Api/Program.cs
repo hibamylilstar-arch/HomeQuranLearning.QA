@@ -29,6 +29,7 @@ builder.Services.AddScoped<DashboardQueryService>();
 builder.Services.AddScoped<StudentService>();
 builder.Services.AddScoped<CourseService>();
 builder.Services.AddScoped<ScheduleService>();
+builder.Services.AddScoped<ScheduleAccessService>();
 builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<AttendanceReducer>();
 builder.Services.AddScoped<DailyAttendanceReportService>();
@@ -791,27 +792,71 @@ app.MapPost("/api/admin/courses", async (
 
 app.MapGet("/api/admin/schedules", async (
     ClaimsPrincipal user,
-    HttpRequest request,
     ScheduleService scheduleService,
+    ScheduleAccessService scheduleAccessService,
     CancellationToken cancellationToken) =>
 {
-    var schedules = await scheduleService.GetSchedulesAsync(cancellationToken);
-    return Results.Ok(schedules);
+    var (userId, role) =
+        GetUserInfo(user);
+
+    if (userId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    var schedules =
+        await scheduleService.GetSchedulesAsync(
+            cancellationToken);
+
+    var visibleSchedules =
+        await scheduleAccessService
+            .FilterVisibleSchedulesAsync(
+                schedules,
+                userId,
+                role,
+                cancellationToken);
+
+    return Results.Ok(
+        visibleSchedules);
 }).RequireAuthorization();
 
 app.MapPost("/api/admin/schedules", async (
     ClaimsPrincipal user,
     HttpRequest request,
     ScheduleService scheduleService,
+    ScheduleAccessService scheduleAccessService,
     CancellationToken cancellationToken) =>
 {
-    var body = await request.ReadFromJsonAsync<CreateScheduleRequest>(
-        jsonOptions,
-        cancellationToken);
+    var (userId, role) =
+        GetUserInfo(user);
+
+    if (userId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    var body =
+        await request.ReadFromJsonAsync<CreateScheduleRequest>(
+            jsonOptions,
+            cancellationToken);
 
     if (body is null)
     {
-        return Results.BadRequest("Schedule data is required.");
+        return Results.BadRequest(
+            "Schedule data is required.");
+    }
+
+    var canManageTeacher =
+        await scheduleAccessService
+            .CanManageTeacherAsync(
+                userId,
+                role,
+                body.TeacherId,
+                cancellationToken);
+
+    if (!canManageTeacher)
+    {
+        return Results.Forbid();
     }
 
     try
@@ -821,7 +866,8 @@ app.MapPost("/api/admin/schedules", async (
                 body,
                 cancellationToken);
 
-        return Results.Ok(schedule);
+        return Results.Ok(
+            schedule);
     }
     catch (InvalidOperationException ex)
     {
@@ -835,6 +881,88 @@ app.MapPost("/api/admin/schedules", async (
     }
 }).RequireAuthorization();
 
+app.MapPatch("/api/admin/schedules/{scheduleId:guid}", async (
+    ClaimsPrincipal user,
+    Guid scheduleId,
+    HttpRequest request,
+    ScheduleService scheduleService,
+    ScheduleAccessService scheduleAccessService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) =
+        GetUserInfo(user);
+
+    if (userId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    var body =
+        await request.ReadFromJsonAsync<UpdateScheduleRequest>(
+            jsonOptions,
+            cancellationToken);
+
+    if (body is null)
+    {
+        return Results.BadRequest(
+            "Schedule data is required.");
+    }
+
+    var canAccessCurrent =
+        await scheduleAccessService
+            .CanAccessScheduleAsync(
+                scheduleId,
+                userId,
+                role,
+                cancellationToken);
+
+    if (!canAccessCurrent)
+    {
+        // Match the existing session-access behavior:
+        // do not expose schedules outside Manager scope.
+        return Results.NotFound();
+    }
+
+    var canManageReplacementTeacher =
+        await scheduleAccessService
+            .CanManageTeacherAsync(
+                userId,
+                role,
+                body.TeacherId,
+                cancellationToken);
+
+    if (!canManageReplacementTeacher)
+    {
+        return Results.Forbid();
+    }
+
+    try
+    {
+        var schedule =
+            await scheduleService.ReplaceScheduleAsync(
+                scheduleId,
+                body,
+                cancellationToken);
+
+        return Results.Ok(
+            schedule);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(
+            new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(
+            new { error = ex.Message });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(
+            new { error = ex.Message });
+    }
+}).RequireAuthorization();
 app.MapGet("/api/admin/reports/daily-attendance", async (
     DateOnly? date,
     ClaimsPrincipal user,

@@ -362,6 +362,69 @@ public sealed class SessionService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task ReviewAttendanceAsync(
+        Guid sessionId,
+        ReviewAttendanceRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var session =
+            await _sessionRepository.GetByIdAsync(
+                sessionId,
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Session not found.");
+
+        if (session.Status != SessionStatus.Completed)
+        {
+            throw new ArgumentException(
+                "Attendance can only be reviewed after the session is completed.");
+        }
+
+        if (!Enum.TryParse<AttendanceStatus>(
+                request.TeacherAttendanceStatus,
+                true,
+                out var teacherStatus) ||
+            teacherStatus is AttendanceStatus.Unknown
+                or AttendanceStatus.NeedsReview)
+        {
+            throw new ArgumentException(
+                "Teacher attendance status must be Present, Late, Absent, or Excused.");
+        }
+
+        if (!Enum.TryParse<AttendanceStatus>(
+                request.StudentAttendanceStatus,
+                true,
+                out var studentStatus) ||
+            studentStatus is AttendanceStatus.Unknown
+                or AttendanceStatus.NeedsReview)
+        {
+            throw new ArgumentException(
+                "Student attendance status must be Present, Late, Absent, or Excused.");
+        }
+
+        session.TeacherAttendanceStatus =
+            teacherStatus;
+
+        session.StudentAttendanceStatus =
+            studentStatus;
+
+        session.AttendanceReviewStatus =
+            AttendanceReviewStatus.Reviewed;
+
+        session.AttendanceNotes =
+            string.IsNullOrWhiteSpace(request.Notes)
+                ? "Attendance manually reviewed."
+                : request.Notes.Trim();
+
+        session.UpdatedAtUtc =
+            DateTimeOffset.UtcNow;
+
+        _sessionRepository.Update(
+            session);
+
+        await _unitOfWork.SaveChangesAsync(
+            cancellationToken);
+    }
     private static IReadOnlyList<SessionDto> MapSessions(IEnumerable<Session> sessions)
     {
         return sessions
@@ -380,7 +443,21 @@ public sealed class SessionService
                 DeviceName = x.Device?.DeviceName ?? string.Empty,
                 StartedAtUtc = x.StartedAtUtc,
                 EndedAtUtc = x.EndedAtUtc,
-                Status = x.Status.ToString()
+                Status = x.Status.ToString(),
+                TeacherAttendanceStatus =
+                    x.TeacherAttendanceStatus.ToString(),
+                StudentAttendanceStatus =
+                    x.StudentAttendanceStatus.ToString(),
+                AttendanceReviewStatus =
+                    x.AttendanceReviewStatus.ToString(),
+                AttendanceNotes =
+                    x.AttendanceNotes,
+                ActiveSeconds =
+                    x.ActiveSeconds,
+                DisconnectCount =
+                    x.DisconnectCount,
+                DisconnectSeconds =
+                    x.DisconnectSeconds
             })
             .ToList();
     }

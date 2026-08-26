@@ -15,4 +15,18 @@ public sealed class SessionDto
     public DateTimeOffset StartedAtUtc { get; init; }
     public DateTimeOffset? EndedAtUtc { get; init; }
     public string Status { get; init; } = string.Empty;
+
+    public string TeacherAttendanceStatus { get; init; } = string.Empty;
+
+    public string StudentAttendanceStatus { get; init; } = string.Empty;
+
+    public string AttendanceReviewStatus { get; init; } = string.Empty;
+
+    public string? AttendanceNotes { get; init; }
+
+    public int ActiveSeconds { get; init; }
+
+    public int DisconnectCount { get; init; }
+
+    public int DisconnectSeconds { get; init; }
 }

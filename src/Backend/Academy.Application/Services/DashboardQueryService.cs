@@ -131,6 +131,121 @@ public sealed class DashboardQueryService
             .ToList();
     }
 
+    public async Task<IReadOnlyList<SessionDto>> GetVisibleSessionsAsync(
+        Guid userId,
+        string role,
+        CancellationToken cancellationToken = default)
+    {
+        var sessions =
+            await _sessionRepository
+                .GetAllWithDetailsAsync(
+                    cancellationToken);
+
+        if (role == UserRole.Manager.ToString())
+        {
+            var teacherIds =
+                await GetAssignedTeacherIdsAsync(
+                    userId,
+                    cancellationToken);
+
+            sessions =
+                sessions
+                    .Where(x =>
+                        teacherIds.Contains(
+                            x.TeacherId))
+                    .ToList();
+        }
+        else if (
+            role != UserRole.Owner.ToString() &&
+            role != UserRole.Admin.ToString())
+        {
+            return Array.Empty<SessionDto>();
+        }
+
+        return sessions
+            .OrderByDescending(
+                x => x.StartedAtUtc)
+            .Select(
+                x => new SessionDto
+                {
+                    Id = x.Id,
+                    ScheduleId = x.ScheduleId,
+                    TeacherId = x.TeacherId,
+                    TeacherFullName =
+                        x.Teacher?.FullName
+                        ?? string.Empty,
+                    StudentId = x.StudentId,
+                    StudentFullName =
+                        x.Student?.FullName
+                        ?? string.Empty,
+                    CourseId = x.CourseId,
+                    CourseName =
+                        x.Course?.Name
+                        ?? string.Empty,
+                    DeviceId = x.DeviceId,
+                    DeviceName =
+                        x.Device?.DeviceName
+                        ?? string.Empty,
+                    StartedAtUtc =
+                        x.StartedAtUtc,
+                    EndedAtUtc =
+                        x.EndedAtUtc,
+                    Status =
+                        x.Status.ToString(),
+                    TeacherAttendanceStatus =
+                        x.TeacherAttendanceStatus.ToString(),
+                    StudentAttendanceStatus =
+                        x.StudentAttendanceStatus.ToString(),
+                    AttendanceReviewStatus =
+                        x.AttendanceReviewStatus.ToString(),
+                    AttendanceNotes =
+                        x.AttendanceNotes,
+                    ActiveSeconds =
+                        x.ActiveSeconds,
+                    DisconnectCount =
+                        x.DisconnectCount,
+                    DisconnectSeconds =
+                        x.DisconnectSeconds
+                })
+            .ToList();
+    }
+
+    public async Task<bool> CanAccessSessionAsync(
+        Guid sessionId,
+        Guid userId,
+        string role,
+        CancellationToken cancellationToken = default)
+    {
+        var session =
+            await _sessionRepository.GetByIdAsync(
+                sessionId,
+                cancellationToken);
+
+        if (session is null)
+        {
+            return false;
+        }
+
+        if (
+            role == UserRole.Owner.ToString() ||
+            role == UserRole.Admin.ToString())
+        {
+            return true;
+        }
+
+        if (role != UserRole.Manager.ToString())
+        {
+            return false;
+        }
+
+        var teacherIds =
+            await GetAssignedTeacherIdsAsync(
+                userId,
+                cancellationToken);
+
+        return teacherIds.Contains(
+            session.TeacherId);
+    }
     private async Task<HashSet<Guid>> GetAssignedTeacherIdsAsync(
         Guid managerUserId,
         CancellationToken cancellationToken)

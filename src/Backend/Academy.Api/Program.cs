@@ -836,14 +836,87 @@ app.MapPost("/api/admin/schedules", async (
 
 app.MapGet("/api/admin/sessions", async (
     ClaimsPrincipal user,
-    HttpRequest request,
-    SessionService sessionService,
+    DashboardQueryService dashboardQueryService,
     CancellationToken cancellationToken) =>
 {
-    var sessions = await sessionService.GetSessionsAsync(cancellationToken);
+    var (userId, role) =
+        GetUserInfo(user);
+
+    if (userId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    var sessions =
+        await dashboardQueryService
+            .GetVisibleSessionsAsync(
+                userId,
+                role,
+                cancellationToken);
+
     return Results.Ok(sessions);
 }).RequireAuthorization();
 
+app.MapPatch("/api/admin/sessions/{sessionId:guid}/attendance-review", async (
+    ClaimsPrincipal user,
+    Guid sessionId,
+    ReviewAttendanceRequest body,
+    DashboardQueryService dashboardQueryService,
+    SessionService sessionService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) =
+        GetUserInfo(user);
+
+    if (userId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    var canAccess =
+        await dashboardQueryService
+            .CanAccessSessionAsync(
+                sessionId,
+                userId,
+                role,
+                cancellationToken);
+
+    if (!canAccess)
+    {
+        return Results.NotFound();
+    }
+
+    try
+    {
+        await sessionService
+            .ReviewAttendanceAsync(
+                sessionId,
+                body,
+                cancellationToken);
+
+        return Results.Ok(
+            new
+            {
+                updated = true
+            });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(
+            new
+            {
+                error = ex.Message
+            });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(
+            new
+            {
+                error = ex.Message
+            });
+    }
+}).RequireAuthorization();
 app.MapGet("/api/admin/live-sessions", async (
     ClaimsPrincipal user,
     HttpRequest request,

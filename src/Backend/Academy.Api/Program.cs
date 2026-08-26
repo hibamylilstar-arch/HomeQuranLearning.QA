@@ -31,6 +31,7 @@ builder.Services.AddScoped<CourseService>();
 builder.Services.AddScoped<ScheduleService>();
 builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<AttendanceReducer>();
+builder.Services.AddScoped<DailyAttendanceReportService>();
 builder.Services.AddScoped<ISessionEventRepository, SessionEventRepository>();
 builder.Services.AddScoped<LiveKitTokenService>();
 
@@ -833,6 +834,27 @@ app.MapPost("/api/admin/schedules", async (
             new { error = ex.Message });
     }
 }).RequireAuthorization();
+
+app.MapGet("/api/admin/reports/daily-attendance", async (
+    DateOnly? date,
+    ClaimsPrincipal user,
+    DailyAttendanceReportService reportService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) =
+        GetUserInfo(user);
+
+    var report =
+        await reportService
+            .GetDailyReportAsync(
+                date,
+                userId,
+                role,
+                cancellationToken);
+
+    return Results.Ok(report);
+})
+.RequireAuthorization();
 
 app.MapGet("/api/admin/sessions", async (
     ClaimsPrincipal user,

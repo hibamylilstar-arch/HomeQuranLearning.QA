@@ -25,6 +25,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen: boo
     { name: "Courses", href: "/courses" },
     { name: "Schedules", href: "/schedules" },
     { name: "Sessions", href: "/sessions" },
+    { name: "Attendance Report", href: "/reports/attendance" },
     { name: "Users", href: "/users" },
     { name: "Assignments", href: "/assignments" },
   ];

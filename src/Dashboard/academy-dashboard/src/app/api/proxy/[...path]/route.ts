@@ -49,7 +49,10 @@ async function proxy(
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const url = `${backendBaseUrl}/api/admin/${pathSegments.join("/")}`;
+  const sourceUrl = new URL(request.url);
+
+  const url =
+    `${backendBaseUrl}/api/admin/${pathSegments.join("/")}${sourceUrl.search}`;
 
   const res = await fetch(url, {
     method,

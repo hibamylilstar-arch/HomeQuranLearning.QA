@@ -10,13 +10,19 @@ import type {
   CourseListItem,
   ScheduleListItem,
   SessionListItem,
+  DailyAttendanceReport,
 } from "@/types";
 
 async function proxyFetch<T>(
   pathSegments: string[],
-  init?: RequestInit
+  init?: RequestInit,
+  searchParams?: URLSearchParams
 ): Promise<T> {
-  const res = await fetch(`/api/proxy/${pathSegments.join("/")}`, {
+  const queryString = searchParams?.toString();
+
+  const res = await fetch(
+    `/api/proxy/${pathSegments.join("/")}${queryString ? `?${queryString}` : ""}`,
+    {
     ...init,
     credentials: "include",
     headers: {
@@ -154,6 +160,22 @@ export async function createSchedule(
 
 export async function getSessions(): Promise<SessionListItem[]> {
   return proxyFetch<SessionListItem[]>(["sessions"]);
+}
+
+export async function getDailyAttendanceReport(
+  date?: string
+): Promise<DailyAttendanceReport> {
+  const searchParams = new URLSearchParams();
+
+  if (date) {
+    searchParams.set("date", date);
+  }
+
+  return proxyFetch<DailyAttendanceReport>(
+    ["reports", "daily-attendance"],
+    undefined,
+    searchParams
+  );
 }
 
 export async function reviewSessionAttendance(

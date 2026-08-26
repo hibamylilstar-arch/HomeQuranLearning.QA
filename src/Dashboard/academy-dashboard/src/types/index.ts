@@ -120,3 +120,36 @@ export interface SessionListItem {
   disconnectCount: number;
   disconnectSeconds: number;
 }
+
+export interface DailyAttendanceReportItem {
+  sessionId: string;
+  teacherId: string;
+  teacherFullName: string;
+  studentId: string;
+  studentFullName: string;
+  courseId: string;
+  courseName: string;
+  scheduledStartUtc: string;
+  scheduledEndUtc: string;
+  studentAttendanceStatus: string;
+  attendanceReviewStatus: string;
+  attendanceNotes?: string | null;
+  activeSeconds: number;
+  disconnectCount: number;
+  disconnectSeconds: number;
+}
+
+export interface DailyAttendanceReport {
+  date: string;
+  timeZone: string;
+  completedSessions: number;
+  presentSessions: number;
+  lateSessions: number;
+  confirmedAbsentSessions: number;
+  excusedSessions: number;
+  needsReviewSessions: number;
+  unknownSessions: number;
+  pendingReviewSessions: number;
+  confirmedAbsences: DailyAttendanceReportItem[];
+  unresolvedSessions: DailyAttendanceReportItem[];
+}

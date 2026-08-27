@@ -601,6 +601,7 @@ app.MapPost("/api/admin/qa-alerts", async (
 
     await alertService.CreateAlertAsync(
         body.RecordingId,
+        body.QaRuleId,
         body.MatchedPhrase,
         body.TimestampUtc,
         cancellationToken);
@@ -1238,6 +1239,7 @@ app.MapPost("/api/worker/qa-alerts", async (
 
     await alertService.CreateAlertAsync(
         body.RecordingId,
+        body.QaRuleId,
         body.MatchedPhrase,
         body.TimestampUtc,
         cancellationToken);

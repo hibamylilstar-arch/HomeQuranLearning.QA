@@ -159,7 +159,8 @@ public sealed class RecordingService
                 RecordingId = recording.Id,
                 FileName = recording.FileName,
                 StorageKey = recording.StorageKey,
-                PresignedUrl = presignedUrl
+                PresignedUrl = presignedUrl,
+                StartedAtUtc = recording.StartedAtUtc
             });
         }
 

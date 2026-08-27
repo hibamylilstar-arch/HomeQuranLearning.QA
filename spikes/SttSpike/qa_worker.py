@@ -1,14 +1,41 @@
 import json
 import os
+import sys
+import tempfile
 import time
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
-from faster_whisper import WhisperModel
 
-BACKEND_BASE_URL = os.environ.get("BACKEND_BASE_URL", "http://localhost:5100")
-WORKER_API_KEY = os.environ.get("WORKER_API_KEY", "local-dev-worker-key")
-POLL_INTERVAL_SECONDS = 10
+BACKEND_BASE_URL = os.environ.get(
+    "BACKEND_BASE_URL",
+    "http://localhost:5100",
+)
+
+WORKER_API_KEY = os.environ.get(
+    "WORKER_API_KEY",
+    "local-dev-worker-key",
+)
+
+QA_MODEL_NAME = os.environ.get(
+    "QA_MODEL_NAME",
+    "base",
+)
+
+POLL_INTERVAL_SECONDS = int(
+    os.environ.get("QA_POLL_INTERVAL_SECONDS", "10")
+)
+
+HTTP_TIMEOUT_SECONDS = int(
+    os.environ.get("QA_HTTP_TIMEOUT_SECONDS", "30")
+)
+
+DOWNLOAD_TIMEOUT_SECONDS = int(
+    os.environ.get("QA_DOWNLOAD_TIMEOUT_SECONDS", "180")
+)
+
+_model = None
 
 
 def http_get_json(path, api_key):
@@ -16,45 +43,78 @@ def http_get_json(path, api_key):
         f"{BACKEND_BASE_URL}{path}",
         headers={"X-Api-Key": api_key},
     )
-    with urllib.request.urlopen(request) as response:
-        return json.loads(response.read().decode("utf-8"))
+
+    with urllib.request.urlopen(
+        request,
+        timeout=HTTP_TIMEOUT_SECONDS,
+    ) as response:
+        return json.loads(
+            response.read().decode("utf-8")
+        )
 
 
 def http_post_json(path, body, api_key):
-    data = json.dumps(body).encode("utf-8")
     request = urllib.request.Request(
         f"{BACKEND_BASE_URL}{path}",
-        data=data,
+        data=json.dumps(body).encode("utf-8"),
         headers={
             "X-Api-Key": api_key,
             "Content-Type": "application/json",
         },
         method="POST",
     )
-    with urllib.request.urlopen(request) as response:
-        return json.loads(response.read().decode("utf-8"))
+
+    with urllib.request.urlopen(
+        request,
+        timeout=HTTP_TIMEOUT_SECONDS,
+    ) as response:
+        return json.loads(
+            response.read().decode("utf-8")
+        )
 
 
 def download_file(url, output_path):
     request = urllib.request.Request(url)
-    with urllib.request.urlopen(request) as response:
-        with open(output_path, "wb") as f:
-            f.write(response.read())
+
+    with urllib.request.urlopen(
+        request,
+        timeout=DOWNLOAD_TIMEOUT_SECONDS,
+    ) as response:
+        with open(output_path, "wb") as output:
+            while True:
+                chunk = response.read(1024 * 1024)
+
+                if not chunk:
+                    break
+
+                output.write(chunk)
 
 
 def get_pending_recordings():
-    return http_get_json("/api/worker/recordings/pending", WORKER_API_KEY)
+    return http_get_json(
+        "/api/worker/recordings/pending",
+        WORKER_API_KEY,
+    )
 
 
 def get_active_rules():
-    return http_get_json("/api/worker/qa-rules", WORKER_API_KEY)
+    return http_get_json(
+        "/api/worker/qa-rules",
+        WORKER_API_KEY,
+    )
 
 
-def create_alert(recording_id, matched_phrase, timestamp_utc):
+def create_alert(
+    recording_id,
+    qa_rule_id,
+    matched_phrase,
+    timestamp_utc,
+):
     return http_post_json(
         "/api/worker/qa-alerts",
         {
             "recordingId": recording_id,
+            "qaRuleId": qa_rule_id,
             "matchedPhrase": matched_phrase,
             "timestampUtc": timestamp_utc,
         },
@@ -64,79 +124,364 @@ def create_alert(recording_id, matched_phrase, timestamp_utc):
 
 def mark_processed(recording_id):
     return http_post_json(
-        f"/api/worker/recordings/{recording_id}/mark-qa-processed",
+        (
+            "/api/worker/recordings/"
+            f"{recording_id}/mark-qa-processed"
+        ),
         {},
         WORKER_API_KEY,
+    )
+
+
+def get_model():
+    global _model
+
+    if _model is None:
+        from faster_whisper import WhisperModel
+
+        print(f"Loading Whisper model {QA_MODEL_NAME}...")
+
+        _model = WhisperModel(
+            QA_MODEL_NAME,
+            compute_type="int8",
+        )
+
+        print("Whisper model loaded.")
+
+    return _model
+
+
+def parse_utc(value):
+    if not value:
+        raise ValueError(
+            "Recording StartedAtUtc is required."
+        )
+
+    parsed = datetime.fromisoformat(
+        value.replace("Z", "+00:00")
+    )
+
+    if parsed.tzinfo is None:
+        raise ValueError(
+            "StartedAtUtc must include timezone."
+        )
+
+    return parsed.astimezone(timezone.utc)
+
+
+def normalize_text(value):
+    return " ".join(
+        (value or "").strip().lower().split()
+    )
+
+
+def build_transcript_index(segments):
+    parts = []
+    ranges = []
+    cursor = 0
+
+    for segment in segments:
+        text = normalize_text(
+            getattr(segment, "text", "")
+        )
+
+        if not text:
+            continue
+
+        if parts:
+            cursor += 1
+
+        start_index = cursor
+
+        parts.append(text)
+
+        cursor += len(text)
+
+        ranges.append(
+            (
+                start_index,
+                cursor,
+                float(segment.start),
+            )
+        )
+
+    return " ".join(parts), ranges
+
+
+def locate_phrase_offset(
+    transcript,
+    ranges,
+    phrase,
+):
+    phrase = normalize_text(phrase)
+
+    if not phrase:
+        return None
+
+    match_index = transcript.find(phrase)
+
+    if match_index < 0:
+        return None
+
+    for start_index, end_index, offset in ranges:
+        if start_index <= match_index < end_index:
+            return offset
+
+    return ranges[0][2] if ranges else 0.0
+
+
+def find_rule_matches(segments, rules):
+    transcript, ranges = build_transcript_index(
+        segments
+    )
+
+    matches = []
+
+    for rule in rules:
+        if not rule.get("isActive", True):
+            continue
+
+        phrase = str(
+            rule.get("phrase", "")
+        ).strip()
+
+        if not phrase:
+            continue
+
+        offset = locate_phrase_offset(
+            transcript,
+            ranges,
+            phrase,
+        )
+
+        if offset is None:
+            continue
+
+        matches.append(
+            {
+                "ruleId": rule.get("id"),
+                "phrase": phrase,
+                "offsetSeconds": offset,
+            }
+        )
+
+    return transcript, matches
+
+
+def timestamp_for_offset(
+    recording_started_at,
+    offset_seconds,
+):
+    timestamp = (
+        recording_started_at
+        + timedelta(seconds=offset_seconds)
+    )
+
+    return (
+        timestamp
+        .astimezone(timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z")
     )
 
 
 def process_recording(recording):
     recording_id = recording["recordingId"]
     file_name = recording["fileName"]
-    presigned_url = recording["presignedUrl"]
 
-    print(f"\nProcessing recording {file_name} ({recording_id})")
+    recording_started_at = parse_utc(
+        recording["startedAtUtc"]
+    )
 
-    local_file = os.path.join(os.path.dirname(__file__), "download.mp4")
-    download_file(presigned_url, local_file)
-    print(f"Downloaded to {local_file}")
+    suffix = os.path.splitext(file_name)[1] or ".mp4"
+
+    descriptor, local_file = tempfile.mkstemp(
+        prefix="academy-qa-",
+        suffix=suffix,
+    )
+
+    os.close(descriptor)
+
+    print(
+        f"\nProcessing {file_name} ({recording_id})"
+    )
 
     try:
-        model = WhisperModel("base", compute_type="int8")
-        segments, _ = model.transcribe(local_file)
+        download_file(
+            recording["presignedUrl"],
+            local_file,
+        )
 
-        transcript = " ".join(segment.text for segment in segments)
+        model = get_model()
+
+        segment_generator, info = model.transcribe(
+            local_file
+        )
+
+        segments = list(segment_generator)
+
+        transcript, matches = find_rule_matches(
+            segments,
+            get_active_rules(),
+        )
+
+        print(
+            "Detected language: "
+            f"{getattr(info, 'language', 'unknown')}"
+        )
+
         print(f"Transcript: {transcript}")
+        print(f"Rule matches: {len(matches)}")
 
-        rules = get_active_rules()
-        active_rules = [r for r in rules if r.get("isActive", True)]
-        print(f"Active rules: {len(active_rules)}")
+        for match in matches:
+            timestamp_utc = timestamp_for_offset(
+                recording_started_at,
+                match["offsetSeconds"],
+            )
 
-        lower_transcript = transcript.lower()
-        created_count = 0
+            print(
+                f"MATCH: {match['phrase']} "
+                f"at +{match['offsetSeconds']:.3f}s "
+                f"({timestamp_utc})"
+            )
 
-        for rule in active_rules:
-            phrase = rule["phrase"].lower()
-            if phrase in lower_transcript:
-                print(f"MATCH: {rule['phrase']}")
+            create_alert(
+                recording_id,
+                match["ruleId"],
+                match["phrase"],
+                timestamp_utc,
+            )
 
-                timestamp_utc = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-                create_alert(recording_id, rule["phrase"], timestamp_utc)
-                created_count += 1
-            else:
-                print(f"NO MATCH: {rule['phrase']}")
+        mark_processed(recording_id)
 
-        print(f"Created {created_count} alert(s).")
+        print(
+            f"Marked {recording_id} as processed."
+        )
+
+        return True
 
     except Exception as ex:
-        print(f"Transcription/QA detection failed: {ex}")
+        print(
+            "Transcription/QA processing failed: "
+            f"{ex}"
+        )
+
+        print(
+            "Recording remains pending for retry."
+        )
+
+        raise
 
     finally:
-        try:
-            mark_processed(recording_id)
-            print(f"Marked {recording_id} as processed.")
-        except Exception as mark_ex:
-            print(f"Failed to mark processed: {mark_ex}")
+        if os.path.exists(local_file):
+            os.remove(local_file)
 
-    if os.path.exists(local_file):
-        os.remove(local_file)
+
+def run_self_test():
+    started = parse_utc(
+        "2026-08-27T06:00:00Z"
+    )
+
+    segments = [
+        SimpleNamespace(
+            start=2.0,
+            text="Please share contact",
+        ),
+        SimpleNamespace(
+            start=5.5,
+            text="number after the class",
+        ),
+        SimpleNamespace(
+            start=9.25,
+            text="Do not use WhatsApp please",
+        ),
+    ]
+
+    rules = [
+        {
+            "id": "rule-contact",
+            "phrase": "contact number",
+            "isActive": True,
+        },
+        {
+            "id": "rule-whatsapp",
+            "phrase": "WhatsApp",
+            "isActive": True,
+        },
+        {
+            "id": "rule-disabled",
+            "phrase": "class",
+            "isActive": False,
+        },
+    ]
+
+    transcript, matches = find_rule_matches(
+        segments,
+        rules,
+    )
+
+    assert transcript == (
+        "please share contact "
+        "number after the class "
+        "do not use whatsapp please"
+    )
+
+    assert len(matches) == 2
+
+    contact = next(
+        item
+        for item in matches
+        if item["ruleId"] == "rule-contact"
+    )
+
+    whatsapp = next(
+        item
+        for item in matches
+        if item["ruleId"] == "rule-whatsapp"
+    )
+
+    assert contact["offsetSeconds"] == 2.0
+    assert whatsapp["offsetSeconds"] == 9.25
+
+    assert timestamp_for_offset(
+        started,
+        contact["offsetSeconds"],
+    ) == "2026-08-27T06:00:02Z"
+
+    assert timestamp_for_offset(
+        started,
+        whatsapp["offsetSeconds"],
+    ) == "2026-08-27T06:00:09.250000Z"
+
+    print("QA_WORKER_TRANSCRIPT_INDEX_OK")
+    print("QA_WORKER_CROSS_SEGMENT_MATCH_OK")
+    print("QA_WORKER_RULE_LINK_OK")
+    print("QA_WORKER_TIMESTAMP_ALIGNMENT_OK")
+    print("QA_WORKER_SELF_TEST_OK")
 
 
 def main():
     print("QA worker started.")
     print(f"Backend URL: {BACKEND_BASE_URL}")
-    print(f"Polling every {POLL_INTERVAL_SECONDS} seconds...")
+    print(
+        f"Polling every {POLL_INTERVAL_SECONDS} seconds..."
+    )
 
     while True:
         try:
             pending = get_pending_recordings()
-            print(f"\nPending recordings: {len(pending)}")
+
+            print(
+                f"\nPending recordings: {len(pending)}"
+            )
 
             for recording in pending:
                 try:
                     process_recording(recording)
                 except Exception as ex:
-                    print(f"Error processing recording: {ex}")
+                    print(
+                        f"Error processing recording: {ex}"
+                    )
 
         except Exception as ex:
             print(f"Worker loop error: {ex}")
@@ -145,4 +490,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if "--self-test" in sys.argv:
+        run_self_test()
+    else:
+        main()

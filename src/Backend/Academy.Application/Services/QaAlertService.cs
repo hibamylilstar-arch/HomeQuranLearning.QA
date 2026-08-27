@@ -39,15 +39,35 @@ public sealed class QaAlertService
 
     public async Task CreateAlertAsync(
         Guid recordingId,
+        Guid? qaRuleId,
         string matchedPhrase,
         DateTimeOffset timestampUtc,
         CancellationToken cancellationToken = default)
     {
+        var existingAlerts =
+            await _alertRepository.GetAllAsync(
+                cancellationToken);
+
+        bool duplicate =
+            existingAlerts.Any(x =>
+                x.RecordingId == recordingId &&
+                x.QaRuleId == qaRuleId &&
+                string.Equals(
+                    x.MatchedPhrase,
+                    matchedPhrase,
+                    StringComparison.OrdinalIgnoreCase) &&
+                x.TimestampUtc == timestampUtc);
+
+        if (duplicate)
+        {
+            return;
+        }
+
         var alert = new QaAlert
         {
             Id = Guid.NewGuid(),
             RecordingId = recordingId,
-            QaRuleId = null,
+            QaRuleId = qaRuleId,
             MatchedPhrase = matchedPhrase,
             TimestampUtc = timestampUtc,
             Status = QaAlertStatus.Open,
@@ -55,10 +75,13 @@ public sealed class QaAlertService
             UpdatedAtUtc = DateTimeOffset.UtcNow
         };
 
-        await _alertRepository.AddAsync(alert, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-    }
+        await _alertRepository.AddAsync(
+            alert,
+            cancellationToken);
 
+        await _unitOfWork.SaveChangesAsync(
+            cancellationToken);
+    }
     public async Task UpdateStatusAsync(
         Guid alertId,
         QaAlertStatus status,

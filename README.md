@@ -24,6 +24,7 @@ Next recommended product phase: `7A-2 — durable timestamped transcript segment
 ## Important documentation
 
 - `docs/PROJECT-STATE.md`
+- `docs/PROJECT-DECISIONS.md`
 - `docs/CODEX-WORKFLOW.md`
 - `docs/OWNER-CONTROL-PLANE.md`
 - `docs/architecture/current-state.md`

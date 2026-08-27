@@ -4,11 +4,12 @@
 
 Canonical checkpoint:
 
-- Branch: `main`
-- Commit: `415bbec`
-- Subject: `feat(qa): align alerts with transcript timestamps`
-- Latest closed phase: `7A-1`
-- Next recommended phase: `7A-2`
+- Working branch: `codex/s1-stabilize-access-attendance`
+- Base commit: `32202b3`
+- Base subject: `chore(codex): add autonomous project governance`
+- Latest closed product phase: `7A-1`
+- Current product phase: `S1 — access and attendance stabilization`
+- Next planned QA phase after stabilization: `7A-2`
 
 Canonical resumable state: `docs/PROJECT-STATE.md`
 
@@ -186,7 +187,7 @@ Current semantics:
 - CallAttempted = teacher evidence only
 - StudentCallConnected = explicit student presence
 - CallEnded = stop/duration evidence
-- LessonShared = teacher evidence only, NOT student presence
+- LessonShared = strong teacher and student presence evidence, but not an arrival timestamp
 
 StudentCallConnected within 3 minutes => Present; later => Late.
 
@@ -295,7 +296,7 @@ These counts are historical proof only, not permanent invariants.
 
 ## Next engineering work
 
-Immediate recommendation: a narrow stabilization phase for current authorization gaps, the LessonShared reducer-policy conflict, stale runtime/service proof, TeamsHelper startup, and manual-session gaps.
+Immediate work: a narrow stabilization phase for current authorization gaps and stale runtime/service proof. TeamsHelper startup and manual-session gaps remain later stabilization work.
 
 The next QA feature remains `7A-2 — durable timestamped transcript segments`, but it must not start until stabilization scope is discussed/approved and normal phase gates are followed.
 

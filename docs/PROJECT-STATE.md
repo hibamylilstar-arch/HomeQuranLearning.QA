@@ -8,25 +8,25 @@ Chat history is not authoritative. Repository state + this file are the durable 
 
 ## Canonical checkpoint
 
-- Branch: `main`
-- Commit: `415bbec68c1ec2d7731dc738f976d87dd389e485`
-- Origin: `origin/main` at the same commit (verified 2026-08-27)
-- Subject: `feat(qa): align alerts with transcript timestamps`
-- Latest closed phase: `7A-1`
-- Current product phase: none
-- Current governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
+- Branch: `codex/s1-stabilize-access-attendance`
+- Base commit: `32202b3b4202515a684373bfbf6500e8a4e7eef7`
+- Origin: `origin/main` at the same base commit (verified 2026-08-27)
+- Subject: `chore(codex): add autonomous project governance`
+- Latest closed product phase: `7A-1`
+- Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
+- Current product phase: `S1 — access and attendance stabilization`
 - Current phase status: `WAITING_RELEASE_APPROVAL`
-- Next engineering gate: narrow stabilization before `7A-2`
+- Next engineering gate: S1 release approval; do not start `7A-2`
 - Waiting human test: no
 - Waiting release approval: yes
-- Last verified checkpoint: governance artifacts created and validated
-- Tests already passed: 7A-1 full build GREEN, unit 67/67, integration 2/2, production API/DB proof GREEN; governance TOML/rules/secrets/diff validation GREEN
-- Tests still required: after `APPROVE`, reverify exact files and staged set before commit
-- Expected changed files: the governance/configuration/documentation list near the end of this file
-- Temporary data: 7A-1 proof data cleaned; governance bootstrap created none
+- Last verified checkpoint: S1 release candidate fully validated; changes unstaged; API/Agent/FFmpeg returned OFF
+- Tests already passed: full solution build GREEN; focused attendance/access 35/35; unit 75/75; integration 2/2; Agent 1/1; API RBAC/resource-scope proof GREEN; current QA worker source self-test and API probe GREEN; `git diff --check` GREEN
+- Tests still required: after `APPROVE`, verify the exact unstaged/staged file set, rerun final diff/secrets checks, commit and normal push
+- Expected changed files: the ten-file S1 release list below
+- Temporary data: all isolated API/DB proof rows removed and zero-count cleanup verified
 - Product runtime expected after latest proof: OFF
 
-Neither stabilization nor 7A-2 has started.
+S1 is waiting for release approval. `7A-2` has not started.
 
 ## Current runtime snapshot
 
@@ -36,7 +36,7 @@ Verified 2026-08-27:
 - Docker: PostgreSQL, Redis, MinIO, LiveKit, LiveKit Ingress and ingress-manager running
 - Windows service `AcademyQaWorker`: Running / Automatic
 
-Reconnaissance indicates the worker process predates commit `415bbec`; treat it as potentially stale until it is deliberately restarted and proved during stabilization. The bootstrap does not alter runtime.
+The `AcademyQaWorker` service remains Running/Automatic and is wired to the repository worker source. Its current source passes all self-test markers and a live read-only API probe, but Windows denied service-control and child-process termination, so the long-running service process itself could not be refreshed. Keep this operational caveat visible after release.
 
 ## Proven architecture
 
@@ -137,9 +137,8 @@ Current semantics:
 - CallAttempted = teacher evidence, not student presence
 - StudentCallConnected = explicit student presence
 - CallEnded = stop/duration evidence
-- LessonShared = teacher evidence only, NOT student presence
-
-**Verified stabilization conflict:** current `AttendanceReducer` behavior/tests mark student Present from `LessonShared`, contradicting the authoritative policy above. Do not silently select new semantics inside another phase; resolve this as explicit, tested stabilization work.
+- LessonShared = strong teacher and student participation/presence evidence
+- LessonShared timestamp is not a student arrival timestamp and must not by itself cause Late
 
 Late threshold: 3 minutes.
 Pre-class teacher-ready window: 5 minutes.
@@ -218,19 +217,54 @@ QA worker remains production-wired at `spikes/SttSpike/qa_worker.py`.
 
 `.dev-runtime/Runtime.ps1 StartApi` may briefly report API OFF immediately after launch while HTTP readiness later succeeds. Use explicit bounded readiness checks.
 
-## Next engineering gate — stabilization, then 7A-2
+## S1 — release candidate
 
-Reconnaissance identified the following current-state work. Do not implement it during the governance bootstrap:
+Implemented:
 
-1. Several admin routes and playback/live/token operations lack complete granular permission + resource-scope enforcement.
-2. `LessonShared` reducer behavior conflicts with authoritative attendance policy.
-3. The running QA worker may be stale relative to HEAD.
-4. TeamsHelper lacks a verified durable launcher/installer/startup mechanism.
-5. Manual-session workflow is incomplete.
-6. Agent configuration contains environment-specific FFmpeg/device assumptions and recording is disabled by default.
-7. Production Compose omits some live/reverse-proxy components and needs deliberate deployment design later.
+- Owner/Admin role policy on user, people, assignment, QA-rule, QA-alert write, device-management and manual-session routes.
+- Manager recording playback restricted to recordings belonging to assigned teachers.
+- Manager live-session visibility and LiveKit tokens restricted to active sessions belonging to assigned teachers.
+- Manager denied LiveKit server credentials and publish-capable participant tokens; Owner/Admin token workflows remain available.
+- Unknown roles fail closed for dashboard recordings, alerts and devices.
+- Corrected Owner policy recorded durably: `LessonShared` proves both teacher and student presence but is not an arrival/late timestamp.
 
-The immediate next engineering step should be a narrowly scoped stabilization plan for the highest-risk defects. `7A-2` remains the next QA feature, not the next unconditional action.
+Proof:
+
+- full solution build: GREEN
+- focused attendance/access tests: 35/35
+- unit tests: 75/75
+- integration tests: 2/2
+- Agent tests: 1/1
+- local API Owner/Admin/Manager policy and assigned/unassigned resource proof: GREEN
+- temporary runtime proof cleanup: GREEN, zero remaining rows
+- QA worker current-source self-test and read-only API probe: GREEN
+- exact service-process refresh: not achieved because host service/process control returned Access Denied
+
+Expected S1 release files:
+
+- `AGENTS.md`
+- `README.md`
+- `docs/PROJECT-DECISIONS.md`
+- `docs/PROJECT-STATE.md`
+- `docs/architecture/current-state.md`
+- `docs/architecture/overview.md`
+- `docs/decisions/coding-conventions.md`
+- `src/Backend/Academy.Api/Program.cs`
+- `src/Backend/Academy.Application/Services/DashboardQueryService.cs`
+- `tests/Academy.UnitTests/DashboardResourceAccessTests.cs`
+
+## Current engineering gate — S1 stabilization, then 7A-2
+
+S1 closes the immediate role and resource-scope defects. Remaining stabilization and future authorization observations are:
+
+1. Full granular permission-catalog enforcement remains future Owner Control Plane phase O1 work; S1 intentionally applies existing role and assignment boundaries only.
+2. The running QA worker service process could not be refreshed under the current host permissions, although current source/runtime probes are green.
+3. TeamsHelper lacks a verified durable launcher/installer/startup mechanism.
+4. Manual-session workflow is incomplete.
+5. Agent configuration contains environment-specific FFmpeg/device assumptions and recording is disabled by default.
+6. Production Compose omits some live/reverse-proxy components and needs deliberate deployment design later.
+
+After S1 closes through its release gate, reassess the remaining stabilization observations before starting `7A-2`. `7A-2` remains the next planned QA feature, not an unconditional next action.
 
 ## Planned QA phase — 7A-2 (not started)
 
@@ -322,13 +356,13 @@ Likely future tracks are O1 authorization/permission foundation, O2 organization
 
 ## Codex governance status
 
-Project-wide governance has been prepared and validated but is not committed/pushed. Status is `WAITING_RELEASE_APPROVAL`.
+Project-wide governance was committed and pushed at `32202b3b4202515a684373bfbf6500e8a4e7eef7`. Status is `CLOSED`.
 
 Root `AGENTS.md` is the repository-wide governance file. The existing `src/Dashboard/academy-dashboard/AGENTS.md` adds only Next.js/dashboard-specific guidance.
 
 Project-local `.codex/config.toml` requests `workspace-write`, `on-request`, and the supported native Windows elevated sandbox. Project rules allow routine read-only Git inspection, prompt on commit/push, and forbid destructive Git patterns. These project-local layers load only when the repository is trusted.
 
-Expected bootstrap changes:
+Committed bootstrap files:
 
 - `.codex/config.toml`
 - `.codex/rules/default.rules`
@@ -357,5 +391,5 @@ Deferred until local product completeness/stabilization and explicit owner appro
 4. Inspect staged/uncommitted files.
 5. Inspect runtime.
 6. Determine whether current phase is closed, in progress, waiting human test, waiting release approval or blocked.
-7. Honor `WAITING_RELEASE_APPROVAL`: do not stage/commit/push or start stabilization/7A-2.
+7. If the recorded status is `WAITING_RELEASE_APPROVAL`, do not stage/commit/push or start the next phase.
 8. Resume only from verified state.

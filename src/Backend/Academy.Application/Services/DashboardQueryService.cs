@@ -41,6 +41,10 @@ public sealed class DashboardQueryService
                 .Where(r => r.TeacherId is not null && teacherIds.Contains(r.TeacherId.Value))
                 .ToList();
         }
+        else if (!IsOwnerOrAdmin(role))
+        {
+            return Array.Empty<RecordingListItem>();
+        }
 
         return recordings
             .OrderByDescending(x => x.StartedAtUtc)
@@ -80,6 +84,10 @@ public sealed class DashboardQueryService
                 .Where(a => visibleRecordingIds.Contains(a.RecordingId))
                 .ToList();
         }
+        else if (!IsOwnerOrAdmin(role))
+        {
+            return Array.Empty<QaAlertDto>();
+        }
 
         return alerts
             .OrderByDescending(x => x.TimestampUtc)
@@ -114,6 +122,10 @@ public sealed class DashboardQueryService
             devices = devices
                 .Where(d => visibleDeviceIds.Contains(d.Id))
                 .ToList();
+        }
+        else if (!IsOwnerOrAdmin(role))
+        {
+            return Array.Empty<DeviceListItem>();
         }
 
         return devices
@@ -246,6 +258,97 @@ public sealed class DashboardQueryService
         return teacherIds.Contains(
             session.TeacherId);
     }
+
+    public async Task<bool> CanAccessRecordingAsync(
+        Guid recordingId,
+        Guid userId,
+        string role,
+        CancellationToken cancellationToken = default)
+    {
+        var recording =
+            await _recordingRepository.GetByIdAsync(
+                recordingId,
+                cancellationToken);
+
+        if (recording is null)
+        {
+            return false;
+        }
+
+        if (IsOwnerOrAdmin(role))
+        {
+            return true;
+        }
+
+        if (role != UserRole.Manager.ToString() ||
+            recording.TeacherId is null)
+        {
+            return false;
+        }
+
+        var teacherIds =
+            await GetAssignedTeacherIdsAsync(
+                userId,
+                cancellationToken);
+
+        return teacherIds.Contains(
+            recording.TeacherId.Value);
+    }
+
+    public async Task<IReadOnlyList<SessionDto>> GetVisibleLiveSessionsAsync(
+        Guid userId,
+        string role,
+        CancellationToken cancellationToken = default)
+    {
+        var sessions =
+            await GetVisibleSessionsAsync(
+                userId,
+                role,
+                cancellationToken);
+
+        return sessions
+            .Where(x =>
+                x.Status ==
+                SessionStatus.Live.ToString())
+            .ToList();
+    }
+
+    public async Task<bool> CanAccessLiveSessionAsync(
+        Guid sessionId,
+        Guid userId,
+        string role,
+        CancellationToken cancellationToken = default)
+    {
+        var session =
+            await _sessionRepository.GetByIdAsync(
+                sessionId,
+                cancellationToken);
+
+        if (session is null ||
+            session.Status != SessionStatus.Live)
+        {
+            return false;
+        }
+
+        if (IsOwnerOrAdmin(role))
+        {
+            return true;
+        }
+
+        if (role != UserRole.Manager.ToString())
+        {
+            return false;
+        }
+
+        var teacherIds =
+            await GetAssignedTeacherIdsAsync(
+                userId,
+                cancellationToken);
+
+        return teacherIds.Contains(
+            session.TeacherId);
+    }
+
     private async Task<HashSet<Guid>> GetAssignedTeacherIdsAsync(
         Guid managerUserId,
         CancellationToken cancellationToken)
@@ -255,5 +358,11 @@ public sealed class DashboardQueryService
             cancellationToken);
 
         return assignments.Select(x => x.TeacherId).ToHashSet();
+    }
+
+    private static bool IsOwnerOrAdmin(string role)
+    {
+        return role == UserRole.Owner.ToString() ||
+               role == UserRole.Admin.ToString();
     }
 }

@@ -59,7 +59,7 @@ Major domains include auth/RBAC, teachers, students, courses, devices, schedules
 
 Teams UI evidence uses an academy-controlled helper and secured Named Pipe integration with the main Agent.
 
-`LessonShared` is teacher evidence, not student presence.
+`LessonShared` is strong teacher and student presence evidence, but its timestamp is not an arrival-time signal and cannot by itself establish lateness.
 
 `StudentCallConnected` is the explicit Teams student-presence event.
 

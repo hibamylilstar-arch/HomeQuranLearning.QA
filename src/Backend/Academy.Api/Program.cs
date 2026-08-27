@@ -14,6 +14,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
+const string OwnerOrAdminPolicy = "OwnerOrAdmin";
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
@@ -90,7 +92,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(
+        OwnerOrAdminPolicy,
+        policy => policy.RequireRole(
+            UserRole.Owner.ToString(),
+            UserRole.Admin.ToString()));
+});
 
 builder.Services.AddCors(options =>
 {
@@ -344,27 +353,12 @@ app.MapGet("/api/admin/devices", async (
 }).RequireAuthorization();
 
 app.MapPatch("/api/admin/devices/{deviceId:guid}/recording-display-name", async (
-    ClaimsPrincipal user,
     Guid deviceId,
     UpdateRecordingDisplayNameRequest body,
     IDeviceRepository deviceRepository,
     IUnitOfWork unitOfWork,
     CancellationToken cancellationToken) =>
 {
-    var (_, role) = GetUserInfo(user);
-
-    if (!string.Equals(
-            role,
-            "Owner",
-            StringComparison.OrdinalIgnoreCase) &&
-        !string.Equals(
-            role,
-            "Admin",
-            StringComparison.OrdinalIgnoreCase))
-    {
-        return Results.Forbid();
-    }
-
     var device =
         await deviceRepository.GetByIdAsync(
             deviceId,
@@ -411,7 +405,7 @@ app.MapPatch("/api/admin/devices/{deviceId:guid}/recording-display-name", async 
         recordingDisplayName =
             device.RecordingDisplayName
     });
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapGet("/api/admin/recordings", async (
     ClaimsPrincipal user,
@@ -428,9 +422,29 @@ app.MapGet("/api/admin/recordings/{recordingId:guid}/playback-url", async (
     ClaimsPrincipal user,
     HttpRequest request,
     Guid recordingId,
+    DashboardQueryService dashboardQueryService,
     RecordingService recordingService,
     CancellationToken cancellationToken) =>
 {
+    var (userId, role) = GetUserInfo(user);
+
+    if (userId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    var canAccess =
+        await dashboardQueryService.CanAccessRecordingAsync(
+            recordingId,
+            userId,
+            role,
+            cancellationToken);
+
+    if (!canAccess)
+    {
+        return Results.NotFound();
+    }
+
     var url = await recordingService.GetPlaybackUrlAsync(
         recordingId,
         TimeSpan.FromMinutes(10),
@@ -548,7 +562,7 @@ app.MapGet("/api/admin/qa-rules", async (
 {
     var rules = await ruleService.GetRulesAsync(cancellationToken);
     return Results.Ok(rules);
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPost("/api/admin/qa-rules", async (
     ClaimsPrincipal user,
@@ -571,7 +585,7 @@ app.MapPost("/api/admin/qa-rules", async (
         cancellationToken);
 
     return Results.Ok(rule);
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapGet("/api/admin/qa-alerts", async (
     ClaimsPrincipal user,
@@ -607,7 +621,7 @@ app.MapPost("/api/admin/qa-alerts", async (
         cancellationToken);
 
     return Results.Ok(new { created = true });
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapGet("/api/admin/users", async (
     ClaimsPrincipal user,
@@ -617,7 +631,7 @@ app.MapGet("/api/admin/users", async (
 {
     var users = await adminUserService.GetUsersAsync(cancellationToken);
     return Results.Ok(users);
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPost("/api/admin/users", async (
     ClaimsPrincipal user,
@@ -643,7 +657,7 @@ app.MapPost("/api/admin/users", async (
     {
         return Results.BadRequest(new { message = ex.Message });
     }
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPatch("/api/admin/users/{userId:guid}/status", async (
     ClaimsPrincipal user,
@@ -662,7 +676,7 @@ app.MapPatch("/api/admin/users/{userId:guid}/status", async (
     {
         return Results.BadRequest(new { message = ex.Message });
     }
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapGet("/api/admin/teachers", async (
     ClaimsPrincipal user,
@@ -672,7 +686,7 @@ app.MapGet("/api/admin/teachers", async (
 {
     var teachers = await teacherService.GetTeachersAsync(cancellationToken);
     return Results.Ok(teachers);
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPost("/api/admin/teachers", async (
     ClaimsPrincipal user,
@@ -691,7 +705,7 @@ app.MapPost("/api/admin/teachers", async (
 
     var teacher = await teacherService.CreateTeacherAsync(body, cancellationToken);
     return Results.Ok(teacher);
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapGet("/api/admin/manager-assignments", async (
     ClaimsPrincipal user,
@@ -701,7 +715,7 @@ app.MapGet("/api/admin/manager-assignments", async (
 {
     var assignments = await assignmentService.GetAssignmentsAsync(cancellationToken);
     return Results.Ok(assignments);
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPost("/api/admin/manager-assignments", async (
     ClaimsPrincipal user,
@@ -731,7 +745,7 @@ app.MapPost("/api/admin/manager-assignments", async (
     {
         return Results.BadRequest(new { message = ex.Message });
     }
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapGet("/api/admin/students", async (
     ClaimsPrincipal user,
@@ -741,7 +755,7 @@ app.MapGet("/api/admin/students", async (
 {
     var students = await studentService.GetStudentsAsync(cancellationToken);
     return Results.Ok(students);
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPost("/api/admin/students", async (
     ClaimsPrincipal user,
@@ -760,7 +774,7 @@ app.MapPost("/api/admin/students", async (
 
     var student = await studentService.CreateStudentAsync(body, cancellationToken);
     return Results.Ok(student);
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapGet("/api/admin/courses", async (
     ClaimsPrincipal user,
@@ -770,7 +784,7 @@ app.MapGet("/api/admin/courses", async (
 {
     var courses = await courseService.GetCoursesAsync(cancellationToken);
     return Results.Ok(courses);
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPost("/api/admin/courses", async (
     ClaimsPrincipal user,
@@ -789,7 +803,7 @@ app.MapPost("/api/admin/courses", async (
 
     var course = await courseService.CreateCourseAsync(body, cancellationToken);
     return Results.Ok(course);
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapGet("/api/admin/schedules", async (
     ClaimsPrincipal user,
@@ -1071,10 +1085,22 @@ app.MapPatch("/api/admin/sessions/{sessionId:guid}/attendance-review", async (
 app.MapGet("/api/admin/live-sessions", async (
     ClaimsPrincipal user,
     HttpRequest request,
-    SessionService sessionService,
+    DashboardQueryService dashboardQueryService,
     CancellationToken cancellationToken) =>
 {
-    var sessions = await sessionService.GetLiveSessionsAsync(cancellationToken);
+    var (userId, role) = GetUserInfo(user);
+
+    if (userId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    var sessions =
+        await dashboardQueryService.GetVisibleLiveSessionsAsync(
+            userId,
+            role,
+            cancellationToken);
+
     return Results.Ok(sessions);
 }).RequireAuthorization();
 
@@ -1095,11 +1121,12 @@ app.MapPost("/api/admin/sessions", async (
 
     var session = await sessionService.CreateSessionAsync(body, cancellationToken);
     return Results.Ok(session);
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPost("/api/admin/livekit/token", async (
     ClaimsPrincipal user,
     HttpRequest request,
+    DashboardQueryService dashboardQueryService,
     LiveKitTokenService liveKitTokenService,
     CancellationToken cancellationToken) =>
 {
@@ -1110,6 +1137,39 @@ app.MapPost("/api/admin/livekit/token", async (
     if (body is null || string.IsNullOrWhiteSpace(body.RoomName) || string.IsNullOrWhiteSpace(body.Identity))
     {
         return Results.BadRequest("RoomName and Identity are required.");
+    }
+
+    if (!TryGetSessionIdFromRoomName(
+            body.RoomName,
+            out Guid sessionId))
+    {
+        return Results.BadRequest(
+            "RoomName must use the session-{guid} format.");
+    }
+
+    var (userId, role) = GetUserInfo(user);
+
+    if (userId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (role == UserRole.Manager.ToString() &&
+        body.CanPublish)
+    {
+        return Results.Forbid();
+    }
+
+    var canAccess =
+        await dashboardQueryService.CanAccessLiveSessionAsync(
+            sessionId,
+            userId,
+            role,
+            cancellationToken);
+
+    if (!canAccess)
+    {
+        return Results.NotFound();
     }
 
     var token = liveKitTokenService.GenerateToken(
@@ -1132,7 +1192,7 @@ app.MapGet("/api/admin/livekit/server-token", async (
 {
     var token = liveKitTokenService.GenerateServerApiToken();
     return Results.Ok(new { token });
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapGet("/api/worker/sessions/pending-livekit-ingress", async (
     HttpRequest request,
@@ -1261,6 +1321,25 @@ static (Guid UserId, string Role) GetUserInfo(ClaimsPrincipal user)
     string role = user.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
 
     return (userId, role);
+}
+
+static bool TryGetSessionIdFromRoomName(
+    string roomName,
+    out Guid sessionId)
+{
+    const string prefix = "session-";
+
+    if (!roomName.StartsWith(
+            prefix,
+            StringComparison.Ordinal))
+    {
+        sessionId = Guid.Empty;
+        return false;
+    }
+
+    return Guid.TryParse(
+        roomName[prefix.Length..],
+        out sessionId);
 }
 
 static async Task SeedOwnerAsync(WebApplication app)

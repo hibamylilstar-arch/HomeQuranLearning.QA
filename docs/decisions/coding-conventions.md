@@ -47,9 +47,9 @@ Current Teams policy:
 - CallAttempted: teacher evidence
 - StudentCallConnected: explicit student presence
 - CallEnded: stop/duration evidence
-- LessonShared: teacher evidence only
+- LessonShared: strong teacher and student presence evidence
 
-Do not infer student presence from `LessonShared`.
+Do not infer student arrival time or lateness from `LessonShared`; use explicit arrival signals such as `StudentCallConnected` for that purpose.
 
 ## QA/STT
 

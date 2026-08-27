@@ -8,7 +8,7 @@ Before substantive work, read:
 
 1. `AGENTS.md`
 2. `docs/PROJECT-STATE.md`
-3. the relevant architecture/decision documents
+3. `docs/PROJECT-DECISIONS.md` and the relevant architecture/decision documents
 4. `docs/OWNER-CONTROL-PLANE.md` for authorization, Owner, retention, or device-lifecycle work
 
 Chat history is not authoritative. Git, current source/runtime evidence, and `docs/PROJECT-STATE.md` are.
@@ -93,7 +93,7 @@ Known helper caveat: `StartApi` may briefly report API OFF although HTTP readine
 - `StudentCallConnected` is explicit Teams student-presence evidence.
 - `TeacherGreetingSent` and `CallAttempted` are teacher evidence only.
 - `CallEnded` ends duration and does not independently prove attendance.
-- Owner policy says `LessonShared` is teacher evidence only and must not prove student presence. Current reducer behavior conflicts with that policy; treat it as an unresolved stabilization defect, not a license to silently choose semantics.
+- `LessonShared` is strong attendance evidence for both teacher and student, but its timestamp is not an arrival-time signal and must not by itself mark either participant Late.
 - QA alert time represents recording start plus matched speech offset.
 - A recording is QA-processed only after the complete successful QA path.
 - The production-wired QA worker currently remains `spikes/SttSpike/qa_worker.py`; do not move it casually.

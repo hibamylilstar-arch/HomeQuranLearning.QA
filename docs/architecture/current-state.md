@@ -4,12 +4,13 @@
 
 Canonical checkpoint:
 
-- Working branch: `main`
+- Working branch: `codex/s1.2-teamshelper-lifecycle`
 - Base commit: `32202b3`
 - Base subject: `chore(codex): add autonomous project governance`
 - Latest closed product phase: `S1 - access and attendance stabilization`
-- Current product phase: `BETWEEN PHASES - S1 closed`
-- Next planned QA phase: `7A-2`; next engineering phase requires post-S1 reassessment.
+- Current product phase: `S1.2 - TeamsHelper startup and lifecycle stabilization`
+- Phase status: `WAITING_RELEASE_APPROVAL`; S1.2 local install/runtime recovery proof is complete.
+- Next planned QA feature: `7A-2`; it has not started.
 
 Canonical resumable state: `docs/PROJECT-STATE.md`
 

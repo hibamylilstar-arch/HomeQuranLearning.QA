@@ -15,11 +15,13 @@ Private internal QA, attendance and monitoring platform for the HomeQuranLearnin
 
 ## Current checkpoint
 
-`415bbec feat(qa): align alerts with transcript timestamps`
+`d8dd5a1 fix(recordings): handle unavailable playback cleanly`
 
-Latest closed phase: `S1 - access and attendance stabilization`
+Latest closed phase: `S1.1 - deleted recording playback stabilization`
 
-Next planned QA phase: `7A-2`; next engineering phase requires post-S1 reassessment.
+Current engineering phase: `S1.2 - TeamsHelper startup and lifecycle stabilization`.
+
+Next planned QA feature remains `7A-2`; it has not started.
 
 ## Important documentation
 
@@ -30,6 +32,7 @@ Next planned QA phase: `7A-2`; next engineering phase requires post-S1 reassessm
 - `docs/architecture/current-state.md`
 - `docs/architecture/overview.md`
 - `docs/architecture/qa-worker-service.md`
+- `docs/architecture/teams-helper-lifecycle.md`
 - `docs/decisions/ADR-001-system-architecture.md`
 - `docs/decisions/coding-conventions.md`
 

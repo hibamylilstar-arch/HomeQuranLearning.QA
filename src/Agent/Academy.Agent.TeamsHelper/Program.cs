@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Windows.Automation;
 using Academy.Agent.Teams;
 using Academy.Agent.TeamsHelper;
@@ -20,25 +21,87 @@ if (HasArgument(
     return;
 }
 
+if (HasArgument(
+        "--lifecycle-probe"))
+{
+    RunLifecycleProbe();
+    return;
+}
+
 if (HasArgument("--monitor"))
 {
-    using var cancellation =
-        new CancellationTokenSource();
+    TeamsHelperRuntimePaths paths =
+        TeamsHelperRuntimePaths.CreateDefault();
 
-    Console.CancelKeyPress +=
-        (_, eventArgs) =>
+    var log =
+        new TeamsHelperFileLog(
+            paths.LogPath);
+
+    TeamsHelperInstanceLease? instanceLease =
+        TeamsHelperInstanceLease.TryAcquire();
+
+    if (instanceLease is null)
+    {
+        log.Information(
+            "TEAMS_HELPER_ALREADY_RUNNING");
+
+        return;
+    }
+
+    using (instanceLease)
+    {
+        var health =
+            new TeamsHelperHealthReporter(
+                paths.HealthPath);
+
+        health.TryUpdate(
+            "Starting",
+            force: true);
+
+        using var cancellation =
+            new CancellationTokenSource();
+
+        Console.CancelKeyPress +=
+            (_, eventArgs) =>
+            {
+                eventArgs.Cancel =
+                    true;
+
+                cancellation.Cancel();
+            };
+
+        var monitor =
+            new TeamsEvidenceMonitor(
+                log,
+                health);
+
+        try
         {
-            eventArgs.Cancel =
-                true;
+            await monitor.RunAsync(
+                cancellation.Token);
+        }
+        catch (OperationCanceledException)
+            when (cancellation.IsCancellationRequested)
+        {
+            health.TryUpdate(
+                "Stopped",
+                force: true);
+        }
+        catch (Exception ex)
+        {
+            health.TryUpdate(
+                "Failed",
+                $"{ex.GetType().Name}: {ex.Message}",
+                force: true);
 
-            cancellation.Cancel();
-        };
+            log.Error(
+                "TeamsHelper monitor terminated unexpectedly.",
+                ex);
 
-    var monitor =
-        new TeamsEvidenceMonitor();
-
-    await monitor.RunAsync(
-        cancellation.Token);
+            Environment.ExitCode =
+                1;
+        }
+    }
 
     return;
 }
@@ -492,4 +555,148 @@ static void RunStateMachineProbe()
 
     Console.WriteLine(
         "STATE_MACHINE_PROBE_OK");
+}
+
+
+static void RunLifecycleProbe()
+{
+    string temporaryRoot =
+        Path.Combine(
+            Path.GetTempPath(),
+            "AcademyAgent.TeamsHelper.Probe",
+            Guid.NewGuid().ToString("N"));
+
+    Directory.CreateDirectory(
+        temporaryRoot);
+
+    try
+    {
+        string mutexName =
+            $"Local\\AcademyAgent.TeamsHelper.Probe.{Guid.NewGuid():N}";
+
+        TeamsHelperInstanceLease? first =
+            TeamsHelperInstanceLease.TryAcquire(
+                mutexName);
+
+        if (first is null)
+        {
+            throw new InvalidOperationException(
+                "Lifecycle probe could not acquire its first instance lease.");
+        }
+
+        using (first)
+        {
+            using TeamsHelperInstanceLease? duplicate =
+                TeamsHelperInstanceLease.TryAcquire(
+                    mutexName);
+
+            if (duplicate is not null)
+            {
+                throw new InvalidOperationException(
+                    "Lifecycle probe allowed a duplicate instance lease.");
+            }
+        }
+
+        using TeamsHelperInstanceLease? reacquired =
+            TeamsHelperInstanceLease.TryAcquire(
+                mutexName);
+
+        if (reacquired is null)
+        {
+            throw new InvalidOperationException(
+                "Lifecycle probe did not release its instance lease.");
+        }
+
+        Console.WriteLine(
+            "TEAMS_HELPER_SINGLE_INSTANCE_OK");
+
+        DateTimeOffset now =
+            DateTimeOffset.UtcNow;
+
+        string healthPath =
+            Path.Combine(
+                temporaryRoot,
+                "health.json");
+
+        var health =
+            new TeamsHelperHealthReporter(
+                healthPath,
+                TimeSpan.FromHours(1),
+                () => now,
+                processId: 123,
+                sessionId: 456);
+
+        bool firstHealthWrite =
+            health.TryUpdate(
+                "Starting");
+
+        bool throttledHealthWrite =
+            health.TryUpdate(
+                "Starting");
+
+        now =
+            now.AddSeconds(1);
+
+        bool changedHealthWrite =
+            health.TryUpdate(
+                "Monitoring");
+
+        TeamsHelperHealthSnapshot? snapshot =
+            JsonSerializer.Deserialize<TeamsHelperHealthSnapshot>(
+                File.ReadAllText(healthPath),
+                new JsonSerializerOptions(
+                    JsonSerializerDefaults.Web));
+
+        if (!firstHealthWrite ||
+            throttledHealthWrite ||
+            !changedHealthWrite ||
+            snapshot?.State != "Monitoring" ||
+            snapshot.ProcessId != 123 ||
+            snapshot.SessionId != 456)
+        {
+            throw new InvalidOperationException(
+                "Lifecycle health probe failed.");
+        }
+
+        Console.WriteLine(
+            "TEAMS_HELPER_HEALTH_OK");
+
+        string logPath =
+            Path.Combine(
+                temporaryRoot,
+                "TeamsHelper.log");
+
+        var log =
+            new TeamsHelperFileLog(
+                logPath,
+                maximumBytes: 1);
+
+        log.Information(
+            "LIFECYCLE_PROBE_FIRST_LOG");
+
+        log.Information(
+            "LIFECYCLE_PROBE_SECOND_LOG");
+
+        if (!File.Exists(logPath) ||
+            !File.Exists(logPath + ".1"))
+        {
+            throw new InvalidOperationException(
+                "Lifecycle log rotation probe failed.");
+        }
+
+        Console.WriteLine(
+            "TEAMS_HELPER_LOG_ROTATION_OK");
+
+        Console.WriteLine(
+            "TEAMS_HELPER_LIFECYCLE_PROBE_OK");
+    }
+    finally
+    {
+        if (Directory.Exists(temporaryRoot))
+        {
+            Directory.Delete(
+                temporaryRoot,
+                recursive: true);
+        }
+    }
 }

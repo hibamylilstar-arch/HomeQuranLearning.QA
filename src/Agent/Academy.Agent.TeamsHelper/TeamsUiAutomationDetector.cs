@@ -28,19 +28,26 @@ internal static class TeamsUiAutomationDetector
             RegexOptions.IgnoreCase |
             RegexOptions.CultureInvariant);
 
-    private static readonly Regex GreetingRegex =
+    private static readonly Regex LessonKeywordRegex =
         new(
-            @"\b(?:assalamu?\s+alaikum|assalam\s*(?:u|o)?\s*alaikum|assalamualaikum|assalamu?\s+alaykum|assalamu?\s+aliekum)\b",
+            @"\b(?:" +
+            @"para|parah|sipara|siparah|" +
+            @"juz|" +
+            @"surah|surahs|surat|" +
+            @"verse|verses|" +
+            @"ayah|ayahs|ayat|ayats|" +
+            @"line|lines|" +
+            @"page|pages|" +
+            @"lesson|lessons|" +
+            @"sabaq|" +
+            @"qaida|" +
+            @"nazra|" +
+            @"ruku|" +
+            @"tajweed" +
+            @")\b",
             RegexOptions.IgnoreCase |
             RegexOptions.CultureInvariant);
-
-    private static readonly Regex LessonRegex =
-        new(
-            @"\btoday\s+lesson\b",
-            RegexOptions.IgnoreCase |
-            RegexOptions.CultureInvariant);
-
-    public static TeamsUiSnapshot Scan(
+public static TeamsUiSnapshot Scan(
         string studentName,
         string? teacherName)
     {
@@ -297,11 +304,11 @@ internal static class TeamsUiAutomationDetector
                 kind switch
                 {
                     MessageKind.Greeting =>
-                        GreetingRegex.IsMatch(
+                        IsGreetingText(
                             name),
 
                     MessageKind.Lesson =>
-                        LessonRegex.IsMatch(
+                        ContainsLessonKeyword(
                             name),
 
                     _ =>
@@ -385,6 +392,46 @@ internal static class TeamsUiAutomationDetector
     }
 
 
+    internal static bool IsGreetingText(
+        string? text)
+    {
+        if (string.IsNullOrWhiteSpace(
+                text))
+        {
+            return false;
+        }
+
+        // Teacher wording can vary. Spaces/punctuation/spelling around
+        // Alaikum are irrelevant; the Salam/Salaam core is mandatory.
+        string normalized =
+            Regex.Replace(
+                text.ToLowerInvariant(),
+                @"[^a-z]+",
+                string.Empty);
+
+        return
+            normalized.Contains(
+                "salam",
+                StringComparison.Ordinal) ||
+            normalized.Contains(
+                "salaam",
+                StringComparison.Ordinal);
+    }
+
+
+    internal static bool ContainsLessonKeyword(
+        string? text)
+    {
+        if (string.IsNullOrWhiteSpace(
+                text))
+        {
+            return false;
+        }
+
+        return LessonKeywordRegex.IsMatch(
+            text);
+    }
+
     private static string? FindAttachmentName(
         AutomationElement messageElement,
         string messageId)
@@ -406,12 +453,19 @@ internal static class TeamsUiAutomationDetector
         bool attachmentContainerFound =
             false;
 
+        bool imageFound =
+            false;
+
+        string? detectedImageName =
+            null;
+
         string expectedAttachmentId =
             $"attachments-{messageId}";
 
-        for (int i = 0;
-             i < descendants.Count;
-             i++)
+        for (
+            int i = 0;
+            i < descendants.Count;
+            i++)
         {
             AutomationElement element =
                 descendants[i];
@@ -428,39 +482,46 @@ internal static class TeamsUiAutomationDetector
                 attachmentContainerFound =
                     true;
             }
-        }
 
-        for (int i = 0;
-             i < descendants.Count;
-             i++)
-        {
-            AutomationElement element =
-                descendants[i];
-
-            ControlType? controlType =
-                GetControlType(
-                    element);
-
-            if (controlType !=
+            if (GetControlType(
+                    element) ==
                 ControlType.Image)
             {
-                continue;
-            }
+                imageFound =
+                    true;
 
-            string name =
-                GetName(
-                    element);
+                string name =
+                    GetName(
+                        element);
 
-            if (!string.IsNullOrWhiteSpace(
-                    name))
-            {
-                return name.Trim();
+                if (
+                    detectedImageName is null &&
+                    !string.IsNullOrWhiteSpace(
+                        name)
+                )
+                {
+                    detectedImageName =
+                        name.Trim();
+                }
             }
         }
 
-        return attachmentContainerFound
-            ? "attachment"
-            : null;
+        // Business rule:
+        // same outgoing Teams message must contain an attachment
+        // container plus an actual image UI element.
+        //
+        // Filename and extension are not attendance semantics.
+        if (
+            !attachmentContainerFound ||
+            !imageFound
+        )
+        {
+            return null;
+        }
+
+        return
+            detectedImageName ??
+            "image";
     }
 
     private static IReadOnlyList<int> FindTeamsWebViewProcessIds()

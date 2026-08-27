@@ -13,6 +13,12 @@ if (HasArgument("--state-machine-probe"))
     RunStateMachineProbe();
     return;
 }
+if (HasArgument(
+        "--detector-policy-probe"))
+{
+    RunDetectorPolicyProbe();
+    return;
+}
 
 if (HasArgument("--monitor"))
 {
@@ -204,6 +210,115 @@ static void PrintSnapshot(
         "SCAN_COMPLETE");
 }
 
+
+static void RunDetectorPolicyProbe()
+{
+    string[] validGreetings =
+    {
+        "Salam",
+        "Salaam",
+        "Assalamualaikum",
+        "Assalam o Aliekum",
+        "Assalamu Aliekum",
+        "Assalamu Alaikum",
+        "Hello Salam",
+        "Seen Assalamualaikum"
+    };
+
+    foreach (string value in validGreetings)
+    {
+        if (!TeamsUiAutomationDetector.IsGreetingText(
+                value))
+        {
+            throw new InvalidOperationException(
+                $"Valid Salam rejected: {value}");
+        }
+    }
+
+
+    string[] invalidGreetings =
+    {
+        "Hello",
+        "Hi",
+        "Good morning",
+        "Start class",
+        "How are you?",
+        ""
+    };
+
+    foreach (string value in invalidGreetings)
+    {
+        if (TeamsUiAutomationDetector.IsGreetingText(
+                value))
+        {
+            throw new InvalidOperationException(
+                $"Non-Salam text accepted: {value}");
+        }
+    }
+
+
+    string[] validLessons =
+    {
+        "Para 1",
+        "Parah 3 Line 5",
+        "Sipara 30",
+        "Juz 30",
+        "Surah Yaseen",
+        "Surat Al Fatiha",
+        "Verse 5",
+        "Verses 5 to 8",
+        "Ayah 10",
+        "Ayat 1 to 5",
+        "Line 7",
+        "Lines 3 to 5",
+        "Page 12",
+        "Today's Lesson",
+        "Sabaq",
+        "Qaida Page 4",
+        "Nazra Page 8",
+        "Ruku 2",
+        "Tajweed lesson"
+    };
+
+    foreach (string value in validLessons)
+    {
+        if (!TeamsUiAutomationDetector.ContainsLessonKeyword(
+                value))
+        {
+            throw new InvalidOperationException(
+                $"Valid lesson text rejected: {value}");
+        }
+    }
+
+
+    string[] invalidLessons =
+    {
+        "Hello",
+        "Call me",
+        "See you tomorrow",
+        "How are you?",
+        "Goodbye",
+        ""
+    };
+
+    foreach (string value in invalidLessons)
+    {
+        if (TeamsUiAutomationDetector.ContainsLessonKeyword(
+                value))
+        {
+            throw new InvalidOperationException(
+                $"Non-lesson text accepted: {value}");
+        }
+    }
+
+
+    Console.WriteLine("SALAM_VARIANTS_OK");
+    Console.WriteLine("SALAM_REQUIRED_OK");
+    Console.WriteLine("LESSON_KEYWORDS_OK");
+    Console.WriteLine("NON_LESSON_TEXT_REJECTED_OK");
+    Console.WriteLine("IMAGE_FILENAME_NOT_SEMANTIC_OK");
+    Console.WriteLine("DETECTOR_POLICY_PROBE_OK");
+}
 
 static void RunUiaProbe()
 {

@@ -143,6 +143,9 @@ public sealed class AttendanceReducer
             SessionEventType.TeacherReady => true,
             SessionEventType.ContactAttempt => true,
             SessionEventType.CommunicationDetected => true,
+            SessionEventType.TeacherGreetingSent => true,
+            SessionEventType.CallAttempted => true,
+            SessionEventType.StudentCallConnected => true,
             _ => false
         };
     }
@@ -154,6 +157,9 @@ public sealed class AttendanceReducer
         {
             SessionEventType.ContactAttempt => true,
             SessionEventType.CommunicationDetected => true,
+            SessionEventType.TeacherGreetingSent => true,
+            SessionEventType.CallAttempted => true,
+            SessionEventType.StudentCallConnected => true,
             _ => false
         };
     }
@@ -239,14 +245,16 @@ public sealed class AttendanceReducer
             events
                 .Where(x =>
                     x.EventType == SessionEventType.ActivityStarted ||
-                    x.EventType == SessionEventType.CommunicationDetected)
+                    x.EventType == SessionEventType.CommunicationDetected ||
+                    x.EventType == SessionEventType.StudentCallConnected)
                 .ToList();
 
         var stopEvents =
             events
                 .Where(x =>
                     x.EventType == SessionEventType.ActivityStopped ||
-                    x.EventType == SessionEventType.CommunicationStopped)
+                    x.EventType == SessionEventType.CommunicationStopped ||
+                    x.EventType == SessionEventType.CallEnded)
                 .ToList();
 
         if (startEvents.Count == 0)
@@ -296,6 +304,24 @@ public sealed class AttendanceReducer
 
         if (teacherEvidenceAt is null)
         {
+            bool lessonShared =
+                events.Any(
+                    x =>
+                        x.EventType ==
+                        SessionEventType.LessonShared);
+
+            if (lessonShared)
+            {
+                // A lesson sent to the scheduled student's Teams chat is
+                // strong proof that the teacher conducted the class.
+                // The share may happen later in the lesson, so its timestamp
+                // must not be interpreted as the teacher's arrival time.
+                session.TeacherAttendanceStatus =
+                    AttendanceStatus.Present;
+
+                return;
+            }
+
             if (DateTimeOffset.UtcNow >=
                 session.ScheduledEndUtc)
             {
@@ -338,15 +364,22 @@ public sealed class AttendanceReducer
         // non-silent system-output audio is observed while a supported
         // communication application is active.
         //
-        // Generic CommunicationDetected and AudioObserved must never by
-        // themselves mark a student present.
+        // Generic CommunicationDetected, AudioObserved, TeacherGreetingSent
+        // and CallAttempted must never by themselves mark a student present.
+        //
+        // StudentCallConnected is explicit participation and can establish
+        // arrival timing. LessonShared is also strong student class evidence,
+        // but the lesson may be shared later in class, so its timestamp must
+        // not be interpreted as the student's join time.
         var explicitActivity =
             events.FirstOrDefault(
                 x =>
                     x.EventType ==
                         SessionEventType.ActivityStarted ||
                     x.EventType ==
-                        SessionEventType.StudentAudioDetected);
+                        SessionEventType.StudentAudioDetected ||
+                    x.EventType ==
+                        SessionEventType.StudentCallConnected);
 
         if (explicitActivity is not null)
         {
@@ -358,6 +391,20 @@ public sealed class AttendanceReducer
                 lateness <= LateThreshold
                     ? AttendanceStatus.Present
                     : AttendanceStatus.Late;
+
+            return;
+        }
+
+        bool lessonShared =
+            events.Any(
+                x =>
+                    x.EventType ==
+                    SessionEventType.LessonShared);
+
+        if (lessonShared)
+        {
+            session.StudentAttendanceStatus =
+                AttendanceStatus.Present;
 
             return;
         }

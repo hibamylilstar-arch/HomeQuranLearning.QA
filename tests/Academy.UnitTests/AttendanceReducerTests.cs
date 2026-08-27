@@ -667,6 +667,288 @@ public sealed class AttendanceReducerTests
             AttendanceStatus.Late,
             session.StudentAttendanceStatus);
     }
+    [Fact]
+    public void TeacherGreetingSent_OnTime_ProvesTeacherButNotStudent()
+    {
+        var start =
+            DateTimeOffset.UtcNow.AddHours(-2);
+
+        var session =
+            CreateCompletedSession(start);
+
+        var greeting =
+            start.AddMinutes(1);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.TeacherGreetingSent,
+                greeting)
+        };
+
+        _reducer.Reduce(
+            session,
+            events);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.TeacherAttendanceStatus);
+
+        Assert.Equal(
+            greeting,
+            session.TeacherReadyAtUtc);
+
+        Assert.Equal(
+            greeting,
+            session.FirstContactAtUtc);
+
+        Assert.Equal(
+            AttendanceStatus.NeedsReview,
+            session.StudentAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceReviewStatus.Pending,
+            session.AttendanceReviewStatus);
+    }
+
+    [Fact]
+    public void CallAttempted_AfterGrace_MarksTeacherLateButNotStudentPresent()
+    {
+        var start =
+            DateTimeOffset.UtcNow.AddHours(-2);
+
+        var session =
+            CreateCompletedSession(start);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.CallAttempted,
+                start.AddMinutes(5))
+        };
+
+        _reducer.Reduce(
+            session,
+            events);
+
+        Assert.Equal(
+            AttendanceStatus.Late,
+            session.TeacherAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceStatus.NeedsReview,
+            session.StudentAttendanceStatus);
+    }
+
+    [Fact]
+    public void LessonShared_LateInClass_ProvesTeacherAndStudentWithoutInferringArrivalTime()
+    {
+        var start =
+            DateTimeOffset.UtcNow.AddHours(-2);
+
+        var session =
+            CreateCompletedSession(start);
+
+        var lessonSharedAt =
+            start.AddMinutes(20);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.LessonShared,
+                lessonSharedAt)
+        };
+
+        _reducer.Reduce(
+            session,
+            events);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.TeacherAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.StudentAttendanceStatus);
+
+        Assert.Null(
+            session.TeacherReadyAtUtc);
+
+        Assert.Null(
+            session.FirstContactAtUtc);
+
+        Assert.Equal(
+            AttendanceReviewStatus.AutoResolved,
+            session.AttendanceReviewStatus);
+    }
+    [Fact]
+    public void StudentCallConnected_WithinGrace_MarksStudentPresent()
+    {
+        var start =
+            DateTimeOffset.UtcNow.AddHours(-2);
+
+        var session =
+            CreateCompletedSession(start);
+
+        var connected =
+            start.AddMinutes(2);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.StudentCallConnected,
+                connected)
+        };
+
+        _reducer.Reduce(
+            session,
+            events);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.TeacherAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.StudentAttendanceStatus);
+
+        Assert.Equal(
+            connected,
+            session.FirstContactAtUtc);
+
+        Assert.Equal(
+            AttendanceReviewStatus.AutoResolved,
+            session.AttendanceReviewStatus);
+    }
+
+    [Fact]
+    public void StudentCallConnected_AfterGrace_MarksStudentLate()
+    {
+        var start =
+            DateTimeOffset.UtcNow.AddHours(-2);
+
+        var session =
+            CreateCompletedSession(start);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.TeacherGreetingSent,
+                start),
+
+            Event(
+                session,
+                SessionEventType.StudentCallConnected,
+                start.AddMinutes(5))
+        };
+
+        _reducer.Reduce(
+            session,
+            events);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.TeacherAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceStatus.Late,
+            session.StudentAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceReviewStatus.AutoResolved,
+            session.AttendanceReviewStatus);
+    }
+
+    [Fact]
+    public void TeamsCallLifecycle_CalculatesConnectedActiveSeconds()
+    {
+        var start =
+            DateTimeOffset.UtcNow.AddHours(-2);
+
+        var session =
+            CreateCompletedSession(start);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.TeacherGreetingSent,
+                start),
+
+            Event(
+                session,
+                SessionEventType.StudentCallConnected,
+                start.AddMinutes(2)),
+
+            Event(
+                session,
+                SessionEventType.CallEnded,
+                start.AddMinutes(27))
+        };
+
+        _reducer.Reduce(
+            session,
+            events);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.TeacherAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.StudentAttendanceStatus);
+
+        Assert.Equal(
+            1500,
+            session.ActiveSeconds);
+
+        Assert.Equal(
+            AttendanceReviewStatus.AutoResolved,
+            session.AttendanceReviewStatus);
+    }
+
+    [Fact]
+    public void CallEnded_Alone_DoesNotProveAttendance()
+    {
+        var start =
+            DateTimeOffset.UtcNow.AddHours(-2);
+
+        var session =
+            CreateCompletedSession(start);
+
+        var events = new[]
+        {
+            Event(
+                session,
+                SessionEventType.CallEnded,
+                start.AddMinutes(20))
+        };
+
+        _reducer.Reduce(
+            session,
+            events);
+
+        Assert.Equal(
+            AttendanceStatus.Absent,
+            session.TeacherAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceStatus.NeedsReview,
+            session.StudentAttendanceStatus);
+
+        Assert.Equal(
+            0,
+            session.ActiveSeconds);
+
+        Assert.Equal(
+            AttendanceReviewStatus.Pending,
+            session.AttendanceReviewStatus);
+    }
     private static Session CreateCompletedSession(
         DateTimeOffset start)
     {

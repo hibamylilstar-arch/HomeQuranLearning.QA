@@ -1,0 +1,6 @@
+# Project-local Codex defaults. Loaded only when this repository is trusted.
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[windows]
+sandbox = "elevated"

@@ -1,36 +1,45 @@
-\# HomeQuranLearning QA
+# HomeQuranLearning.QA
 
+Private internal QA, attendance and monitoring platform for the HomeQuranLearning online Quran academy.
 
+## Current stack
 
-Private teacher monitoring and QA system for HomeQuranLearning academy.
+- Windows Agent — C# / .NET 10
+- Backend — ASP.NET Core / EF Core / PostgreSQL
+- Dashboard — Next.js / React / TypeScript
+- Object storage — MinIO / S3-compatible
+- Live monitoring — FFmpeg RTMP -> LiveKit Ingress -> LiveKit -> browser
+- System audio — NAudio / WASAPI loopback
+- QA/STT — Python / faster-whisper
+- Infrastructure — Docker Compose / PostgreSQL / Redis / MinIO / LiveKit
 
+## Current checkpoint
 
+`415bbec feat(qa): align alerts with transcript timestamps`
 
-\## Components
+Latest closed phase: `7A-1`
 
+Next recommended product phase: `7A-2 — durable timestamped transcript segments`
 
+## Important documentation
 
-\- Windows Agent — .NET 10 Worker Service
+- `docs/PROJECT-STATE.md`
+- `docs/CODEX-WORKFLOW.md`
+- `docs/OWNER-CONTROL-PLANE.md`
+- `docs/architecture/current-state.md`
+- `docs/architecture/overview.md`
+- `docs/architecture/qa-worker-service.md`
+- `docs/decisions/ADR-001-system-architecture.md`
+- `docs/decisions/coding-conventions.md`
 
-\- Backend API — ASP.NET Core, PostgreSQL, MinIO
+## Development policy
 
-\- QA Worker — Python faster-whisper
+The project is local-first. Production/VPS deployment remains deferred until the planned local product is substantially implemented, tested and stable.
 
-\- Dashboard — Next.js + TypeScript + Tailwind CSS
+Do not push major-phase changes without a completed validation summary and explicit owner approval.
 
+On a new Codex task or after reboot, use `Continue project`. Codex must reconstruct state from root `AGENTS.md`, `docs/PROJECT-STATE.md`, Git, and runtime evidence.
 
+## Security
 
-\## Development Setup
-
-
-
-1\. Start infrastructure:
-
-
-
-&#x20;  ```powershell
-
-&#x20;  cd infrastructure\\docker
-
-&#x20;  docker compose up -d
-
+Do not commit passwords, API keys, JWT secrets, storage secrets, cookies or authentication tokens.

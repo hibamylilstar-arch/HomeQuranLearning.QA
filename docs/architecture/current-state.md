@@ -1,264 +1,331 @@
-\# HomeQuranLearning QA — Current Architecture
+# HomeQuranLearning.QA — Current Technical State
 
+## Status
 
+Canonical checkpoint:
 
-\## Overview
+- Branch: `main`
+- Commit: `415bbec`
+- Subject: `feat(qa): align alerts with transcript timestamps`
+- Latest closed phase: `7A-1`
+- Next recommended phase: `7A-2`
 
+Canonical resumable state: `docs/PROJECT-STATE.md`
 
+## Purpose
 
-HomeQuranLearning QA is a private teacher monitoring and QA system for an online Quran academy.
+Private internal QA, attendance, monitoring and evidence system for an online Quran academy using academy-owned/managed Windows teacher laptops.
 
+Expected scale:
 
+- 20+ teachers
+- approximately 15 simultaneous teacher laptops/classes at peak
+- roughly 2–3 hour peak windows
+- mostly stable teacher/device mapping with occasional substitutions
 
-The system consists of:
+## Local-first policy
+
+Production/VPS deployment is deferred until core and advanced local functionality is implemented, tested and stabilized, and the owner explicitly approves deployment.
 
+## Stack
 
+### Backend
+- ASP.NET Core
+- .NET 10
+- EF Core
+- PostgreSQL
 
-\- Windows Agent on academy-managed teacher laptops
+### Infrastructure
+- PostgreSQL
+- Redis
+- MinIO
+- LiveKit
+- LiveKit Ingress
+- ingress-manager
+- Docker Compose
 
-\- Cloud backend API
+### Dashboard
+- Next.js
+- React
+- TypeScript
 
-\- Web dashboard
+### Agent
+- Academy.Agent.Service
+- Academy.Agent.Cloud
+- Academy.Agent.Audio
+- Academy.Agent.Capture
+- Academy.Agent.Media
+- Academy.Agent.Teams
+- Academy.Agent.TeamsHelper
 
-\- QA speech-to-text worker
+## Live monitoring — proven
 
+```text
+Windows Agent
+-> FFmpeg RTMP
+-> LiveKit Ingress
+-> LiveKit
+-> Browser Dashboard
+```
 
+Current proven screen path uses FFmpeg `ddagrab`.
 
-\---
+Known-good timing:
 
+```text
+framerate=10
+dup_frames=1
+hwdownload
+format=bgra
+setpts=N/(10*TB)
+```
 
+Current system-audio path:
 
-\## Components
+```text
+NAudio / WASAPI loopback
+-> local UDP
+-> FFmpeg AAC
+-> LiveKit
+```
 
+Live screen + system audio and dashboard audio enable/disable have been proven end-to-end locally.
 
+## Recording — proven
 
-\### Windows Agent
+Recording was changed away from huge raw BGRA temporary files.
 
+Current direction:
 
+```text
+screen/audio capture
+-> FFmpeg
+-> direct H264 MP4
+-> upload/recovery pipeline
+```
 
-\- C# .NET 10 Worker Service
+Historical recording/session identity must remain safe across later schedule or mapping changes.
 
-\- Runs on teacher laptops
+## Domain foundation
 
-\- Captures screen via DirectX OutputDuplication
+Implemented foundations include:
 
-\- Captures system audio via NAudio WASAPI loopback
+- users
+- Owner/Admin/Manager roles and partial Manager teacher filtering
+- teachers
+- students
+- courses
+- devices
+- manager-teacher assignments
+- device heartbeats
+- schedules
+- sessions
+- session events
+- recordings
+- QA rules
+- QA alerts
 
-\- Records MP4 using FFmpeg post-processing
+Auth includes JWT/HTTP-only dashboard flow plus agent and worker API keys.
 
-\- Handles silent audio gracefully
+Some Manager-facing resources are filtered to assigned-teacher scope. Reconnaissance found important routes and playback/live/token operations that still lack complete permission + resource-scope enforcement. Treat authorization as incomplete until planned stabilization/O1 work is proved.
 
-\- Sends device heartbeat
+## Scheduling/history
 
-\- Uploads recording metadata and MP4 to backend
+Completed historical sessions must retain original TeacherId, StudentId, CourseId, DeviceId and scheduled window.
 
-\- Runs as a Windows service
+## Attendance
 
+Implemented states include Unknown, Present, Late, Absent, Excused and NeedsReview.
 
+Review states include Pending, AutoResolved and Reviewed.
 
-\### Backend API
+Late threshold: `3 minutes`
 
+Teacher pre-class ready window: `5 minutes`
 
+Attendance is evidence-driven.
 
-\- ASP.NET Core minimal APIs
+## Teams attendance — completed
 
-\- PostgreSQL via EF Core
+Architecture:
 
-\- Redis available for future caching/pub-sub
+```text
+Academy.Agent.Service
+<-> secured Named Pipe
+<-> Academy.Agent.TeamsHelper
+-> Teams UI Automation / WebView
+```
 
-\- MinIO object storage for recordings
+Proven:
 
-\- JWT authentication for dashboard users
+- exact scheduled-student chat binding
+- outgoing message detection
+- stable IDs/timestamps
+- lesson attachment evidence
+- call snapshots/lifecycle
+- durable evidence journal
+- backend delivery
+- PostgreSQL persistence
+- dedupe/idempotency
 
-\- API key authentication for agent and QA worker
+Backend event types:
 
-\- RBAC: Owner, Admin, Manager
+```text
+TeacherGreetingSent  = 19
+CallAttempted        = 20
+StudentCallConnected = 21
+CallEnded            = 22
+LessonShared         = 23
+```
 
-\- Automatic session creation from schedules
+Source: `TeamsUIAutomation`
 
-\- Recording/session association
+Current semantics:
 
-\- Secure presigned playback URLs
+- TeacherGreetingSent = teacher evidence only
+- CallAttempted = teacher evidence only
+- StudentCallConnected = explicit student presence
+- CallEnded = stop/duration evidence
+- LessonShared = teacher evidence only, NOT student presence
 
+StudentCallConnected within 3 minutes => Present; later => Late.
 
+Known example:
 
-\### QA Worker
+```text
+StudentCallConnected +2m
+CallEnded +12m
+=> ActiveSeconds 600
+```
 
+CallEnded alone does not prove attendance.
 
+LessonShared requires exact scheduled student chat + outgoing teacher message + lesson-related text + actual image in the same message.
 
-\- Python faster-whisper
+Image alone is insufficient. Keyword-only text is insufficient. Filename/extension are not semantics.
 
-\- Polls backend for unprocessed uploaded recordings
+## Teams call lifecycle
 
-\- Downloads MP4 from MinIO
+```text
+Available / Idle -> Attempting -> Connected -> Available
+```
 
-\- Transcribes audio locally
+Real evidence path has been proven:
 
-\- Matches active QA rules
+```text
+Teams UI
+-> evidence journal
+-> delivery worker
+-> /api/agent/session-events
+-> PostgreSQL
+-> AttendanceReducer
+```
 
-\- Creates QA alerts automatically
+## Daily attendance
 
+Daily reporting foundation is implemented.
 
+Timezone: `Asia/Karachi` / `Pakistan Standard Time`
 
-\### Dashboard
+Manager filtering must remain enforced.
 
+## QA/STT worker
 
+Current STT engine: `faster-whisper 1.2.1`
 
-\- Next.js + TypeScript + Tailwind CSS
+Current production-wired source:
 
-\- Responsive desktop/mobile layout
+`spikes/SttSpike/qa_worker.py`
 
-\- Login, devices, recordings, QA rules/alerts
+Docker wiring:
 
-\- Teacher/Student/Course/Schedule/Session management
+`infrastructure/docker/Dockerfile.worker`
 
-\- Manager assignment and filtering
+Current worker endpoints include pending recordings, mark processed, active QA rules and create QA alert.
 
-\- Secure inline video player
+## Phase 7A-1 — closed GREEN
 
+Commit: `415bbec`
 
+Implemented:
 
-\---
+- `PendingQaRecordingDto.StartedAtUtc`
+- `CreateQaAlertRequest.QaRuleId`
+- reusable Whisper model
+- normalized transcript index
+- cross-segment phrase matching
+- recording-relative alert timestamps
+- exact QA rule linkage
+- duplicate retry suppression
+- successful-processing-only `QaProcessedAtUtc`
+- failure remains pending
 
+Self-test markers:
 
+```text
+QA_WORKER_TRANSCRIPT_INDEX_OK
+QA_WORKER_CROSS_SEGMENT_MATCH_OK
+QA_WORKER_RULE_LINK_OK
+QA_WORKER_TIMESTAMP_ALIGNMENT_OK
+QA_WORKER_SELF_TEST_OK
+```
 
-\## Database Tables
+Gates:
 
+- full build GREEN
+- unit 67/67
+- integration 2/2
+- production runtime/API/DB proof GREEN
 
+Historical post-cleanup snapshot:
 
-\- users
+```text
+Recordings 148
+QA Rules 1
+QA Alerts 5
+Sessions 20
+Session Events 163
+```
 
-\- teachers
+These counts are historical proof only, not permanent invariants.
 
-\- students
+## Known runtime helper behavior
 
-\- courses
+`.dev-runtime/Runtime.ps1 StartApi` may briefly show API OFF immediately after launch even when HTTP readiness succeeds later. Use bounded HTTP readiness checks.
 
-\- devices
+## Next engineering work
 
-\- device\_heartbeats
+Immediate recommendation: a narrow stabilization phase for current authorization gaps, the LessonShared reducer-policy conflict, stale runtime/service proof, TeamsHelper startup, and manual-session gaps.
 
-\- schedules
+The next QA feature remains `7A-2 — durable timestamped transcript segments`, but it must not start until stabilization scope is discussed/approved and normal phase gates are followed.
 
-\- sessions
+Likely concerns:
 
-\- recordings
+- Recording linkage
+- deterministic SegmentIndex
+- StartSeconds / EndSeconds
+- transcript text
+- language
+- meaningful Whisper probability/log metadata
+- idempotent retry
+- transactional batch persistence
 
-\- qa\_rules
+Required order:
 
-\- qa\_alerts
+```text
+download
+-> transcribe
+-> persist transcript segments
+-> evaluate/persist alerts
+-> mark processed only after all success
+```
 
-\- manager\_teacher\_assignments
+Evidence clip extraction remains a later coherent phase.
 
-\- \_\_EFMigrationsHistory
+## Production
 
+Production/VPS is not the current next phase.
 
+## Owner Control Plane direction
 
-\---
-
-
-
-\## Key Relationships
-
-
-
-\- Recording -> Device (Cascade)
-
-\- Recording -> Teacher (SetNull)
-
-\- Recording -> Session (SetNull)
-
-\- Recording -> QaAlert (Cascade)
-
-\- QaAlert -> QaRule (SetNull)
-
-\- User -> ManagerTeacherAssignment
-
-\- Teacher -> ManagerTeacherAssignment
-
-\- Teacher -> Student (SetNull)
-
-\- Schedule -> Teacher, Student, Course, Device
-
-\- Session -> Teacher, Student, Course, Device
-
-\- Session -> Schedule (SetNull)
-
-
-
-\---
-
-
-
-\## Authentication / Authorization
-
-
-
-\- Dashboard uses JWT bearer tokens.
-
-\- Agent uses `X-Api-Key` header.
-
-\- QA worker uses `X-Api-Key` header with worker key.
-
-\- Admin endpoints require JWT and role checks.
-
-\- Manager resource filtering:
-
-&#x20; - Recordings filtered by assigned teachers.
-
-&#x20; - QA alerts filtered through visible recordings.
-
-&#x20; - Devices filtered by assigned teachers' sessions.
-
-
-
-\---
-
-
-
-\## Configuration
-
-
-
-\- Development settings are in `appsettings.Development.json`.
-
-\- Production secrets are placeholders in `appsettings.json`.
-
-\- Docker `.env` contains local infrastructure secrets.
-
-\- Production must use environment variables or a secure secret store.
-
-
-
-\---
-
-
-
-\## Automated Tests
-
-
-
-\- Located in `tests/Academy.UnitTests`
-
-\- Cover:
-
-&#x20; - AuthService login
-
-&#x20; - PasswordHasher
-
-&#x20; - Recording/session association
-
-&#x20; - Manager filtering for recordings
-
-&#x20; - Manager filtering for devices
-
-
-
-Run tests with:
-
-
-
-```powershell
-
-dotnet test tests\\Academy.UnitTests\\Academy.UnitTests.csproj
-
+The dedicated Owner Control Plane is a required future product track, not a current completed capability. The target authorization model is authenticated user + granular permission + resource scope, enforced by the backend. It also includes organization assignment history, configurable recording retention, audit, and secure centralized device/Main-Agent lifecycle. See `docs/OWNER-CONTROL-PLANE.md`.

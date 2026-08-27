@@ -1,0 +1,71 @@
+# Read-only Git inspection can run without repeated approval prompts.
+prefix_rule(
+    pattern = ["git", ["status", "diff", "log", "show", "rev-parse", "ls-files"]],
+    decision = "allow",
+    justification = "Routine repository inspection is non-destructive",
+    match = [
+        "git status --short --branch",
+        "git diff --check",
+        "git log --oneline -10",
+        "git rev-parse HEAD",
+    ],
+    not_match = [
+        "git add AGENTS.md",
+        "git commit -m test",
+        "git push origin main",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "branch", "--show-current"],
+    decision = "allow",
+    justification = "Reading the current branch is non-destructive",
+    match = ["git branch --show-current"],
+    not_match = ["git branch codex/example"],
+)
+
+# Commits and normal pushes always remain release-gated.
+prefix_rule(
+    pattern = ["git", "commit"],
+    decision = "prompt",
+    justification = "A commit requires the owner's explicit RELEASE APPROVAL",
+    match = ["git commit -m test"],
+    not_match = ["git status"],
+)
+
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "prompt",
+    justification = "A normal push requires the owner's explicit RELEASE APPROVAL",
+    match = ["git push origin main"],
+    not_match = ["git status"],
+)
+
+# Destructive Git operations are forbidden by project policy.
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "forbidden",
+    justification = "Preserve the worktree and history; use read-only inspection and a surgical recovery plan",
+    match = ["git reset --hard", "git reset --hard HEAD~1"],
+    not_match = ["git reset --soft HEAD~1", "git status"],
+)
+
+prefix_rule(
+    pattern = ["git", "clean"],
+    decision = "forbidden",
+    justification = "Do not delete untracked work; inspect and obtain explicit owner direction",
+    match = ["git clean -fd", "git clean -df", "git clean -n"],
+    not_match = ["git status", "git diff"],
+)
+
+prefix_rule(
+    pattern = ["git", "push", ["--force", "--force-with-lease", "-f"]],
+    decision = "forbidden",
+    justification = "Force push and history rewriting are prohibited; use a normal approved push",
+    match = [
+        "git push --force origin main",
+        "git push --force-with-lease origin main",
+        "git push -f origin main",
+    ],
+    not_match = ["git push origin main", "git status"],
+)

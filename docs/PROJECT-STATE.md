@@ -8,22 +8,23 @@ Chat history is not authoritative. Repository state + this file are the durable 
 
 ## Canonical checkpoint
 
-- Branch: `codex/s1-stabilize-access-attendance`
+- Branch: `main`
 - Base commit: `32202b3b4202515a684373bfbf6500e8a4e7eef7`
 - S1 implementation commit: `ca18589d2d027a07b300cc86fbeadda49540f968`
-- Origin: `origin/main` at the same base commit (verified 2026-08-27)
-- Subject: `chore(codex): add autonomous project governance`
-- Latest closed product phase: `S1 ? access and attendance stabilization`
+- S1 closure commit: `c68f6e2b5f6088447243afa494e17eeb7716748a`
+- Origin: local `main` and `origin/main` synchronized after S1 release verification
+- Subject: `docs: close S1 checkpoint`
+- Latest closed product phase: `S1 - access and attendance stabilization`
 - Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
-- Current product phase: `BETWEEN PHASES ? S1 closed`
-- Current phase status: `WAITING_RELEASE_APPROVAL`
+- Current product phase: `BETWEEN PHASES - S1 closed`
+- Current phase status: `BETWEEN_PHASES`
 - Next engineering gate: reassess remaining stabilization observations and select the next phase; do not automatically start `7A-2`
 - Waiting human test: no
-- Waiting release approval: yes
+- Waiting release approval: no
 - Last verified checkpoint: S1 fully validated and release-approved; implementation commit `ca18589d2d027a07b300cc86fbeadda49540f968`; API/Agent/FFmpeg returned OFF
 - Tests already passed: full solution build GREEN; focused attendance/access 35/35; unit 75/75; integration 2/2; Agent 1/1; API RBAC/resource-scope proof GREEN; current QA worker source self-test and API probe GREEN; `git diff --check` GREEN
-- Tests still required: after `APPROVE`, verify the exact unstaged/staged file set, rerun final diff/secrets checks, commit and normal push
-- Expected changed files: the ten-file S1 release list below
+- Tests still required: none for S1; unresolved follow-ups are tracked below
+- Expected changed files: historical ten-file S1 implementation release list below
 - Temporary data: all isolated API/DB proof rows removed and zero-count cleanup verified
 - Product runtime expected after latest proof: OFF
 
@@ -218,7 +219,7 @@ QA worker remains production-wired at `spikes/SttSpike/qa_worker.py`.
 
 `.dev-runtime/Runtime.ps1 StartApi` may briefly report API OFF immediately after launch while HTTP readiness later succeeds. Use explicit bounded readiness checks.
 
-## S1 ? closed
+## S1 - closed
 
 Implemented:
 
@@ -254,18 +255,17 @@ S1 implementation release files:
 - `src/Backend/Academy.Application/Services/DashboardQueryService.cs`
 - `tests/Academy.UnitTests/DashboardResourceAccessTests.cs`
 
-## Current engineering gate ? post-S1 reassessment
+## Current engineering gate - post-S1 reassessment
 
 S1 closed the immediate role and resource-scope defects. Remaining stabilization and future authorization observations are:
 
 1. Full granular permission-catalog enforcement remains future Owner Control Plane phase O1 work; S1 intentionally applies existing role and assignment boundaries only.
 2. The running QA worker service process could not be refreshed under the current host permissions, although current source/runtime probes are green.
-3. A playback request for a historical `Deleted` recording returned HTTP 500 during S1 proof. The assigned `Uploaded` recording path returned 200 and the unassigned path returned 404. S1 authorization therefore remains green; Deleted-recording playback error handling is an unresolved follow-up.
-3. A playback request for a historical `Deleted` recording returned HTTP 500 during S1 proof. The corrected assigned `Uploaded` recording path returned 200 and the unassigned path returned 404, so S1 authorization is green; Deleted-recording playback error handling remains an unresolved follow-up.
-3. TeamsHelper lacks a verified durable launcher/installer/startup mechanism.
-4. Manual-session workflow is incomplete.
-5. Agent configuration contains environment-specific FFmpeg/device assumptions and recording is disabled by default.
-6. Production Compose omits some live/reverse-proxy components and needs deliberate deployment design later.
+3. A playback request for a historical `Deleted` recording returned HTTP 500 during S1 proof. The assigned `Uploaded` recording path returned 200 and the unassigned path returned 404. S1 authorization remains green; Deleted-recording playback error handling is an unresolved follow-up.
+4. TeamsHelper lacks a verified durable launcher/installer/startup mechanism.
+5. Manual-session workflow is incomplete.
+6. Agent configuration contains environment-specific FFmpeg/device assumptions and recording is disabled by default.
+7. Production Compose omits some live/reverse-proxy components and needs deliberate deployment design later.
 
 After S1 closure, reassess the remaining stabilization observations before starting `7A-2`. `7A-2` remains the next planned QA feature, not an unconditional next action.
 

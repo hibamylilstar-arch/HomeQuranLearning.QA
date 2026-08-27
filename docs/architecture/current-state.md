@@ -4,12 +4,12 @@
 
 Canonical checkpoint:
 
-- Working branch: `codex/s1-stabilize-access-attendance`
+- Working branch: `main`
 - Base commit: `32202b3`
 - Base subject: `chore(codex): add autonomous project governance`
-- Latest closed product phase: `S1 ? access and attendance stabilization`
-- Current product phase: `S1 — access and attendance stabilization`
-- Next planned QA phase after stabilization: `7A-2`
+- Latest closed product phase: `S1 - access and attendance stabilization`
+- Current product phase: `BETWEEN PHASES - S1 closed`
+- Next planned QA phase: `7A-2`; next engineering phase requires post-S1 reassessment.
 
 Canonical resumable state: `docs/PROJECT-STATE.md`
 

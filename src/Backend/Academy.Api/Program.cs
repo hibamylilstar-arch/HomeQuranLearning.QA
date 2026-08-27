@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Academy.Application.Abstractions;
 using Academy.Application.Contracts;
+using Academy.Application.Exceptions;
 using Academy.Application.Options;
 using Academy.Application.Services;
 using Academy.Domain.Entities;
@@ -445,12 +446,20 @@ app.MapGet("/api/admin/recordings/{recordingId:guid}/playback-url", async (
         return Results.NotFound();
     }
 
-    var url = await recordingService.GetPlaybackUrlAsync(
-        recordingId,
-        TimeSpan.FromMinutes(10),
-        cancellationToken);
+    try
+    {
+        var url = await recordingService.GetPlaybackUrlAsync(
+            recordingId,
+            TimeSpan.FromMinutes(10),
+            cancellationToken);
 
-    return Results.Ok(new { url });
+        return Results.Ok(new { url });
+    }
+    catch (RecordingUnavailableException)
+    {
+        return Results.BadRequest(
+            new { error = "Recording file is not available." });
+    }
 }).RequireAuthorization();
 
 app.MapGet("/api/admin/recordings/{recordingId:guid}/download-url", async (

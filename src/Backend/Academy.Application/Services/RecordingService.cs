@@ -1,5 +1,6 @@
 using Academy.Application.Abstractions;
 using Academy.Application.Contracts;
+using Academy.Application.Exceptions;
 using Academy.Domain.Entities;
 using Academy.Domain.Enums;
 
@@ -191,7 +192,7 @@ public sealed class RecordingService
 
         if (recording.Status != RecordingStatus.Uploaded)
         {
-            throw new InvalidOperationException("Recording is not uploaded yet.");
+            throw new RecordingUnavailableException(recording.Status);
         }
 
         return await _storageService.GetPresignedUrlAsync(

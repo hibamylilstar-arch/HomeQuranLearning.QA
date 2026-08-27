@@ -12,23 +12,24 @@ Chat history is not authoritative. Repository state + this file are the durable 
 - Base commit: `32202b3b4202515a684373bfbf6500e8a4e7eef7`
 - S1 implementation commit: `ca18589d2d027a07b300cc86fbeadda49540f968`
 - S1 closure commit: `c68f6e2b5f6088447243afa494e17eeb7716748a`
-- Origin: local `main` and `origin/main` synchronized after S1 release verification
-- Subject: `docs: close S1 checkpoint`
-- Latest closed product phase: `S1 - access and attendance stabilization`
+- S1.1 release parent: `a97cd465cef4811b58491a781eb5e02fc63771e6`
+- Origin: local `main` and `origin/main` synchronized after S1.1 release verification
+- Subject: `fix(recordings): handle unavailable playback cleanly`
+- Latest closed product phase: `S1.1 - deleted recording playback stabilization`
 - Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
-- Current product phase: `BETWEEN PHASES - S1 closed`
+- Current product phase: `BETWEEN PHASES - S1.1 closed`
 - Current phase status: `BETWEEN_PHASES`
-- Next engineering gate: reassess remaining stabilization observations and select the next phase; do not automatically start `7A-2`
+- Next engineering gate: discuss and approve the next remaining stabilization phase; do not automatically start `7A-2`
 - Waiting human test: no
 - Waiting release approval: no
-- Last verified checkpoint: S1 fully validated and release-approved; implementation commit `ca18589d2d027a07b300cc86fbeadda49540f968`; API/Agent/FFmpeg returned OFF
-- Tests already passed: full solution build GREEN; focused attendance/access 35/35; unit 75/75; integration 2/2; Agent 1/1; API RBAC/resource-scope proof GREEN; current QA worker source self-test and API probe GREEN; `git diff --check` GREEN
-- Tests still required: none for S1; unresolved follow-ups are tracked below
-- Expected changed files: historical ten-file S1 implementation release list below
-- Temporary data: all isolated API/DB proof rows removed and zero-count cleanup verified
+- Last verified checkpoint: S1.1 was fully validated, release-approved and pushed; authorized `Deleted` playback returns HTTP 400 while existing `Uploaded` playback returns HTTP 200; isolated proof data was removed; API/Agent/FFmpeg returned OFF
+- Tests already passed for S1.1: targeted deleted-recording regression 1/1; full unit 76/76; integration 2/2; Agent 1/1; full solution build GREEN with 0 warnings and 0 errors; runtime HTTP Deleted 400 / Uploaded 200 proof GREEN; final diff/status review and `git diff --check` GREEN
+- Tests still required: none for S1.1; remaining follow-ups are tracked below
+- S1.1 release files: `docs/PROJECT-STATE.md`, `src/Backend/Academy.Api/Program.cs`, `src/Backend/Academy.Application/Exceptions/RecordingUnavailableException.cs`, `src/Backend/Academy.Application/Services/RecordingService.cs`, `tests/Academy.UnitTests/RecordingServiceTests.cs`
+- Temporary data: the isolated S1.1 Deleted-recording proof row was removed; proof row count returned to zero and the recordings baseline returned to 148
 - Product runtime expected after latest proof: OFF
 
-S1 is CLOSED after full validation and release approval. `7A-2` has not started.
+S1 and S1.1 are CLOSED after full validation and release approval. `7A-2` has not started.
 
 ## Current runtime snapshot
 
@@ -255,13 +256,48 @@ S1 implementation release files:
 - `src/Backend/Academy.Application/Services/DashboardQueryService.cs`
 - `tests/Academy.UnitTests/DashboardResourceAccessTests.cs`
 
+## S1.1 - closed
+
+Goal:
+
+- Replace the HTTP 500 returned for an authorized playback request against a historical `Deleted` recording with the established unavailable-recording client response, without changing authorization or healthy uploaded playback.
+
+Root cause:
+
+- `RecordingService.GetPlaybackUrlAsync` represented every non-`Uploaded` status with a generic `InvalidOperationException`.
+- The `/api/admin/recordings/{recordingId}/playback-url` endpoint did not map that known domain condition, so ASP.NET Core surfaced it as HTTP 500 after authorization had correctly succeeded.
+
+Released:
+
+- A typed `RecordingUnavailableException` carries the current recording status.
+- `RecordingService` throws that exception before requesting a presigned URL for any non-`Uploaded` recording.
+- The playback endpoint maps only that known exception to HTTP 400 with the existing `Recording file is not available.` response.
+- A regression test proves `Deleted` status raises the typed unavailable condition and never calls storage.
+
+Proof:
+
+- targeted deleted-recording regression: 1/1 GREEN
+- full unit tests: 76/76 GREEN
+- integration tests: 2/2 GREEN
+- Agent tests: 1/1 GREEN
+- full solution build: GREEN, 0 warnings, 0 errors
+- authenticated runtime HTTP proof: isolated `Deleted` recording returned 400; existing `Uploaded` control returned 200
+- cleanup: isolated proof row count zero; recordings baseline restored to 148
+- runtime after proof: API OFF, Agent OFF, FFmpeg 0
+
+Protected behavior:
+
+- Existing authorization and manager resource-scope checks still execute before playback resolution.
+- Uploaded recording presigned-URL behavior is unchanged.
+- Download endpoint behavior, recording lifecycle, storage, LiveKit, Teams, attendance and QA processing semantics are unchanged.
+
 ## Current engineering gate - post-S1 reassessment
 
 S1 closed the immediate role and resource-scope defects. Remaining stabilization and future authorization observations are:
 
 1. Full granular permission-catalog enforcement remains future Owner Control Plane phase O1 work; S1 intentionally applies existing role and assignment boundaries only.
 2. The running QA worker service process could not be refreshed under the current host permissions, although current source/runtime probes are green.
-3. A playback request for a historical `Deleted` recording returned HTTP 500 during S1 proof. The assigned `Uploaded` recording path returned 200 and the unassigned path returned 404. S1 authorization remains green; Deleted-recording playback error handling is an unresolved follow-up.
+3. The historical `Deleted`-recording HTTP 500 follow-up was resolved and released in S1.1. Runtime proof returned Deleted 400, Uploaded 200, and S1 authorization ordering remains unchanged.
 4. TeamsHelper lacks a verified durable launcher/installer/startup mechanism.
 5. Manual-session workflow is incomplete.
 6. Agent configuration contains environment-specific FFmpeg/device assumptions and recording is disabled by default.

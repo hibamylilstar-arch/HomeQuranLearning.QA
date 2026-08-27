@@ -26,5 +26,14 @@ public enum SessionEventType
 
     // Explicit remote/student participation evidence produced only
     // from non-silent loopback audio during an active communication app.
-    StudentAudioDetected = 18
+    StudentAudioDetected = 18,
+
+    // Raw Microsoft Teams UI Automation evidence.
+    // Attendance semantics are intentionally handled separately
+    // by AttendanceReducer and are NOT changed in this phase.
+    TeacherGreetingSent = 19,
+    CallAttempted = 20,
+    StudentCallConnected = 21,
+    CallEnded = 22,
+    LessonShared = 23
 }

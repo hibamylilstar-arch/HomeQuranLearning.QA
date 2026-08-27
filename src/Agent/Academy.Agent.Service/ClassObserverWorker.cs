@@ -11,6 +11,7 @@ public sealed class ClassObserverWorker : BackgroundService
     private readonly CloudOptions _cloudOptions;
     private readonly IConfiguration _configuration;
     private readonly AgentActivityState _activityState;
+    private readonly TeamsObservationTargetState _teamsObservationTargetState;
 
     private readonly HashSet<Guid> _processedActivitySignalIds = new();
 
@@ -47,7 +48,8 @@ public sealed class ClassObserverWorker : BackgroundService
         AttendanceEventJournal journal,
         CloudOptions cloudOptions,
         IConfiguration configuration,
-        AgentActivityState activityState)
+        AgentActivityState activityState,
+        TeamsObservationTargetState teamsObservationTargetState)
     {
         _logger = logger;
         _cloudClient = cloudClient;
@@ -56,6 +58,7 @@ public sealed class ClassObserverWorker : BackgroundService
         _cloudOptions = cloudOptions;
         _configuration = configuration;
         _activityState = activityState;
+        _teamsObservationTargetState = teamsObservationTargetState;
     }
 
     protected override async Task ExecuteAsync(
@@ -266,6 +269,7 @@ public sealed class ClassObserverWorker : BackgroundService
 
                 _observedSessionId = null;
                 _observedClass = null;
+                _teamsObservationTargetState.Clear();
             }
 
             return;
@@ -274,6 +278,7 @@ public sealed class ClassObserverWorker : BackgroundService
         if (_observedSessionId == candidate.SessionId)
         {
             _observedClass = candidate;
+            _teamsObservationTargetState.Set(candidate);
 
             await ProcessActivitySignalsAsync(
                 identity,
@@ -291,6 +296,8 @@ public sealed class ClassObserverWorker : BackgroundService
 
         _observedClass =
             candidate;
+
+        _teamsObservationTargetState.Set(candidate);
 
         _processedActivitySignalIds.Clear();
 

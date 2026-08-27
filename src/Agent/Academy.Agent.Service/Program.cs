@@ -14,6 +14,8 @@ var cloudOptions = builder.Configuration
 
 builder.Services.AddSingleton(cloudOptions);
 builder.Services.AddSingleton<AgentActivityState>();
+builder.Services.AddSingleton<TeamsObservationTargetState>();
+builder.Services.AddSingleton<TeamsEvidenceInbox>();
 
 builder.Services.AddHttpClient<IAgentCloudClient, AgentCloudClient>(client =>
 {
@@ -47,6 +49,8 @@ builder.Services.AddHostedService<AttendanceEventDeliveryWorker>();
 builder.Services.AddHostedService<ClassObserverWorker>();
 builder.Services.AddHostedService<CommunicationProcessMonitorWorker>();
 builder.Services.AddHostedService<StudentAudioEvidenceWorker>();
+builder.Services.AddHostedService<TeamsEvidencePipeServer>();
+builder.Services.AddHostedService<TeamsEvidenceJournalWorker>();
 
 builder.Services.AddHostedService<RecordingWorker>();
 builder.Services.AddHostedService<HeartbeatWorker>();

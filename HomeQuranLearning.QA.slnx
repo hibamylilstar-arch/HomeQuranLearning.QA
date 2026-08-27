@@ -6,6 +6,8 @@
     <Project Path="src/Agent/Academy.Agent.Cloud/Academy.Agent.Cloud.csproj" />
     <Project Path="src/Agent/Academy.Agent.Media/Academy.Agent.Media.csproj" />
     <Project Path="src/Agent/Academy.Agent.Service/Academy.Agent.Service.csproj" />
+    <Project Path="src/Agent/Academy.Agent.Teams/Academy.Agent.Teams.csproj" />
+    <Project Path="src/Agent/Academy.Agent.TeamsHelper/Academy.Agent.TeamsHelper.csproj" />
   </Folder>
   <Folder Name="/src/Backend/">
     <Project Path="src/Backend/Academy.Api/Academy.Api.csproj" />

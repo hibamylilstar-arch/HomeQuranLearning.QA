@@ -19,6 +19,7 @@
     <ProjectReference Include="..\Academy.Agent.Audio\Academy.Agent.Audio.csproj" />
     <ProjectReference Include="..\Academy.Agent.Media\Academy.Agent.Media.csproj" />
     <ProjectReference Include="..\Academy.Agent.Cloud\Academy.Agent.Cloud.csproj" />
+    <ProjectReference Include="..\Academy.Agent.Teams\Academy.Agent.Teams.csproj" />
   </ItemGroup>
 </Project>
 

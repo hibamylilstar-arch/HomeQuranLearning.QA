@@ -17,7 +17,7 @@ Private internal QA, attendance and monitoring platform for the HomeQuranLearnin
 
 `415bbec feat(qa): align alerts with transcript timestamps`
 
-Latest closed phase: `7A-1`
+Latest closed phase: `S1 ? access and attendance stabilization`
 
 Next recommended product phase: `7A-2 — durable timestamped transcript segments`
 

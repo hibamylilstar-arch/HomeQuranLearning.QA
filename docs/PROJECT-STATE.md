@@ -17,20 +17,22 @@ Chat history is not authoritative. Repository state + this file are the durable 
 - Subject: `fix(recordings): handle unavailable playback cleanly`
 - Latest closed product phase: `Dashboard completion - evidence and operational views`
 - Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
-- Current product phase: `7A-2 — durable timestamped transcript segments`
+- Current product phase: `7A-3 — QA transcript review and evidence workflow`
 - Current phase status: `WAITING_RELEASE_APPROVAL`
-- Next engineering gate: Owner release approval for the completed 7A-2 change
+- Next engineering gate: Owner release approval for the completed 7A-3 change
 - Waiting human test: none
 - Waiting release approval: yes
-- Last verified checkpoint: 7A-2 implementation and validation completed on branch `codex/7a-2-transcript-segments`; runtime OFF and database counts sessions=20, session_events=163, recordings=148, qa_alerts=5 and transcript_segments=0
+- Last verified checkpoint: 7A-3 implementation and browser proof completed on branch `codex/7a-3-qa-transcript-review`; runtime OFF and database counts sessions=20, session_events=163, recordings=2, qa_alerts=0 and transcript_segments=0 after Owner-approved recording cleanup
 - Tests already passed for S1.1: targeted deleted-recording regression 1/1; full unit 76/76; integration 2/2; Agent 1/1; full solution build GREEN with 0 warnings and 0 errors; runtime HTTP Deleted 400 / Uploaded 200 proof GREEN; final diff/status review and `git diff --check` GREEN
 - Dashboard gates completed: full dashboard lint/build, backend unit/integration gates, authenticated session-evidence API proof, role-scope proof, authenticated browser evidence-timeline/filter proof and final runtime cleanup
 - 7A-2 gates completed: worker self-test 6/6 markers; full unit tests 81/81; integration tests 3/3; full solution build 0 warnings/0 errors; local API persistence/retry proof; exact proof-row cleanup and baseline restoration; runtime OFF
+- 7A-3 gates completed: dashboard lint and production build GREEN; authenticated Owner browser proof for QA Alerts → Recording QA Review; two timestamped segments rendered; click-to-seek set video position to 3.0s and highlighted the segment; browser console errors 0; six test recordings, dependent alerts, test object and orphan test device cleaned
+- Owner-approved high-risk recording cleanup: 141 remaining recordings and dependent QA evidence removed; exactly two approved samples retained (`15541c8f-2a67-4bdd-9b0d-cc3ff020960d` Uploaded and `eeb925e3-e28f-4eb6-81d3-33650560c73d` Pending); no MinIO objects remained; sessions/events/devices were preserved
 - S1.1 release files: `docs/PROJECT-STATE.md`, `src/Backend/Academy.Api/Program.cs`, `src/Backend/Academy.Application/Exceptions/RecordingUnavailableException.cs`, `src/Backend/Academy.Application/Services/RecordingService.cs`, `tests/Academy.UnitTests/RecordingServiceTests.cs`
 - Temporary data: the isolated S1.1 Deleted-recording proof row was removed; proof row count returned to zero and the recordings baseline returned to 148
 - Product runtime expected after latest proof: OFF
 
-S1, S1.1, S1.2 and the dashboard evidence/operational slice are CLOSED after full validation, Owner approval and push. Dashboard operational hardening is CLOSED at `e127a19`. 7A-2 is now the active phase.
+S1, S1.1, S1.2, dashboard operational hardening and 7A-2 are CLOSED after full validation, Owner approval and push. 7A-3 is fully validated and is waiting for release approval.
 
 ## Current runtime snapshot
 
@@ -370,7 +372,7 @@ S1 closed the immediate role and resource-scope defects. Remaining stabilization
 6. Agent configuration contains environment-specific FFmpeg/device assumptions and recording is disabled by default.
 7. Production Compose omits some live/reverse-proxy components and needs deliberate deployment design later.
 
-7A-2 is complete in the working tree and is waiting only for the governed release approval. No next phase is to be implemented before that approval and push.
+7A-2 is released at `f4617e0`. 7A-3 is the active local phase; VPS, Owner Control Plane and APK remain deferred.
 
 ## QA phase — 7A-2 (implementation complete; release approval pending)
 

@@ -11,6 +11,7 @@ import type {
   ScheduleListItem,
   SessionListItem,
   SessionEventListItem,
+  TranscriptSegmentListItem,
   DailyAttendanceReport,
 } from "@/types";
 
@@ -195,6 +196,16 @@ export async function createSchedule(
 
 export async function getSessions(): Promise<SessionListItem[]> {
   return proxyFetch<SessionListItem[]>(["sessions"]);
+}
+
+export async function getTranscriptSegments(
+  recordingId: string
+): Promise<TranscriptSegmentListItem[]> {
+  return proxyFetch<TranscriptSegmentListItem[]>([
+    "recordings",
+    recordingId,
+    "transcript-segments",
+  ]);
 }
 
 export async function getSessionEvents(

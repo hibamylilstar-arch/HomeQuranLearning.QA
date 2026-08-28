@@ -121,6 +121,20 @@ export interface SessionListItem {
   disconnectSeconds: number;
 }
 
+export interface TranscriptSegmentListItem {
+  id: string;
+  recordingId: string;
+  segmentIndex: number;
+  startSeconds: number;
+  endSeconds: number;
+  text: string;
+  language: string | null;
+  avgLogProbability: number | null;
+  noSpeechProbability: number | null;
+  compressionRatio: number | null;
+  createdAtUtc: string;
+}
+
 export interface SessionEventListItem {
   id: string;
   eventType: string;

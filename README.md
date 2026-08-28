@@ -19,9 +19,9 @@ Private internal QA, attendance and monitoring platform for the HomeQuranLearnin
 
 Latest closed phase: `S1.2 - TeamsHelper startup and lifecycle stabilization`
 
-Current engineering phase: `7A-2 — durable timestamped transcript segments` (implemented; release approval pending).
+Current engineering phase: `7A-3 — QA transcript review and evidence workflow` (implemented; release approval pending).
 
-Next action: approve the validated 7A-2 release before beginning another phase.
+Next action: approve the validated 7A-3 release before beginning another phase.
 
 ## Important documentation
 

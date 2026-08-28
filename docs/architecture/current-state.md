@@ -4,13 +4,13 @@
 
 Canonical checkpoint:
 
-- Working branch: `codex/7a-2-transcript-segments`
+- Working branch: `codex/7a-3-qa-transcript-review`
 - Base commit: `32202b3`
 - Base subject: `chore(codex): add autonomous project governance`
 - Latest closed product phase: `Dashboard completion - evidence and operational views`
-- Current product phase: `7A-2 — durable timestamped transcript segments`
-- Phase status: `WAITING_RELEASE_APPROVAL`; dashboard operational hardening is released at `e127a19`.
-- Current QA feature: durable timestamped transcript segment persistence (implemented and validated; release approval pending).
+- Current product phase: `7A-3 — QA transcript review and evidence workflow`
+- Phase status: `WAITING_RELEASE_APPROVAL`; dashboard operational hardening is released at `e127a19` and 7A-2 at `f4617e0`.
+- Current QA feature: transcript review and evidence workflow (implemented and validated; release approval pending).
 
 Canonical resumable state: `docs/PROJECT-STATE.md`
 
@@ -301,7 +301,9 @@ The local dashboard evidence/operational vertical slice is implemented, backend/
 
 The dashboard proof includes 0-error/0-warning lint, a successful production build, full backend build/tests, authenticated login and proxy HTTP checks, 401 unauthenticated behavior and 404 missing/inaccessible event behavior. Browser proof verified the unauthenticated redirect, approved Owner login, 20-session rendering, the six-event raw timeline, filter empty-state/recovery and logout back to `/login`.
 
-7A-2 is implemented on `codex/7a-2-transcript-segments` and is waiting for release approval after full validation.
+7A-2 is released on `codex/7a-2-transcript-segments` at `f4617e0`. 7A-3 is implemented on `codex/7a-3-qa-transcript-review` and is waiting for release approval after full validation.
+
+The 7A-3 review workflow exposes persisted transcript segments in the recording player, maps QA alert timestamps to recording-relative offsets, and provides click-to-seek controls. QA Alerts links now open the relevant recording review. If playback is unavailable, transcript and QA evidence remain reviewable.
 
 Likely concerns:
 

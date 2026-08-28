@@ -1,5 +1,9 @@
 using NAudio.Wave;
 
+// This class deliberately retains the already-proven legacy loopback path.
+// Teacher microphone capture uses NAudio 3's modern WasapiRecorder separately.
+#pragma warning disable CS0618
+
 namespace Academy.Agent.Audio;
 
 public sealed class AudioCaptureService : IAudioCaptureService
@@ -62,3 +66,5 @@ public sealed class AudioCaptureService : IAudioCaptureService
         RecordingStopped?.Invoke(this, EventArgs.Empty);
     }
 }
+
+#pragma warning restore CS0618

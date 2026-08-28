@@ -4,13 +4,12 @@
 
 Canonical checkpoint:
 
-- Working branch: `codex/7a-4-local-multilaptop-readiness`
-- Base commit: `32202b3`
-- Base subject: `chore(codex): add autonomous project governance`
-- Latest closed product phase: `Dashboard completion - evidence and operational views`
-- Current product phase: `7A-4 — controlled local multi-laptop readiness`
-- Phase status: `WAITING_RELEASE_APPROVAL`; dashboard operational hardening is released at `e127a19`, 7A-2 at `f4617e0` and 7A-3 at `a2b8aae`.
-- Current QA feature: multi-device registration, recording isolation, bounded recording storage and Unicode-safe QA worker output (automated and physical proof complete; release approval pending).
+- Working branch: `codex/7a-5-context-aware-teacher-qa`
+- Current phase base: `ee42315`
+- Latest closed product phase: `7A-4 — controlled local multi-laptop readiness`
+- Current product phase: `7A-5 — teacher-audio provenance and context-aware multilingual QA`
+- Phase status: `WAITING_RELEASE_APPROVAL`; dashboard operational hardening is released at `e127a19`, 7A-2 at `f4617e0`, 7A-3 at `a2b8aae` and 7A-4 at `ee42315`.
+- Current QA limitation: legacy layout-0 recordings capture system/loopback audio only and remain non-attributable. The approved 7A-5A slice now adds and persists proven teacher-microphone provenance for new layout-1 recordings; built-in-mic and real `Headset (pro2)` pipeline proofs are complete. Candidate/classifier work has not started.
 
 Canonical resumable state: `docs/PROJECT-STATE.md`
 
@@ -92,6 +91,10 @@ NAudio / WASAPI loopback
 ```
 
 Live screen + system audio and dashboard audio enable/disable have been proven end-to-end locally.
+
+This system-audio proof is not teacher-microphone provenance. The phase 7A-5
+design preserves it for live/class context while adding a separately
+attributable teacher track for QA.
 
 ## Recording — proven
 
@@ -301,7 +304,7 @@ The local dashboard evidence/operational vertical slice is implemented, backend/
 
 The dashboard proof includes 0-error/0-warning lint, a successful production build, full backend build/tests, authenticated login and proxy HTTP checks, 401 unauthenticated behavior and 404 missing/inaccessible event behavior. Browser proof verified the unauthenticated redirect, approved Owner login, 20-session rendering, the six-event raw timeline, filter empty-state/recovery and logout back to `/login`.
 
-7A-2 is released on `codex/7a-2-transcript-segments` at `f4617e0`. 7A-3 is implemented on `codex/7a-3-qa-transcript-review` and is waiting for release approval after full validation.
+7A-2 is released on `codex/7a-2-transcript-segments` at `f4617e0`. 7A-3 is released at `a2b8aae`, and controlled local multi-laptop readiness 7A-4 is released at `ee42315`.
 
 The 7A-3 review workflow exposes persisted transcript segments in the recording player, maps QA alert timestamps to recording-relative offsets, and provides click-to-seek controls. QA Alerts links now open the relevant recording review. If playback is unavailable, transcript and QA evidence remain reviewable.
 
@@ -326,7 +329,11 @@ download
 -> mark processed only after all success
 ```
 
-Evidence clip extraction remains a later coherent phase.
+Phase 7A-5A implements teacher-audio provenance and intentionally reuses the
+full recording rather than storing duplicate clips. The later 7A-5B/5C slices
+cover the human-reviewed candidate lifecycle, multilingual Arabic-recitation
+exclusion and timestamp offsets for ten seconds of context on each side. See
+`docs/architecture/teacher-audio-context-qa.md`.
 
 ## Production
 

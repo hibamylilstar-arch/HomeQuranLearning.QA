@@ -303,8 +303,19 @@ app.MapPost("/api/agent/recordings", async (
         return Results.Unauthorized();
     }
 
-    var response = await recordingService.SubmitRecordingAsync(body, cancellationToken);
-    return Results.Ok(response);
+    try
+    {
+        var response = await recordingService.SubmitRecordingAsync(body, cancellationToken);
+        return Results.Ok(response);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
 });
 
 app.MapPost("/api/agent/recordings/{recordingId:guid}/upload", async (

@@ -8,21 +8,21 @@ Chat history is not authoritative. Repository state + this file are the durable 
 
 ## Canonical checkpoint
 
-- Branch: `codex/7a-4-local-multilaptop-readiness`
-- Base commit: `32202b3b4202515a684373bfbf6500e8a4e7eef7`
+- Branch: `codex/7a-5-context-aware-teacher-qa`
+- Current phase base commit: `ee423152312bd4fd54c109814070dd7bca1b0226`
 - S1 implementation commit: `ca18589d2d027a07b300cc86fbeadda49540f968`
 - S1 closure commit: `c68f6e2b5f6088447243afa494e17eeb7716748a`
 - S1.1 release parent: `a97cd465cef4811b58491a781eb5e02fc63771e6`
-- Origin: local `main` and `origin/main` synchronized after S1.1 release verification
-- Subject: `fix(recordings): handle unavailable playback cleanly`
-- Latest closed product phase: `Dashboard completion - evidence and operational views`
+- Origin: 7A-4 branch was pushed at `ee423152312bd4fd54c109814070dd7bca1b0226`; 7A-5A implementation is currently local and not yet released
+- Subject: `7A-5A teacher-audio provenance implementation`
+- Latest closed product phase: `7A-4 — controlled local multi-laptop readiness`
 - Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
-- Current product phase: `7A-4 — controlled local multi-laptop readiness`
+- Current product phase: `7A-5 — teacher-audio provenance and context-aware multilingual QA`
 - Current phase status: `WAITING_RELEASE_APPROVAL`
-- Next engineering gate: Owner approval for the validated 7A-4 commit and normal push
-- Waiting human test: no
+- Next engineering gate: Owner release decision for the provisionally verified 7A-5A slice
+- Waiting human test: deferred by Owner — headset/default-communications validation remains pending
 - Waiting release approval: yes
-- Last verified checkpoint: 7A-3 was pushed as `a2b8aae`; 7A-4 automated and physical proof completed on branch `codex/7a-4-local-multilaptop-readiness`; exact cleanup restored sessions=20, session_events=163, recordings=2, qa_alerts=0, transcript_segments=0 and devices=3
+- Last verified checkpoint: approved 7A-5A implementation produced aligned two-track MP4 output, proven/unavailable endpoint states, fail-closed worker extraction, API idempotency/upload/recovery evidence and exact proof cleanup; full release gates remain
 - Tests already passed for S1.1: targeted deleted-recording regression 1/1; full unit 76/76; integration 2/2; Agent 1/1; full solution build GREEN with 0 warnings and 0 errors; runtime HTTP Deleted 400 / Uploaded 200 proof GREEN; final diff/status review and `git diff --check` GREEN
 - Dashboard gates completed: full dashboard lint/build, backend unit/integration gates, authenticated session-evidence API proof, role-scope proof, authenticated browser evidence-timeline/filter proof and final runtime cleanup
 - 7A-2 gates completed: worker self-test 6/6 markers; full unit tests 81/81; integration tests 3/3; full solution build 0 warnings/0 errors; local API persistence/retry proof; exact proof-row cleanup and baseline restoration; runtime OFF
@@ -35,11 +35,15 @@ Chat history is not authoritative. Repository state + this file are the durable 
 - 7A-4 Unicode worker repair: the physical transcript exposed repeated Windows `charmap` failures when the service printed non-Latin text. The worker now configures stdout/stderr as UTF-8 and the NSSM batch launcher sets Python UTF-8 environment flags. Forced-cp1252 self-test and manual end-to-end processing of the same recording passed. The already-running Windows service could not be restarted without elevation and will load the fix at its next service/host restart.
 - 7A-4 package preparation: `scripts/Prepare-LocalAgentTestPackage.ps1` publishes self-contained Agent and TeamsHelper binaries, writes LAN/test-only configuration with live streaming disabled, and emits operator instructions under `publish\local-agent-test` (ignored by Git). The compressed v3 package was generated and checksum-verified.
 - 7A-4 final gates: solution Release build 0 warnings/0 errors; Agent tests 7/7; unit tests 81/81; integration tests 3/3; dashboard lint and production build GREEN; QA worker self-test including Unicode output GREEN; PowerShell parser and `git diff --check` GREEN; API, Agent, dashboard and FFmpeg OFF.
+- 7A-5A automated implementation gates: solution Release build 0 warnings/0 errors; Agent tests 9/9; backend unit tests 84/84; integration tests 5/5; worker self-test 8/8 markers; Python compile and PowerShell parser GREEN; migration applied without data loss; two-track FFmpeg/finalizer proof showed video 16.200s and both audio tracks 16.192s; no-microphone proof produced `Unavailable` and worker fail-closed; API first-submit/identical-retry/divergent-retry/upload/pending/download/extraction proof GREEN; exact proof rows/objects removed and baseline restored (recordings 2, devices 3, heartbeats 1361, audio gaps 0); runtime OFF.
+- 7A-5A human-test package: rebuilt self-contained `publish/local-agent-test-v4.zip` from the current source with recording enabled, live streaming disabled, default-communications microphone selection instructions and old-Agent replacement guidance. SHA-256: `9815A5A1661706710E09D4C28491D879B2C55509FD8A8F3FCD36B4C66477F79A`.
+- 7A-5A provisional acceptance: built-in laptop microphone capture was accepted for the technical pipeline proof (recording, two-track layout, persistence, upload and worker validation) before the real headset run; no candidate/classifier or retention implementation is included.
+- 7A-5A headset proof completed (2026-08-29): controlled Agent run selected `Headset (pro2)`, reported `TeacherAudioStatus: Proven`, finalized a 30.592-second two-track MP4, uploaded it successfully through the local API, and PyAV extracted the declared teacher track to 16 kHz mono WAV. Exact six proof recordings/objects and 12 generated heartbeats were removed; baseline returned to recordings 2, devices 3, heartbeats 1361, audio gaps 0. The Owner-requested headset verification is now complete.
 - S1.1 release files: `docs/PROJECT-STATE.md`, `src/Backend/Academy.Api/Program.cs`, `src/Backend/Academy.Application/Exceptions/RecordingUnavailableException.cs`, `src/Backend/Academy.Application/Services/RecordingService.cs`, `tests/Academy.UnitTests/RecordingServiceTests.cs`
 - Temporary data: all 7A-4 automated and physical proof rows/objects/devices were removed by exact identity; the current recordings baseline is the two Owner-approved retained controls
 - Product runtime expected after latest proof: OFF
 
-S1, S1.1, S1.2, dashboard operational hardening, 7A-2 and 7A-3 are CLOSED after full validation, Owner approval and push. 7A-4 is fully validated and waiting for Owner release approval.
+S1, S1.1, S1.2, dashboard operational hardening, 7A-2, 7A-3 and 7A-4 are CLOSED after full validation, Owner approval and push. 7A-5A is implemented locally and remains release-gated; 7A-5B/5C are deferred.
 
 ## Current runtime snapshot
 
@@ -365,7 +369,11 @@ Dashboard proof completed (2026-08-28):
 
 Next recoverable action:
 
-- Obtain release approval for 7A-4. After the phase is pushed and closed, discuss the next coherent local phase; keep VPS, Owner Control Plane and APK work deferred.
+- Complete 7A-5A full automated gates (built-in-mic provisional proof accepted)
+  and request release approval for only the additive provenance slice; headset
+  endpoint validation remains a documented follow-up. Candidate
+  persistence and multilingual classification remain later independently gated
+  slices. Keep VPS, Owner Control Plane and APK work deferred.
 
 ## Current engineering gate - post-S1 reassessment
 
@@ -379,9 +387,9 @@ S1 closed the immediate role and resource-scope defects. Remaining stabilization
 6. Agent configuration contains environment-specific FFmpeg/device assumptions and recording is disabled by default.
 7. Production Compose omits some live/reverse-proxy components and needs deliberate deployment design later.
 
-7A-2 is released at `f4617e0` and 7A-3 at `a2b8aae`. 7A-4 is validated and waiting for release approval; VPS, Owner Control Plane and APK remain deferred.
+7A-2 is released at `f4617e0`, 7A-3 at `a2b8aae` and 7A-4 at `ee42315`. 7A-5A now implements two-track teacher-audio provenance with fail-closed worker validation; release is pending full gates and real-headset proof. Candidate/classifier work, VPS, Owner Control Plane and APK remain deferred.
 
-## QA phase — 7A-2 (implementation complete; release approval pending)
+## QA phase — 7A-2 (closed)
 
 Durable timestamped transcript segment persistence.
 

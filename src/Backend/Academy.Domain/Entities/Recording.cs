@@ -39,9 +39,27 @@ public sealed class Recording
 
     public DateTimeOffset? QaProcessedAtUtc { get; set; }
 
+    public int AudioLayoutVersion { get; set; }
+
+    public int? TeacherAudioTrackIndex { get; set; }
+
+    public string TeacherAudioSourceKind { get; set; } = "Legacy";
+
+    public string? TeacherAudioEndpointId { get; set; }
+
+    public string? TeacherAudioEndpointName { get; set; }
+
+    public DateTimeOffset? TeacherAudioCoverageStartedAtUtc { get; set; }
+
+    public TeacherAudioProvenanceStatus TeacherAudioProvenanceStatus { get; set; } =
+        TeacherAudioProvenanceStatus.LegacyUnknown;
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public DateTimeOffset UpdatedAtUtc { get; set; }
 
     public ICollection<QaAlert> QaAlerts { get; set; } = new List<QaAlert>();
+
+    public ICollection<RecordingAudioCoverageGap> TeacherAudioCoverageGaps { get; set; } =
+        new List<RecordingAudioCoverageGap>();
 }

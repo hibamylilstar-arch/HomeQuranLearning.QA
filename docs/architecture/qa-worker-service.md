@@ -55,6 +55,19 @@ Cross-segment phrase matching is supported.
 
 Duplicate suppression uses RecordingId + QaRuleId + MatchedPhrase + TimestampUtc.
 
+## Current attribution limitation
+
+The recording currently supplies only WASAPI loopback/system audio. The worker
+cannot safely attribute that transcript to the teacher. Literal phrase matches
+must therefore be treated as a legacy foundation, not as reliable teacher
+findings.
+
+7A-5A now provides a discrete teacher-microphone track and fail-closed
+provenance validation in the same MP4. The worker extracts only the declared
+track and rejects legacy, missing, unavailable or undecodable teacher audio.
+Multilingual/recitation-aware windowing and the human-confirmed candidate
+lifecycle remain later slices. See `teacher-audio-context-qa.md`.
+
 ## Phase 7A-1 proof
 
 Commit: `415bbec`

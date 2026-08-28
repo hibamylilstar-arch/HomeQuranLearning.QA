@@ -16,5 +16,9 @@ public sealed class RecordingListItem
     public string Status { get; init; } = string.Empty;
     public bool IsPreserved { get; init; }
     public DateTimeOffset? PreservedAtUtc { get; init; }
+    public int AudioLayoutVersion { get; init; }
+    public int? TeacherAudioTrackIndex { get; init; }
+    public string TeacherAudioProvenanceStatus { get; init; } = string.Empty;
+    public string? TeacherAudioEndpointName { get; init; }
 }
 

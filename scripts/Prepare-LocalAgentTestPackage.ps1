@@ -10,7 +10,9 @@ param(
 
     [string]$OutputDirectory = "",
 
-    [string]$FfmpegPath = "ffmpeg"
+    [string]$FfmpegPath = "ffmpeg",
+
+    [string]$TeacherMicrophoneDeviceId = ""
 )
 
 Set-StrictMode -Version Latest
@@ -80,6 +82,8 @@ $config = [ordered]@{
         AudioBitrateKbps = 64
         AudioSampleRate = 32000
         AudioChannels = 1
+        TeacherMicrophoneDeviceId = $TeacherMicrophoneDeviceId
+        TeacherMicrophoneRetrySeconds = 5
         VideoCrf = 32
         VideoPreset = "veryfast"
         VideoMaxBitrateKbps = 700
@@ -124,6 +128,13 @@ Run these commands on the OTHER/TEST laptop in Windows PowerShell.
 
    TcpTestSucceeded must be True and FFmpeg must print its version.
 
+   Connect the teacher headset and select its microphone as the Windows default
+   communications input before starting the Agent. A fixed endpoint can instead
+   be supplied when building the package with -TeacherMicrophoneDeviceId.
+
+   If the older Academy Agent is running on this laptop, stop it first with
+   Ctrl+C (or stop its test window) before extracting this updated package.
+
 3. Extract the package:
 
    `$zipPath = Join-Path `$env:USERPROFILE "Downloads\$archiveName"
@@ -145,7 +156,9 @@ Run these commands on the OTHER/TEST laptop in Windows PowerShell.
    Set-Location `$installPath
    & .\setup-teams-helper.ps1 -SourceDirectory .\teams-helper -Action Install
 
-6. Confirm the new device heartbeat in the dashboard before recording.
+6. Confirm the new device heartbeat in the dashboard before recording. The
+   Agent window must report "Teacher microphone capture available" before the
+   recording can become QA-eligible.
 
 Do not copy device.json from another laptop. The Agent creates a unique identity
 at C:\ProgramData\AcademyAgent\device.json.

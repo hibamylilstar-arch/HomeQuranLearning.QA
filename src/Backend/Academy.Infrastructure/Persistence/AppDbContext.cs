@@ -13,6 +13,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Device> Devices => Set<Device>();
     public DbSet<DeviceHeartbeat> DeviceHeartbeats => Set<DeviceHeartbeat>();
     public DbSet<Recording> Recordings => Set<Recording>();
+    public DbSet<RecordingAudioCoverageGap> RecordingAudioCoverageGaps => Set<RecordingAudioCoverageGap>();
     public DbSet<QaRule> QaRules => Set<QaRule>();
     public DbSet<QaAlert> QaAlerts => Set<QaAlert>();
     public DbSet<TranscriptSegment> TranscriptSegments => Set<TranscriptSegment>();
@@ -58,6 +59,10 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.FileName).IsRequired().HasMaxLength(512);
             entity.Property(x => x.StorageKey).IsRequired().HasMaxLength(1024);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
+            entity.Property(x => x.TeacherAudioSourceKind).IsRequired().HasMaxLength(64);
+            entity.Property(x => x.TeacherAudioEndpointId).HasMaxLength(512);
+            entity.Property(x => x.TeacherAudioEndpointName).HasMaxLength(512);
+            entity.Property(x => x.TeacherAudioProvenanceStatus).HasConversion<string>().HasMaxLength(32);
 
             entity.HasOne(x => x.Device)
                 .WithMany()
@@ -100,6 +105,19 @@ public sealed class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.QaRuleId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<RecordingAudioCoverageGap>(entity =>
+        {
+            entity.ToTable("recording_audio_coverage_gaps");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Reason).IsRequired().HasMaxLength(128);
+            entity.HasIndex(x => new { x.RecordingId, x.StartedAtUtc });
+
+            entity.HasOne(x => x.Recording)
+                .WithMany(x => x.TeacherAudioCoverageGaps)
+                .HasForeignKey(x => x.RecordingId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<TranscriptSegment>(entity =>

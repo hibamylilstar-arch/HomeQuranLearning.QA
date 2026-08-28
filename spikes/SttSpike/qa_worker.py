@@ -5,6 +5,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+import wave
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -37,6 +38,11 @@ DOWNLOAD_TIMEOUT_SECONDS = int(
 )
 
 _model = None
+
+EXPECTED_AUDIO_LAYOUT_VERSION = 1
+EXPECTED_TEACHER_AUDIO_TRACK_TITLE = (
+    "Academy Teacher Microphone QA v1"
+)
 
 
 def configure_utf8_stream(stream):
@@ -165,6 +171,117 @@ def get_model():
         print("Whisper model loaded.")
 
     return _model
+
+
+def validate_teacher_audio_metadata(recording):
+    layout_version = recording.get(
+        "audioLayoutVersion"
+    )
+
+    track_index = recording.get(
+        "teacherAudioTrackIndex"
+    )
+
+    provenance_status = str(
+        recording.get(
+            "teacherAudioProvenanceStatus",
+            "",
+        )
+    ).strip().lower()
+
+    if layout_version != EXPECTED_AUDIO_LAYOUT_VERSION:
+        raise ValueError(
+            "Recording has no supported teacher-audio layout."
+        )
+
+    if (
+        isinstance(track_index, bool)
+        or not isinstance(track_index, int)
+        or track_index < 0
+    ):
+        raise ValueError(
+            "Recording has no valid teacher-audio track index."
+        )
+
+    if provenance_status != "proven":
+        raise ValueError(
+            "Teacher-audio provenance is not complete."
+        )
+
+    return track_index
+
+
+def extract_teacher_audio(
+    input_path,
+    output_path,
+    teacher_audio_track_index,
+):
+    import av
+
+    sample_count = 0
+
+    with av.open(input_path) as container:
+        audio_streams = [
+            stream
+            for stream in container.streams
+            if stream.type == "audio"
+        ]
+
+        if teacher_audio_track_index >= len(
+            audio_streams
+        ):
+            raise ValueError(
+                "Declared teacher-audio track is missing."
+            )
+
+        teacher_stream = audio_streams[
+            teacher_audio_track_index
+        ]
+
+        labels = {
+            str(value).strip()
+            for key, value in teacher_stream.metadata.items()
+            if key.lower() in {"title", "handler_name"}
+        }
+
+        if EXPECTED_TEACHER_AUDIO_TRACK_TITLE not in labels:
+            raise ValueError(
+                "Declared teacher-audio track identity is invalid."
+            )
+
+        resampler = av.AudioResampler(
+            format="s16",
+            layout="mono",
+            rate=16000,
+        )
+
+        with wave.open(output_path, "wb") as output:
+            output.setnchannels(1)
+            output.setsampwidth(2)
+            output.setframerate(16000)
+
+            for packet in container.demux(
+                teacher_stream
+            ):
+                for frame in packet.decode():
+                    for converted in resampler.resample(
+                        frame
+                    ):
+                        data = converted.to_ndarray()
+                        output.writeframes(data.tobytes())
+                        sample_count += converted.samples
+
+            for converted in resampler.resample(None):
+                data = converted.to_ndarray()
+                output.writeframes(data.tobytes())
+                sample_count += converted.samples
+
+    if sample_count <= 0:
+        raise ValueError(
+            "Teacher-audio track contains no decodable samples."
+        )
+
+    return sample_count
 
 
 def parse_utc(value):
@@ -346,6 +463,10 @@ def process_recording(recording):
         recording["startedAtUtc"]
     )
 
+    teacher_audio_track_index = (
+        validate_teacher_audio_metadata(recording)
+    )
+
     suffix = os.path.splitext(file_name)[1] or ".mp4"
 
     descriptor, local_file = tempfile.mkstemp(
@@ -354,6 +475,15 @@ def process_recording(recording):
     )
 
     os.close(descriptor)
+
+    audio_descriptor, teacher_audio_file = (
+        tempfile.mkstemp(
+            prefix="academy-qa-teacher-",
+            suffix=".wav",
+        )
+    )
+
+    os.close(audio_descriptor)
 
     print(
         f"\nProcessing {file_name} ({recording_id})"
@@ -365,10 +495,16 @@ def process_recording(recording):
             local_file,
         )
 
+        extract_teacher_audio(
+            local_file,
+            teacher_audio_file,
+            teacher_audio_track_index,
+        )
+
         model = get_model()
 
         segment_generator, info = model.transcribe(
-            local_file
+            teacher_audio_file
         )
 
         segments = list(segment_generator)
@@ -434,6 +570,9 @@ def process_recording(recording):
     finally:
         if os.path.exists(local_file):
             os.remove(local_file)
+
+        if os.path.exists(teacher_audio_file):
+            os.remove(teacher_audio_file)
 
 
 def run_self_test():
@@ -527,6 +666,31 @@ def run_self_test():
         whatsapp["offsetSeconds"],
     ) == "2026-08-27T06:00:09.250000Z"
 
+    assert validate_teacher_audio_metadata(
+        {
+            "audioLayoutVersion": 1,
+            "teacherAudioTrackIndex": 1,
+            "teacherAudioProvenanceStatus": "Proven",
+        }
+    ) == 1
+
+    try:
+        validate_teacher_audio_metadata(
+            {
+                "audioLayoutVersion": 0,
+                "teacherAudioTrackIndex": None,
+                "teacherAudioProvenanceStatus": (
+                    "LegacyUnknown"
+                ),
+            }
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Legacy audio was not rejected."
+        )
+
     segment_payload = build_transcript_segments(
         [
             SimpleNamespace(
@@ -565,6 +729,7 @@ def run_self_test():
     print("QA_WORKER_TIMESTAMP_ALIGNMENT_OK")
     print("QA_WORKER_SEGMENT_PAYLOAD_OK")
     print("QA_WORKER_UNICODE_OUTPUT_OK")
+    print("QA_WORKER_TEACHER_AUDIO_PROVENANCE_OK")
     print("QA_WORKER_SELF_TEST_OK")
 
 

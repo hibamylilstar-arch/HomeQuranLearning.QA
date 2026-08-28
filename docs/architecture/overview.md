@@ -44,6 +44,12 @@ Current screen/live implementation uses FFmpeg `ddagrab`.
 
 Current system-audio path uses NAudio/WASAPI loopback and local UDP transport into FFmpeg.
 
+The loopback path alone is not teacher-microphone provenance. The approved
+7A-5A slice now adds an additive two-track recording layout with a discrete
+teacher microphone track and a primary mixed playback track. The worker only
+attributes speech when the declared teacher track and provenance are proven;
+legacy loopback-only recordings remain non-attributable.
+
 ## Backend
 
 Technology:
@@ -74,7 +80,9 @@ Current worker:
 
 Current completed QA work aligns alerts to recording-relative transcript timestamps and exact QA rule IDs.
 
-Durable transcript-segment persistence is the next planned QA slice.
+Durable transcript-segment persistence is complete. 7A-5A teacher-audio
+provenance is implemented locally and release-gated. Candidate persistence and
+context-aware multilingual analysis remain later independently approved tracks.
 
 ## Deployment
 

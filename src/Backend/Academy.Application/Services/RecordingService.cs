@@ -35,6 +35,9 @@ public sealed class RecordingService
         RecordingSubmittedRequest request,
         CancellationToken cancellationToken = default)
     {
+        TeacherAudioProvenanceStatus provenanceStatus =
+            ValidateAndResolveProvenanceStatus(request);
+
         var device = await _deviceRepository.GetByDeviceIdAsync(request.DeviceId, cancellationToken)
             ?? throw new InvalidOperationException("Unknown device.");
 
@@ -48,6 +51,11 @@ public sealed class RecordingService
 
         if (existingRecording is not null)
         {
+            EnsureIdenticalRetry(
+                existingRecording,
+                request,
+                provenanceStatus);
+
             return new RecordingResponse
             {
                 RecordingId = existingRecording.Id,
@@ -68,10 +76,38 @@ public sealed class RecordingService
             EndedAtUtc = request.EndedAtUtc,
             Duration = duration,
             SizeBytes = request.SizeBytes,
+            AudioLayoutVersion = request.AudioLayoutVersion,
+            TeacherAudioTrackIndex = request.TeacherAudioTrackIndex,
+            TeacherAudioSourceKind =
+                request.AudioLayoutVersion == 0
+                    ? "Legacy"
+                    : request.TeacherAudioSourceKind.Trim(),
+            TeacherAudioEndpointId =
+                NormalizeOptional(request.TeacherAudioEndpointId),
+            TeacherAudioEndpointName =
+                NormalizeOptional(request.TeacherAudioEndpointName),
+            TeacherAudioCoverageStartedAtUtc =
+                request.TeacherAudioCoverageStartedAtUtc,
+            TeacherAudioProvenanceStatus = provenanceStatus,
             Status = RecordingStatus.Pending,
             CreatedAtUtc = DateTimeOffset.UtcNow,
             UpdatedAtUtc = DateTimeOffset.UtcNow
         };
+
+        foreach (RecordingAudioCoverageGapRequest gap
+                 in request.TeacherAudioCoverageGaps ?? [])
+        {
+            recording.TeacherAudioCoverageGaps.Add(
+                new RecordingAudioCoverageGap
+                {
+                    Id = Guid.NewGuid(),
+                    RecordingId = recording.Id,
+                    StartedAtUtc = gap.StartedAtUtc,
+                    EndedAtUtc = gap.EndedAtUtc,
+                    Reason = gap.Reason.Trim(),
+                    CreatedAtUtc = DateTimeOffset.UtcNow
+                });
+        }
 
         // Resolve active session for this device at the recording start time.
         var activeSession = await _sessionRepository.GetActiveSessionForDeviceAsync(
@@ -135,7 +171,13 @@ public sealed class RecordingService
                 EndedAtUtc = x.EndedAtUtc,
                 Duration = x.Duration,
                 SizeBytes = x.SizeBytes,
-                Status = x.Status.ToString()
+                Status = x.Status.ToString(),
+                AudioLayoutVersion = x.AudioLayoutVersion,
+                TeacherAudioTrackIndex = x.TeacherAudioTrackIndex,
+                TeacherAudioProvenanceStatus =
+                    x.TeacherAudioProvenanceStatus.ToString(),
+                TeacherAudioEndpointName =
+                    x.TeacherAudioEndpointName
             })
             .ToList();
     }
@@ -161,7 +203,12 @@ public sealed class RecordingService
                 FileName = recording.FileName,
                 StorageKey = recording.StorageKey,
                 PresignedUrl = presignedUrl,
-                StartedAtUtc = recording.StartedAtUtc
+                StartedAtUtc = recording.StartedAtUtc,
+                AudioLayoutVersion = recording.AudioLayoutVersion,
+                TeacherAudioTrackIndex =
+                    recording.TeacherAudioTrackIndex!.Value,
+                TeacherAudioProvenanceStatus =
+                    recording.TeacherAudioProvenanceStatus.ToString()
             });
         }
 
@@ -230,6 +277,227 @@ public sealed class RecordingService
 
         await _unitOfWork.SaveChangesAsync(
             cancellationToken);
+    }
+
+    private static TeacherAudioProvenanceStatus
+        ValidateAndResolveProvenanceStatus(
+            RecordingSubmittedRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (string.IsNullOrWhiteSpace(request.DeviceId) ||
+            string.IsNullOrWhiteSpace(request.FileName))
+        {
+            throw new ArgumentException(
+                "DeviceId and FileName are required.");
+        }
+
+        if (request.EndedAtUtc <= request.StartedAtUtc ||
+            request.SizeBytes < 0)
+        {
+            throw new ArgumentException(
+                "Recording timestamps and size are invalid.");
+        }
+
+        if (request.AudioLayoutVersion == 0)
+        {
+            if (request.TeacherAudioTrackIndex.HasValue ||
+                request.TeacherAudioCoverageStartedAtUtc.HasValue ||
+                (request.TeacherAudioCoverageGaps?.Count ?? 0) > 0)
+            {
+                throw new ArgumentException(
+                    "Legacy recordings cannot declare teacher-audio provenance.");
+            }
+
+            return TeacherAudioProvenanceStatus.LegacyUnknown;
+        }
+
+        if (request.AudioLayoutVersion != 1 ||
+            request.TeacherAudioTrackIndex != 1)
+        {
+            throw new ArgumentException(
+                "Unsupported teacher-audio layout or track index.");
+        }
+
+        if (request.TeacherAudioSourceKind is not
+            ("DefaultCommunicationsEndpoint" or
+             "ConfiguredEndpoint"))
+        {
+            throw new ArgumentException(
+                "TeacherAudioSourceKind is invalid.");
+        }
+
+        if (request.TeacherAudioEndpointId?.Length > 512 ||
+            request.TeacherAudioEndpointName?.Length > 512)
+        {
+            throw new ArgumentException(
+                "Teacher microphone endpoint metadata is too long.");
+        }
+
+        DateTimeOffset previousGapEnd =
+            request.StartedAtUtc;
+
+        foreach (RecordingAudioCoverageGapRequest gap
+                 in (request.TeacherAudioCoverageGaps ?? [])
+                     .OrderBy(x => x.StartedAtUtc))
+        {
+            if (gap.EndedAtUtc <= gap.StartedAtUtc ||
+                gap.StartedAtUtc < request.StartedAtUtc ||
+                gap.EndedAtUtc > request.EndedAtUtc ||
+                gap.StartedAtUtc < previousGapEnd ||
+                string.IsNullOrWhiteSpace(gap.Reason) ||
+                gap.Reason.Length > 128)
+            {
+                throw new ArgumentException(
+                    "Teacher-audio coverage gaps are invalid or overlapping.");
+            }
+
+            previousGapEnd = gap.EndedAtUtc;
+        }
+
+        TeacherAudioProvenanceStatus resolvedStatus;
+
+        if (!request.TeacherAudioCoverageStartedAtUtc.HasValue)
+        {
+            resolvedStatus =
+                TeacherAudioProvenanceStatus.Unavailable;
+        }
+        else
+        {
+            if (request.TeacherAudioCoverageStartedAtUtc <
+                    request.StartedAtUtc ||
+                request.TeacherAudioCoverageStartedAtUtc >
+                    request.EndedAtUtc ||
+                string.IsNullOrWhiteSpace(
+                    request.TeacherAudioEndpointId) ||
+                string.IsNullOrWhiteSpace(
+                    request.TeacherAudioEndpointName))
+            {
+                throw new ArgumentException(
+                    "Teacher microphone provenance metadata is incomplete.");
+            }
+
+            resolvedStatus =
+                (request.TeacherAudioCoverageGaps?.Count ?? 0) == 0
+                    ? TeacherAudioProvenanceStatus.Proven
+                    : TeacherAudioProvenanceStatus.Partial;
+        }
+
+        if (!Enum.TryParse(
+                request.TeacherAudioProvenanceStatus,
+                ignoreCase: true,
+                out TeacherAudioProvenanceStatus reportedStatus) ||
+            reportedStatus != resolvedStatus)
+        {
+            throw new ArgumentException(
+                "Teacher-audio provenance status does not match its evidence.");
+        }
+
+        return resolvedStatus;
+    }
+
+    private static void EnsureIdenticalRetry(
+        Recording existing,
+        RecordingSubmittedRequest request,
+        TeacherAudioProvenanceStatus provenanceStatus)
+    {
+        bool scalarMatch =
+            TimestampsEquivalent(
+                existing.StartedAtUtc,
+                request.StartedAtUtc) &&
+            TimestampsEquivalent(
+                existing.EndedAtUtc,
+                request.EndedAtUtc) &&
+            existing.SizeBytes == request.SizeBytes &&
+            existing.AudioLayoutVersion == request.AudioLayoutVersion &&
+            existing.TeacherAudioTrackIndex ==
+                request.TeacherAudioTrackIndex &&
+            string.Equals(
+                existing.TeacherAudioSourceKind,
+                request.AudioLayoutVersion == 0
+                    ? "Legacy"
+                    : request.TeacherAudioSourceKind.Trim(),
+                StringComparison.Ordinal) &&
+            string.Equals(
+                existing.TeacherAudioEndpointId,
+                NormalizeOptional(
+                    request.TeacherAudioEndpointId),
+                StringComparison.Ordinal) &&
+            string.Equals(
+                existing.TeacherAudioEndpointName,
+                NormalizeOptional(
+                    request.TeacherAudioEndpointName),
+                StringComparison.Ordinal) &&
+            NullableTimestampsEquivalent(
+                existing.TeacherAudioCoverageStartedAtUtc,
+                request.TeacherAudioCoverageStartedAtUtc) &&
+            existing.TeacherAudioProvenanceStatus ==
+                provenanceStatus;
+
+        RecordingAudioCoverageGap[] existingGaps =
+            existing.TeacherAudioCoverageGaps
+                .OrderBy(x => x.StartedAtUtc)
+                .ToArray();
+
+        RecordingAudioCoverageGapRequest[] requestGaps =
+            (request.TeacherAudioCoverageGaps ?? [])
+                .OrderBy(x => x.StartedAtUtc)
+                .ToArray();
+
+        bool gapsMatch =
+            existingGaps.Length == requestGaps.Length &&
+            existingGaps.Zip(requestGaps)
+                .All(pair =>
+                    TimestampsEquivalent(
+                        pair.First.StartedAtUtc,
+                        pair.Second.StartedAtUtc) &&
+                    TimestampsEquivalent(
+                        pair.First.EndedAtUtc,
+                        pair.Second.EndedAtUtc) &&
+                    string.Equals(
+                        pair.First.Reason,
+                        pair.Second.Reason.Trim(),
+                        StringComparison.Ordinal));
+
+        if (!scalarMatch || !gapsMatch)
+        {
+            throw new InvalidOperationException(
+                "Recording submission conflicts with existing idempotency state.");
+        }
+    }
+
+    private static string? NormalizeOptional(
+        string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Trim();
+    }
+
+    private static bool TimestampsEquivalent(
+        DateTimeOffset left,
+        DateTimeOffset right)
+    {
+        // PostgreSQL timestamp precision is one microsecond while .NET keeps
+        // 100-nanosecond ticks. A retry after restart may round-trip through
+        // PostgreSQL before the same pending sidecar is submitted again.
+        return Math.Abs(
+            (left.ToUniversalTime() - right.ToUniversalTime()).Ticks)
+            < TimeSpan.TicksPerMicrosecond;
+    }
+
+    private static bool NullableTimestampsEquivalent(
+        DateTimeOffset? left,
+        DateTimeOffset? right)
+    {
+        if (!left.HasValue || !right.HasValue)
+        {
+            return left.HasValue == right.HasValue;
+        }
+
+        return TimestampsEquivalent(
+            left.Value,
+            right.Value);
     }
 }
 

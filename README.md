@@ -19,9 +19,9 @@ Private internal QA, attendance and monitoring platform for the HomeQuranLearnin
 
 Latest closed phase: `7A-5C — multilingual QA classifier and evaluation`
 
-Current engineering phase: `VPS staging and production preparation` (high-risk approval received; staging access validation in progress).
+Latest released phase: `VPS direct-IP staging preparation and commercial branding` (`20f2fdb`).
 
-Next action: validate the approved production Compose configuration and obtain secure VPS/DNS access facts. See `docs/operations/vps-staging-runbook.md`.
+Next action: discuss the next phase. VPS staging execution does not begin until the Owner replies `GO`; see `docs/operations/vps-staging-runbook.md`.
 
 ## Important documentation
 

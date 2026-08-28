@@ -18,11 +18,11 @@ Chat history is not authoritative. Repository state + this file are the durable 
 - Latest closed product phase: `7A-5C — multilingual QA classifier and evaluation`
 - Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
 - Current product phase: `VPS staging and production preparation`
-- Current phase status: `WAITING_RELEASE_APPROVAL`
-- Next engineering gate: Owner approval for the verified direct-IP VPS staging preparation change set
+- Current phase status: `CLOSED`
+- Next engineering gate: next phase discussion; no VPS access or deployment action starts without `GO`
 - Waiting human test: no
-- Waiting release approval: yes
-- Last verified checkpoint: 7A-5C classifier/evaluation was committed and pushed at `a983841524986992753b9a7f3145b8156b466a08`; VPS branch started clean from that commit
+- Waiting release approval: no
+- Last verified checkpoint: branded direct-IP VPS staging preparation was committed and pushed at `20f2fdb0de75a395717a9de86b7b28703278e5b0`
 - Tests already passed for S1.1: targeted deleted-recording regression 1/1; full unit 76/76; integration 2/2; Agent 1/1; full solution build GREEN with 0 warnings and 0 errors; runtime HTTP Deleted 400 / Uploaded 200 proof GREEN; final diff/status review and `git diff --check` GREEN
 - Dashboard gates completed: full dashboard lint/build, backend unit/integration gates, authenticated session-evidence API proof, role-scope proof, authenticated browser evidence-timeline/filter proof and final runtime cleanup
 - 7A-2 gates completed: worker self-test 6/6 markers; full unit tests 81/81; integration tests 3/3; full solution build 0 warnings/0 errors; local API persistence/retry proof; exact proof-row cleanup and baseline restoration; runtime OFF
@@ -43,12 +43,12 @@ Chat history is not authoritative. Repository state + this file are the durable 
 - 7A-6 attendance operations gates completed (2026-08-29): daily report now includes teacher attendance status and the complete completed-session list while preserving reducer semantics. Dashboard adds clickable status cards, Student Attendance and Teacher Attendance tabs, search/status filters, evidence detail table and 30-second refresh. Backend unit tests 87/87, integration tests 5/5, Release build 0 warnings/0 errors, dashboard lint/TypeScript/production build GREEN. No migration or runtime data mutation required.
 - 7A-6 browser proof completed (2026-08-29): authenticated Owner dashboard loaded Attendance Report; status cards rendered, Present card changed the operational filter, Teacher Attendance tab activated, empty-state table rendered safely, and browser console error count was 0. Dashboard/API remain available for Owner inspection; no test data was created.
 - 7A-5C implementation checkpoint (2026-08-29): the production-wired `spikes/SttSpike/qa_worker.py` now extracts timestamped teacher-track context windows, applies the versioned `7A-5C-lexical-v1` fail-closed classifier, and posts review candidates to `/api/worker/qa-candidates`; it no longer creates final alerts directly. Arabic-recitation windows and isolated `fee`/`fi` tokens are excluded, while supported parent/contact/financial contexts become candidates. The checked-in 10-case synthetic corpus reports TP=4, FP=0, TN=6, FN=0 (policy coverage only, not a production accuracy claim). Python compile, classifier self-test, evaluator and worker candidate-only-order self-test are GREEN; Docker worker now copies the classifier module. Released in `411bbac`.
-- VPS preparation checkpoint (2026-08-29): Owner approved high-risk VPS staging/production preparation and selected direct public-IPv4 HTTP staging before domain/TLS. The production Compose now routes only through Caddy port 80, keeps API/dashboard ports internal, uses an environment-supplied IPv4 host, and explicitly disables API HTTPS redirection for this bounded staging mode. Commercial branding is `Home Quran Learning Operations Suite`; the Admin/Manager entry surface is `Operations & Quality Console`, the laptop package identity is `Home Quran Learning Classroom Agent`, and the developer credit is `Abdul Wahid`. The supplied academy logo is shown through a circular crop without the source image's white square. Login browser proof, console-error check, Compose config, secure-value validator, PowerShell parser, dashboard lint/build, Release solution build (0 warnings/errors), unit 87/87 and integration 5/5 are GREEN. No VPS, DNS, database, recording or secret was mutated. Direct-IP staging is synthetic/test-only because credentials and Agent API keys are not encrypted in transit.
+- VPS preparation checkpoint (2026-08-29): Owner approved high-risk VPS staging/production preparation and selected direct public-IPv4 HTTP staging before domain/TLS. The production Compose now routes only through Caddy port 80, keeps API/dashboard ports internal, uses an environment-supplied IPv4 host, and explicitly disables API HTTPS redirection for this bounded staging mode. Commercial branding is `Home Quran Learning Operations Suite`; the Admin/Manager entry surface is `Operations & Quality Console`, the laptop package identity is `Home Quran Learning Classroom Agent`, and the developer credit is `Abdul Wahid`. The supplied academy logo is shown through a circular crop without the source image's white square. Login browser proof, console-error check, Compose config, secure-value validator, PowerShell parser, dashboard lint/build, Release solution build (0 warnings/errors), unit 87/87 and integration 5/5 are GREEN. No VPS, DNS, database, recording or secret was mutated. Direct-IP staging is synthetic/test-only because credentials and Agent API keys are not encrypted in transit. Released in `20f2fdb`.
 - S1.1 release files: `docs/PROJECT-STATE.md`, `src/Backend/Academy.Api/Program.cs`, `src/Backend/Academy.Application/Exceptions/RecordingUnavailableException.cs`, `src/Backend/Academy.Application/Services/RecordingService.cs`, `tests/Academy.UnitTests/RecordingServiceTests.cs`
 - Temporary data: all 7A-4 automated and physical proof rows/objects/devices were removed by exact identity; the current recordings baseline is the two Owner-approved retained controls
 - Product runtime expected after latest proof: OFF
 
-S1, S1.1, S1.2, dashboard operational hardening, 7A-2, 7A-3, 7A-4, 7A-5A, 7A-5B, 7A-5C and 7A-6 are CLOSED after full validation, Owner approval and push. VPS direct-IP staging preparation is waiting for release approval.
+S1, S1.1, S1.2, dashboard operational hardening, 7A-2, 7A-3, 7A-4, 7A-5A, 7A-5B, 7A-5C, 7A-6 and VPS direct-IP staging preparation are CLOSED after full validation, Owner approval and push.
 
 ## Current runtime snapshot
 
@@ -374,9 +374,9 @@ Dashboard proof completed (2026-08-28):
 
 Next recoverable action:
 
-- Preserve the unstaged VPS/branding change set and wait for the Owner's exact
-  `APPROVE` release keyword. After commit/push verification, collect secure VPS
-  access facts and begin the bounded direct-IP synthetic staging runbook.
+- Discuss the next phase and wait for the Owner's `GO`. If VPS staging execution
+  is selected, collect secure VPS access facts and begin the bounded direct-IP
+  synthetic staging runbook without using real academy data.
 
 ## Current engineering gate - post-S1 reassessment
 

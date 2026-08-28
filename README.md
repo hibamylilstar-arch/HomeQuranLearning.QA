@@ -15,13 +15,13 @@ Private internal QA, attendance and monitoring platform for the HomeQuranLearnin
 
 ## Current checkpoint
 
-`e35ac81 fix(agent): stabilize TeamsHelper lifecycle`
+`e127a19 fix(dashboard): harden operational monitoring workflows`
 
 Latest closed phase: `S1.2 - TeamsHelper startup and lifecycle stabilization`
 
-Current engineering phase: `Dashboard operational hardening`.
+Current engineering phase: `7A-2 — durable timestamped transcript segments` (implemented; release approval pending).
 
-Next planned QA feature remains `7A-2`; it is deferred while dashboard completion is in progress.
+Next action: approve the validated 7A-2 release before beginning another phase.
 
 ## Important documentation
 

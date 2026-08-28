@@ -4,13 +4,13 @@
 
 Canonical checkpoint:
 
-- Working branch: `codex/dashboard-operational-hardening`
+- Working branch: `codex/7a-2-transcript-segments`
 - Base commit: `32202b3`
 - Base subject: `chore(codex): add autonomous project governance`
 - Latest closed product phase: `Dashboard completion - evidence and operational views`
-- Current product phase: `Dashboard operational hardening`
-- Phase status: `WAITING_RELEASE_APPROVAL`; Owner Chrome proof and temporary Manager scope verification are GREEN.
-- Next planned QA feature: `7A-2`; it remains deferred and has not started.
+- Current product phase: `7A-2 — durable timestamped transcript segments`
+- Phase status: `WAITING_RELEASE_APPROVAL`; dashboard operational hardening is released at `e127a19`.
+- Current QA feature: durable timestamped transcript segment persistence (implemented and validated; release approval pending).
 
 Canonical resumable state: `docs/PROJECT-STATE.md`
 
@@ -297,11 +297,11 @@ These counts are historical proof only, not permanent invariants.
 
 ## Next engineering work
 
-The local dashboard evidence/operational vertical slice is implemented, backend/runtime/browser-proven and pushed at `051fe9e`. It exposes a role-scoped raw session-event timeline, historical session filters and a guarded login/logout lifecycle. The active hardening phase now verifies Manager-scoped navigation, recordings/player failure handling, attendance reporting and live-monitor operational states. The VPS remains deferred until local dashboard and stability gates are green.
+The local dashboard evidence/operational vertical slice is implemented, backend/runtime/browser-proven and pushed at `051fe9e`; operational hardening is released at `e127a19`. The VPS remains deferred until local product and stability gates are green.
 
 The dashboard proof includes 0-error/0-warning lint, a successful production build, full backend build/tests, authenticated login and proxy HTTP checks, 401 unauthenticated behavior and 404 missing/inaccessible event behavior. Browser proof verified the unauthenticated redirect, approved Owner login, 20-session rendering, the six-event raw timeline, filter empty-state/recovery and logout back to `/login`.
 
-The next QA feature remains `7A-2 — durable timestamped transcript segments`, but it is deferred while dashboard completion is in progress.
+7A-2 is implemented on `codex/7a-2-transcript-segments` and is waiting for release approval after full validation.
 
 Likely concerns:
 
@@ -328,7 +328,7 @@ Evidence clip extraction remains a later coherent phase.
 
 ## Production
 
-Production/VPS remains deferred until local dashboard, stability and controlled multi-laptop readiness gates are green.
+Production/VPS remains deferred until local dashboard, transcript QA, stability and controlled multi-laptop readiness gates are green.
 
 ## Owner Control Plane direction
 

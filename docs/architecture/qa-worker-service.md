@@ -27,6 +27,7 @@ GET  /api/worker/recordings/pending
 POST /api/worker/recordings/{recordingId}/mark-qa-processed
 GET  /api/worker/qa-rules
 POST /api/worker/qa-alerts
+POST /api/worker/recordings/{recordingId}/transcript-segments
 ```
 
 Worker authentication uses `X-Api-Key`.
@@ -80,8 +81,21 @@ QA_WORKER_SELF_TEST_OK
 - processed recording removed from pending queue
 - temporary proof data cleaned
 
-## Next work
+## Phase 7A-2 — durable transcript segments
 
-`7A-2 — durable timestamped transcript segment persistence`
+- Transcript segments are persisted with deterministic `SegmentIndex` and recording-relative start/end seconds.
+- Whisper language and probability metadata are retained when present.
+- A unique `(RecordingId, SegmentIndex)` constraint plus service-level conflict checks make retries idempotent and reject divergent replays.
+- Empty transcript batches are valid for no-speech recordings.
+- The worker persists segments before alert evaluation and only marks QA processed after all downstream work succeeds.
 
-The worker must remain restart/retry safe and must not write `QaProcessedAtUtc` after partial processing.
+The worker remains restart/retry safe and does not write `QaProcessedAtUtc` after partial processing.
+
+Validation completed on 2026-08-28:
+
+- worker self-test: 6/6 markers GREEN
+- full unit tests: 81/81 GREEN
+- integration tests: 3/3 GREEN
+- full solution build: 0 warnings, 0 errors
+- local API persistence/retry proof: first request persisted 2, identical retry returned existing 2
+- isolated proof rows cleaned; baseline database counts restored

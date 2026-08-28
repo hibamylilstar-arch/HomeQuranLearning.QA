@@ -268,6 +268,43 @@ def find_rule_matches(segments, rules):
     return transcript, matches
 
 
+def build_transcript_segments(segments, language):
+    """Build a stable API payload from faster-whisper segment objects."""
+    persisted = []
+
+    for segment_index, segment in enumerate(segments):
+        text = (getattr(segment, "text", "") or "").strip()
+
+        if not text:
+            continue
+
+        persisted.append(
+            {
+                "segmentIndex": segment_index,
+                "startSeconds": float(segment.start),
+                "endSeconds": float(segment.end),
+                "text": text,
+                "language": language or None,
+                "avgLogProbability": getattr(segment, "avg_logprob", None),
+                "noSpeechProbability": getattr(segment, "no_speech_prob", None),
+                "compressionRatio": getattr(segment, "compression_ratio", None),
+            }
+        )
+
+    return persisted
+
+
+def persist_transcript_segments(recording_id, segments, language):
+    return http_post_json(
+        (
+            "/api/worker/recordings/"
+            f"{recording_id}/transcript-segments"
+        ),
+        {"segments": build_transcript_segments(segments, language)},
+        WORKER_API_KEY,
+    )
+
+
 def timestamp_for_offset(
     recording_started_at,
     offset_seconds,
@@ -319,6 +356,12 @@ def process_recording(recording):
         )
 
         segments = list(segment_generator)
+
+        persist_transcript_segments(
+            recording_id,
+            segments,
+            getattr(info, "language", None),
+        )
 
         transcript, matches = find_rule_matches(
             segments,
@@ -453,10 +496,43 @@ def run_self_test():
         whatsapp["offsetSeconds"],
     ) == "2026-08-27T06:00:09.250000Z"
 
+    segment_payload = build_transcript_segments(
+        [
+            SimpleNamespace(
+                start=2.0,
+                end=4.5,
+                text=" Please share contact ",
+                avg_logprob=-0.25,
+                no_speech_prob=0.01,
+                compression_ratio=1.1,
+            ),
+            SimpleNamespace(
+                start=5.5,
+                end=7.0,
+                text="",
+            ),
+        ],
+        "en",
+    )
+
+    assert segment_payload == [
+        {
+            "segmentIndex": 0,
+            "startSeconds": 2.0,
+            "endSeconds": 4.5,
+            "text": "Please share contact",
+            "language": "en",
+            "avgLogProbability": -0.25,
+            "noSpeechProbability": 0.01,
+            "compressionRatio": 1.1,
+        }
+    ]
+
     print("QA_WORKER_TRANSCRIPT_INDEX_OK")
     print("QA_WORKER_CROSS_SEGMENT_MATCH_OK")
     print("QA_WORKER_RULE_LINK_OK")
     print("QA_WORKER_TIMESTAMP_ALIGNMENT_OK")
+    print("QA_WORKER_SEGMENT_PAYLOAD_OK")
     print("QA_WORKER_SELF_TEST_OK")
 
 

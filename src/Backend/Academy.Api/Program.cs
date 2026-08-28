@@ -25,6 +25,7 @@ builder.Services.AddScoped<DeviceService>();
 builder.Services.AddScoped<DeviceQueryService>();
 builder.Services.AddScoped<QaRuleService>();
 builder.Services.AddScoped<QaAlertService>();
+builder.Services.AddScoped<TranscriptSegmentService>();
 builder.Services.AddScoped<AdminUserService>();
 builder.Services.AddScoped<TeacherService>();
 builder.Services.AddScoped<ManagerAssignmentService>();
@@ -460,6 +461,31 @@ app.MapGet("/api/admin/recordings/{recordingId:guid}/playback-url", async (
         return Results.BadRequest(
             new { error = "Recording file is not available." });
     }
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/recordings/{recordingId:guid}/transcript-segments", async (
+    ClaimsPrincipal user,
+    Guid recordingId,
+    DashboardQueryService dashboardQueryService,
+    TranscriptSegmentService transcriptSegmentService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) = GetUserInfo(user);
+
+    if (!await dashboardQueryService.CanAccessRecordingAsync(
+            recordingId,
+            userId,
+            role,
+            cancellationToken))
+    {
+        return Results.NotFound();
+    }
+
+    var segments = await transcriptSegmentService.GetByRecordingIdAsync(
+        recordingId,
+        cancellationToken);
+
+    return Results.Ok(segments);
 }).RequireAuthorization();
 
 app.MapGet("/api/admin/recordings/{recordingId:guid}/download-url", async (
@@ -1341,6 +1367,38 @@ app.MapPost("/api/worker/qa-alerts", async (
         cancellationToken);
 
     return Results.Ok(new { created = true });
+});
+
+app.MapPost("/api/worker/recordings/{recordingId:guid}/transcript-segments", async (
+    HttpRequest request,
+    Guid recordingId,
+    PersistTranscriptSegmentsRequest body,
+    TranscriptSegmentService transcriptSegmentService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        var result = await transcriptSegmentService.PersistAsync(
+            recordingId,
+            body.Segments,
+            cancellationToken);
+
+        return Results.Ok(result);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(new { error = ex.Message });
+    }
 });
 
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));

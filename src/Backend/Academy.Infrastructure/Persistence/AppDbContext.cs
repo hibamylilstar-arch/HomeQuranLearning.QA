@@ -15,6 +15,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Recording> Recordings => Set<Recording>();
     public DbSet<QaRule> QaRules => Set<QaRule>();
     public DbSet<QaAlert> QaAlerts => Set<QaAlert>();
+    public DbSet<TranscriptSegment> TranscriptSegments => Set<TranscriptSegment>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
     public DbSet<ManagerTeacherAssignment> ManagerTeacherAssignments => Set<ManagerTeacherAssignment>();
@@ -99,6 +100,20 @@ public sealed class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.QaRuleId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<TranscriptSegment>(entity =>
+        {
+            entity.ToTable("transcript_segments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Text).IsRequired().HasMaxLength(4096);
+            entity.Property(x => x.Language).HasMaxLength(32);
+            entity.HasIndex(x => new { x.RecordingId, x.SegmentIndex }).IsUnique();
+
+            entity.HasOne(x => x.Recording)
+                .WithMany()
+                .HasForeignKey(x => x.RecordingId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<User>(entity =>

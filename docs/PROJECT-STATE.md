@@ -8,7 +8,7 @@ Chat history is not authoritative. Repository state + this file are the durable 
 
 ## Canonical checkpoint
 
-- Branch: `codex/dashboard-operational-hardening`
+- Branch: `codex/7a-2-transcript-segments`
 - Base commit: `32202b3b4202515a684373bfbf6500e8a4e7eef7`
 - S1 implementation commit: `ca18589d2d027a07b300cc86fbeadda49540f968`
 - S1 closure commit: `c68f6e2b5f6088447243afa494e17eeb7716748a`
@@ -17,19 +17,20 @@ Chat history is not authoritative. Repository state + this file are the durable 
 - Subject: `fix(recordings): handle unavailable playback cleanly`
 - Latest closed product phase: `Dashboard completion - evidence and operational views`
 - Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
-- Current product phase: `Dashboard operational hardening`
+- Current product phase: `7A-2 — durable timestamped transcript segments`
 - Current phase status: `WAITING_RELEASE_APPROVAL`
-- Next engineering gate: owner release approval for the dashboard operational-hardening change
+- Next engineering gate: Owner release approval for the completed 7A-2 change
 - Waiting human test: none
 - Waiting release approval: yes
-- Last verified checkpoint: operational hardening lint/build and Owner Chrome proof are GREEN; temporary Manager browser/API scope proof is GREEN (assigned-scope endpoints 200, Owner/Admin-only endpoints 403, restricted navigation absent), the exact temporary user and assignment were removed, runtime was stopped, and database counts remain sessions=20, session_events=163, recordings=148 and qa_alerts=5
+- Last verified checkpoint: 7A-2 implementation and validation completed on branch `codex/7a-2-transcript-segments`; runtime OFF and database counts sessions=20, session_events=163, recordings=148, qa_alerts=5 and transcript_segments=0
 - Tests already passed for S1.1: targeted deleted-recording regression 1/1; full unit 76/76; integration 2/2; Agent 1/1; full solution build GREEN with 0 warnings and 0 errors; runtime HTTP Deleted 400 / Uploaded 200 proof GREEN; final diff/status review and `git diff --check` GREEN
 - Dashboard gates completed: full dashboard lint/build, backend unit/integration gates, authenticated session-evidence API proof, role-scope proof, authenticated browser evidence-timeline/filter proof and final runtime cleanup
+- 7A-2 gates completed: worker self-test 6/6 markers; full unit tests 81/81; integration tests 3/3; full solution build 0 warnings/0 errors; local API persistence/retry proof; exact proof-row cleanup and baseline restoration; runtime OFF
 - S1.1 release files: `docs/PROJECT-STATE.md`, `src/Backend/Academy.Api/Program.cs`, `src/Backend/Academy.Application/Exceptions/RecordingUnavailableException.cs`, `src/Backend/Academy.Application/Services/RecordingService.cs`, `tests/Academy.UnitTests/RecordingServiceTests.cs`
 - Temporary data: the isolated S1.1 Deleted-recording proof row was removed; proof row count returned to zero and the recordings baseline returned to 148
 - Product runtime expected after latest proof: OFF
 
-S1, S1.1, S1.2 and the dashboard evidence/operational slice are CLOSED after full validation, Owner approval and push. Dashboard operational hardening is fully validated and is waiting for release approval. `7A-2` has not started.
+S1, S1.1, S1.2 and the dashboard evidence/operational slice are CLOSED after full validation, Owner approval and push. Dashboard operational hardening is CLOSED at `e127a19`. 7A-2 is now the active phase.
 
 ## Current runtime snapshot
 
@@ -355,7 +356,7 @@ Dashboard proof completed (2026-08-28):
 
 Next recoverable action:
 
-- Reproduce and close operational dashboard gaps across Manager-scoped navigation, recordings/player errors, attendance reporting and live-monitor states. Keep VPS, Owner Control Plane, APK and `7A-2` work deferred.
+- Obtain release approval for 7A-2. After the phase is pushed and closed, discuss the next coherent local phase; keep VPS, Owner Control Plane and APK work deferred.
 
 ## Current engineering gate - post-S1 reassessment
 
@@ -369,13 +370,13 @@ S1 closed the immediate role and resource-scope defects. Remaining stabilization
 6. Agent configuration contains environment-specific FFmpeg/device assumptions and recording is disabled by default.
 7. Production Compose omits some live/reverse-proxy components and needs deliberate deployment design later.
 
-Dashboard completion is the active phase by explicit Owner reprioritization. `7A-2` remains deferred and is not an unconditional next action.
+7A-2 is complete in the working tree and is waiting only for the governed release approval. No next phase is to be implemented before that approval and push.
 
-## Planned QA phase — 7A-2 (not started)
+## QA phase — 7A-2 (implementation complete; release approval pending)
 
 Durable timestamped transcript segment persistence.
 
-Likely concerns:
+Implemented contract:
 
 - RecordingId
 - deterministic SegmentIndex
@@ -388,7 +389,7 @@ Likely concerns:
 
 Correctness requirement: if transcript persistence succeeds but later alert processing fails, retry must not duplicate transcript segments.
 
-Worker order should become:
+Worker order is now:
 
 ```text
 download

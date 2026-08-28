@@ -6,28 +6,29 @@ import { useAuth } from "@/components/AuthProvider";
 
 export default function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen: boolean, setMobileOpen: (val: boolean) => void }) {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   const handleLogout = async () => {
     await logout();
   };
 
+  const ownerOrAdminRoles = ["Owner", "Admin"];
   const navItems = [
     { name: "Live Monitoring", href: "/live" },
     { name: "Overview", href: "/" },
     { name: "Devices", href: "/devices" },
     { name: "Recordings", href: "/recordings" },
-    { name: "QA Rules", href: "/qa-rules" },
+    { name: "QA Rules", href: "/qa-rules", roles: ownerOrAdminRoles },
     { name: "QA Alerts", href: "/qa-alerts" },
-    { name: "Teachers", href: "/teachers" },
-    { name: "Students", href: "/students" },
-    { name: "Courses", href: "/courses" },
+    { name: "Teachers", href: "/teachers", roles: ownerOrAdminRoles },
+    { name: "Students", href: "/students", roles: ownerOrAdminRoles },
+    { name: "Courses", href: "/courses", roles: ownerOrAdminRoles },
     { name: "Schedules", href: "/schedules" },
     { name: "Sessions", href: "/sessions" },
     { name: "Attendance Report", href: "/reports/attendance" },
-    { name: "Users", href: "/users" },
-    { name: "Assignments", href: "/assignments" },
-  ];
+    { name: "Users", href: "/users", roles: ownerOrAdminRoles },
+    { name: "Assignments", href: "/assignments", roles: ownerOrAdminRoles },
+  ].filter((item) => !item.roles || (user && item.roles.includes(user.role)));
 
   return (
     <>

@@ -270,6 +270,23 @@ export default function RecordingsPage() {
       </div>
 
       <div className="space-y-3">
+        {filteredRecordings.length === 0 && (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <p className="text-sm font-medium text-slate-600">
+              No recordings match the current filters.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setStatusFilter("ALL");
+              }}
+              className="mt-3 text-xs font-semibold text-indigo-700 hover:text-indigo-600"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
         {filteredRecordings.map(
           (recording) => {
             const status =

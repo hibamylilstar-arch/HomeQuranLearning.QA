@@ -19,7 +19,7 @@ Private internal QA, attendance and monitoring platform for the HomeQuranLearnin
 
 Latest closed phase: `S1.2 - TeamsHelper startup and lifecycle stabilization`
 
-Current engineering phase: `Dashboard completion - evidence and operational views`.
+Current engineering phase: `Dashboard operational hardening`.
 
 Next planned QA feature remains `7A-2`; it is deferred while dashboard completion is in progress.
 

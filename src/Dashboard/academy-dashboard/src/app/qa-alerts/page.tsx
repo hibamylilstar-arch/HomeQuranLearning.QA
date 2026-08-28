@@ -4,6 +4,13 @@ import { useEffect, useState, useMemo } from "react";
 import { getQaAlerts } from "@/lib/api";
 import type { QaAlertListItem } from "@/types";
 
+const utcDateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+  dateStyle: "medium",
+  timeStyle: "medium",
+  hour12: false,
+  timeZone: "UTC",
+});
+
 export default function QaAlertsPage() {
   const [alerts, setAlerts] = useState<QaAlertListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,7 +129,9 @@ export default function QaAlertsPage() {
                     <tr key={alert.id} className="hover:bg-slate-50/65 transition-colors">
                       <td className="px-6 py-4 font-medium text-slate-900 font-mono">{alert.matchedPhrase}</td>
                       <td className="px-6 py-4 text-slate-600 font-mono">{alert.rulePhrase ?? "—"}</td>
-                      <td className="px-6 py-4 text-slate-500">{new Date(alert.timestampUtc).toLocaleString()}</td>
+                      <td className="px-6 py-4 text-slate-500">
+                        {utcDateTimeFormatter.format(new Date(alert.timestampUtc))} UTC
+                      </td>
                       <td className="px-6 py-4">
                         <span className={"inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase " + badgeClass}>
                           {alert.status}

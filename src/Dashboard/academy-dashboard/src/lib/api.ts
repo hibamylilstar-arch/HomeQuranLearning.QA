@@ -32,11 +32,45 @@ async function proxyFetch<T>(
     },
   });
 
+  const responseText = await res.text();
+  let responseBody: unknown = null;
+
+  if (responseText) {
+    try {
+      responseBody = JSON.parse(responseText);
+    } catch {
+      responseBody = responseText;
+    }
+  }
+
   if (!res.ok) {
+    const apiMessage =
+      typeof responseBody === "string"
+        ? responseBody
+        : responseBody && typeof responseBody === "object"
+          ? ["error", "message", "title"]
+              .map((key) => (responseBody as Record<string, unknown>)[key])
+              .find((value): value is string =>
+                typeof value === "string" && value.trim().length > 0
+              )
+          : undefined;
+
+    if (apiMessage) {
+      throw new Error(apiMessage);
+    }
+
+    if (res.status === 401) {
+      throw new Error("Your dashboard session has expired. Please sign in again.");
+    }
+
+    if (res.status === 403) {
+      throw new Error("You do not have access to this resource.");
+    }
+
     throw new Error(`Request failed: ${res.status}`);
   }
 
-  return res.json();
+  return responseBody as T;
 }
 
 export async function getDevices(): Promise<DeviceListItem[]> {

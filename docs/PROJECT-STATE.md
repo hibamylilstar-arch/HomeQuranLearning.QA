@@ -8,28 +8,28 @@ Chat history is not authoritative. Repository state + this file are the durable 
 
 ## Canonical checkpoint
 
-- Branch: `codex/dashboard-completion`
+- Branch: `codex/dashboard-operational-hardening`
 - Base commit: `32202b3b4202515a684373bfbf6500e8a4e7eef7`
 - S1 implementation commit: `ca18589d2d027a07b300cc86fbeadda49540f968`
 - S1 closure commit: `c68f6e2b5f6088447243afa494e17eeb7716748a`
 - S1.1 release parent: `a97cd465cef4811b58491a781eb5e02fc63771e6`
 - Origin: local `main` and `origin/main` synchronized after S1.1 release verification
 - Subject: `fix(recordings): handle unavailable playback cleanly`
-- Latest closed product phase: `S1.2 - TeamsHelper startup and lifecycle stabilization`
+- Latest closed product phase: `Dashboard completion - evidence and operational views`
 - Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
-- Current product phase: `Dashboard completion - evidence and operational views`
+- Current product phase: `Dashboard operational hardening`
 - Current phase status: `WAITING_RELEASE_APPROVAL`
-- Next engineering gate: Owner release approval for the completed dashboard evidence/operational slice
-- Waiting human test: no
+- Next engineering gate: owner release approval for the dashboard operational-hardening change
+- Waiting human test: none
 - Waiting release approval: yes
-- Last verified checkpoint: Dashboard phase baseline captured from clean pushed commit `e35ac810f01745d01856798ece764f57dbdc13c4`; API/Agent/FFmpeg are OFF; Docker PostgreSQL, Redis, MinIO, LiveKit, LiveKit Ingress and ingress-manager are running; database counts are sessions=20, session_events=163 and recordings=148
+- Last verified checkpoint: operational hardening lint/build and Owner Chrome proof are GREEN; temporary Manager browser/API scope proof is GREEN (assigned-scope endpoints 200, Owner/Admin-only endpoints 403, restricted navigation absent), the exact temporary user and assignment were removed, runtime was stopped, and database counts remain sessions=20, session_events=163, recordings=148 and qa_alerts=5
 - Tests already passed for S1.1: targeted deleted-recording regression 1/1; full unit 76/76; integration 2/2; Agent 1/1; full solution build GREEN with 0 warnings and 0 errors; runtime HTTP Deleted 400 / Uploaded 200 proof GREEN; final diff/status review and `git diff --check` GREEN
 - Dashboard gates completed: full dashboard lint/build, backend unit/integration gates, authenticated session-evidence API proof, role-scope proof, authenticated browser evidence-timeline/filter proof and final runtime cleanup
 - S1.1 release files: `docs/PROJECT-STATE.md`, `src/Backend/Academy.Api/Program.cs`, `src/Backend/Academy.Application/Exceptions/RecordingUnavailableException.cs`, `src/Backend/Academy.Application/Services/RecordingService.cs`, `tests/Academy.UnitTests/RecordingServiceTests.cs`
 - Temporary data: the isolated S1.1 Deleted-recording proof row was removed; proof row count returned to zero and the recordings baseline returned to 148
 - Product runtime expected after latest proof: OFF
 
-S1, S1.1 and S1.2 are CLOSED after full validation, owner approval and push. Dashboard completion is now in progress. `7A-2` has not started.
+S1, S1.1, S1.2 and the dashboard evidence/operational slice are CLOSED after full validation, Owner approval and push. Dashboard operational hardening is fully validated and is waiting for release approval. `7A-2` has not started.
 
 ## Current runtime snapshot
 
@@ -355,7 +355,7 @@ Dashboard proof completed (2026-08-28):
 
 Next recoverable action:
 
-- Keep the complete dashboard phase diff unstaged and wait for the Owner's exact `APPROVE` keyword before staging, committing and normally pushing the reported files.
+- Reproduce and close operational dashboard gaps across Manager-scoped navigation, recordings/player errors, attendance reporting and live-monitor states. Keep VPS, Owner Control Plane, APK and `7A-2` work deferred.
 
 ## Current engineering gate - post-S1 reassessment
 

@@ -4,12 +4,12 @@
 
 Canonical checkpoint:
 
-- Working branch: `codex/dashboard-completion`
+- Working branch: `codex/dashboard-operational-hardening`
 - Base commit: `32202b3`
 - Base subject: `chore(codex): add autonomous project governance`
-- Latest closed product phase: `S1.2 - TeamsHelper startup and lifecycle stabilization`
-- Current product phase: `Dashboard completion - evidence and operational views`
-- Phase status: `WAITING_RELEASE_APPROVAL`; implementation and local automated/runtime/browser gates are green.
+- Latest closed product phase: `Dashboard completion - evidence and operational views`
+- Current product phase: `Dashboard operational hardening`
+- Phase status: `WAITING_RELEASE_APPROVAL`; Owner Chrome proof and temporary Manager scope verification are GREEN.
 - Next planned QA feature: `7A-2`; it remains deferred and has not started.
 
 Canonical resumable state: `docs/PROJECT-STATE.md`
@@ -297,7 +297,7 @@ These counts are historical proof only, not permanent invariants.
 
 ## Next engineering work
 
-The local dashboard evidence/operational vertical slice is implemented and backend/runtime/browser-proven on the `codex/dashboard-completion` branch. It now exposes a role-scoped raw session-event timeline, historical session filters and a guarded login/logout lifecycle. The phase is waiting for explicit Owner release approval. The VPS remains deferred until local dashboard and stability gates are green.
+The local dashboard evidence/operational vertical slice is implemented, backend/runtime/browser-proven and pushed at `051fe9e`. It exposes a role-scoped raw session-event timeline, historical session filters and a guarded login/logout lifecycle. The active hardening phase now verifies Manager-scoped navigation, recordings/player failure handling, attendance reporting and live-monitor operational states. The VPS remains deferred until local dashboard and stability gates are green.
 
 The dashboard proof includes 0-error/0-warning lint, a successful production build, full backend build/tests, authenticated login and proxy HTTP checks, 401 unauthenticated behavior and 404 missing/inaccessible event behavior. Browser proof verified the unauthenticated redirect, approved Owner login, 20-session rendering, the six-event raw timeline, filter empty-state/recovery and logout back to `/login`.
 

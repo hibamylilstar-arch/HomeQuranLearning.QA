@@ -8,7 +8,7 @@ Canonical checkpoint:
 - Current phase base: `f4426c1`
 - Latest closed product phase: `7A-6 — attendance operations/reporting`
 - Current product phase: secured real-data VPS pilot preparation
-- Phase status: `WAITING_RELEASE_APPROVAL`; the protected local product phases and direct-IP preparation are closed, while the HTTPS/allowlisted pilot configuration and responsive-login work remain unstaged.
+- Phase status: `CLOSED`; the HTTPS/allowlisted pilot configuration and responsive-login work were released at `b61c1d2`.
 - Current QA limitation: legacy layout-0 recordings capture system/loopback audio only and remain non-attributable. New layout-1 recordings have proven teacher-microphone provenance. 7A-5C now adds a versioned, fail-closed lexical baseline that classifies timestamped teacher-track windows and posts review candidates only; production accuracy is not yet claimed.
 
 Canonical resumable state: `docs/PROJECT-STATE.md`
@@ -300,7 +300,7 @@ These counts are historical proof only, not permanent invariants.
 
 ## Next engineering work
 
-The local dashboard evidence/operational vertical slice is implemented, backend/runtime/browser-proven and pushed at `051fe9e`; operational hardening is released at `e127a19`. Direct-IP VPS preparation is released, and the secured real-data pilot configuration is waiting for release approval before any remote deployment.
+The local dashboard evidence/operational vertical slice is implemented, backend/runtime/browser-proven and pushed at `051fe9e`; operational hardening is released at `e127a19`. Direct-IP VPS preparation and the secured real-data pilot configuration are released. Remote execution starts with a read-only VPS inventory and exact old-copy classification before any deployment or deletion.
 
 The dashboard proof includes 0-error/0-warning lint, a successful production build, full backend build/tests, authenticated login and proxy HTTP checks, 401 unauthenticated behavior and 404 missing/inaccessible event behavior. Browser proof verified the unauthenticated redirect, approved Owner login, 20-session rendering, the six-event raw timeline, filter empty-state/recovery and logout back to `/login`.
 

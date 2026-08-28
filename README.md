@@ -21,7 +21,7 @@ Latest closed phase: `7A-5C — multilingual QA classifier and evaluation`
 
 Latest released phase: `VPS direct-IP staging preparation and commercial branding` (`20f2fdb`, closure at `f4426c1`).
 
-Current phase: secured real-data VPS pilot preparation is `WAITING_RELEASE_APPROVAL`. It adds public-IP HTTPS, exact source allowlisting, hardened package/config validation and responsive login proof. No remote deployment or old-VPS-folder deletion has occurred; see `docs/operations/vps-staging-runbook.md`.
+Latest closed phase: secured real-data VPS pilot preparation (`b61c1d2`). It adds public-IP HTTPS, exact source allowlisting, hardened package/config validation and responsive login proof. No remote deployment or old-VPS-folder deletion has occurred; the next phase starts with read-only VPS inventory as defined in `docs/operations/vps-staging-runbook.md`.
 
 ## Important documentation
 

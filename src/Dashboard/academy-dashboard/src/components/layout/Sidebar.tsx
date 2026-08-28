@@ -20,6 +20,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen: boo
     { name: "Recordings", href: "/recordings" },
     { name: "QA Rules", href: "/qa-rules", roles: ownerOrAdminRoles },
     { name: "QA Alerts", href: "/qa-alerts" },
+    { name: "QA Candidates", href: "/qa-candidates" },
     { name: "Teachers", href: "/teachers", roles: ownerOrAdminRoles },
     { name: "Students", href: "/students", roles: ownerOrAdminRoles },
     { name: "Courses", href: "/courses", roles: ownerOrAdminRoles },

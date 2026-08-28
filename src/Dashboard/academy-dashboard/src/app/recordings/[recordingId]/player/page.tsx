@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getPlaybackUrl,
@@ -33,6 +33,7 @@ function formatUtc(value: string) {
 
 export default function RecordingPlayerPage() {
   const { recordingId } = useParams<{ recordingId: string }>();
+  const searchParams = useSearchParams();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playbackUrl, setPlaybackUrl] = useState("");
   const [recording, setRecording] = useState<RecordingListItem | null>(null);
@@ -42,6 +43,8 @@ export default function RecordingPlayerPage() {
   const [playbackError, setPlaybackError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+
+  const requestedStart = Number(searchParams.get("start"));
 
   async function loadRecordingReview() {
     if (!recordingId) return;
@@ -90,6 +93,16 @@ export default function RecordingPlayerPage() {
     // recordingId is the only input that should reload this resource.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recordingId]);
+
+  useEffect(() => {
+    if (!playbackUrl || !Number.isFinite(requestedStart) || requestedStart < 0) return;
+    const video = videoRef.current;
+    if (!video) return;
+    const seek = () => { video.currentTime = requestedStart; };
+    if (video.readyState >= 1) seek();
+    video.addEventListener("loadedmetadata", seek, { once: true });
+    return () => video.removeEventListener("loadedmetadata", seek);
+  }, [playbackUrl, requestedStart]);
 
   const alertRows = useMemo(
     () =>

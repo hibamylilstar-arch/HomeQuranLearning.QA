@@ -8,21 +8,21 @@ Chat history is not authoritative. Repository state + this file are the durable 
 
 ## Canonical checkpoint
 
-- Branch: `codex/7a-5-context-aware-teacher-qa`
-- Current phase base commit: `ee423152312bd4fd54c109814070dd7bca1b0226`
+- Branch: `codex/7a-5b-candidate-foundation`
+- Current phase base commit: `9d6a8a9ffe3d1ee24c92d570938fdb50009b432b`
 - S1 implementation commit: `ca18589d2d027a07b300cc86fbeadda49540f968`
 - S1 closure commit: `c68f6e2b5f6088447243afa494e17eeb7716748a`
 - S1.1 release parent: `a97cd465cef4811b58491a781eb5e02fc63771e6`
-- Origin: 7A-5A was pushed at `a67ff8ad12a27d65ee7aaf26735d8d82c4880e3d`
-- Subject: `7A-5A teacher-audio provenance implementation`
+- Origin: 7A-5A closure was pushed at `9d6a8a9ffe3d1ee24c92d570938fdb50009b432b`; 7A-5B work is local
+- Subject: `7A-5B candidate foundation`
 - Latest closed product phase: `7A-5A — teacher-audio provenance implementation`
 - Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
-- Current product phase: `7A-5 — teacher-audio provenance and context-aware multilingual QA`
-- Current phase status: `CLOSED`
-- Next engineering gate: discuss and explicitly start the next approved phase
+- Current product phase: `7A-5B — QA candidate foundation`
+- Current phase status: `WAITING_RELEASE_APPROVAL`
+- Next engineering gate: Owner approval for the completed candidate persistence/review phase; 7A-5C classifier remains deferred
 - Waiting human test: no
 - Waiting release approval: no
-- Last verified checkpoint: 7A-5A was fully verified, committed as `a67ff8a`, pushed to origin, and the worktree was confirmed clean
+- Last verified checkpoint: 7A-5A was fully verified and closed at `9d6a8a9`; 7A-5B branch created from that clean pushed state
 - Tests already passed for S1.1: targeted deleted-recording regression 1/1; full unit 76/76; integration 2/2; Agent 1/1; full solution build GREEN with 0 warnings and 0 errors; runtime HTTP Deleted 400 / Uploaded 200 proof GREEN; final diff/status review and `git diff --check` GREEN
 - Dashboard gates completed: full dashboard lint/build, backend unit/integration gates, authenticated session-evidence API proof, role-scope proof, authenticated browser evidence-timeline/filter proof and final runtime cleanup
 - 7A-2 gates completed: worker self-test 6/6 markers; full unit tests 81/81; integration tests 3/3; full solution build 0 warnings/0 errors; local API persistence/retry proof; exact proof-row cleanup and baseline restoration; runtime OFF
@@ -39,11 +39,12 @@ Chat history is not authoritative. Repository state + this file are the durable 
 - 7A-5A human-test package: rebuilt self-contained `publish/local-agent-test-v4.zip` from the current source with recording enabled, live streaming disabled, default-communications microphone selection instructions and old-Agent replacement guidance. SHA-256: `9815A5A1661706710E09D4C28491D879B2C55509FD8A8F3FCD36B4C66477F79A`.
 - 7A-5A provisional acceptance: built-in laptop microphone capture was accepted for the technical pipeline proof (recording, two-track layout, persistence, upload and worker validation) before the real headset run; no candidate/classifier or retention implementation is included.
 - 7A-5A headset proof completed (2026-08-29): controlled Agent run selected `Headset (pro2)`, reported `TeacherAudioStatus: Proven`, finalized a 30.592-second two-track MP4, uploaded it successfully through the local API, and PyAV extracted the declared teacher track to 16 kHz mono WAV. Exact six proof recordings/objects and 12 generated heartbeats were removed; baseline returned to recordings 2, devices 3, heartbeats 1361, audio gaps 0. The Owner-requested headset verification is now complete.
+- 7A-5B candidate foundation gates completed (2026-08-29): proven layout-1 teacher-track candidates now persist with policy/analysis versions, deterministic idempotency, trigger plus ±10-second context, transcript/language/intent/confidence and review audit fields. Owner/Admin and assigned-Manager scoped APIs expose candidates; Confirm alone creates a linked QA alert and Dismiss creates none. Unit tests 87/87, integration tests 5/5, Release build 0 warnings/0 errors, EF migration `20260828201740_AddQaCandidates` applied, dashboard production build and TypeScript checks GREEN; DB baseline remains recordings 2, devices 3, coverage gaps 0, candidates 0. Runtime remains OFF.
 - S1.1 release files: `docs/PROJECT-STATE.md`, `src/Backend/Academy.Api/Program.cs`, `src/Backend/Academy.Application/Exceptions/RecordingUnavailableException.cs`, `src/Backend/Academy.Application/Services/RecordingService.cs`, `tests/Academy.UnitTests/RecordingServiceTests.cs`
 - Temporary data: all 7A-4 automated and physical proof rows/objects/devices were removed by exact identity; the current recordings baseline is the two Owner-approved retained controls
 - Product runtime expected after latest proof: OFF
 
-S1, S1.1, S1.2, dashboard operational hardening, 7A-2, 7A-3, 7A-4 and 7A-5A are CLOSED after full validation, Owner approval and push. 7A-5B/5C are deferred.
+S1, S1.1, S1.2, dashboard operational hardening, 7A-2, 7A-3, 7A-4 and 7A-5A are CLOSED after full validation, Owner approval and push. 7A-5B is now in progress; 7A-5C remains deferred.
 
 ## Current runtime snapshot
 

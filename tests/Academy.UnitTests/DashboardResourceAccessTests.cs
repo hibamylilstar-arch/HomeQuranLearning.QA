@@ -265,6 +265,7 @@ public sealed class DashboardResourceAccessTests
         return new DashboardQueryService(
             recordings.Object,
             Mock.Of<IQaAlertRepository>(),
+            Mock.Of<IQaCandidateRepository>(),
             Mock.Of<IDeviceRepository>(),
             assignments.Object,
             sessions.Object,

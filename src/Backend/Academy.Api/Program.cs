@@ -25,6 +25,7 @@ builder.Services.AddScoped<DeviceService>();
 builder.Services.AddScoped<DeviceQueryService>();
 builder.Services.AddScoped<QaRuleService>();
 builder.Services.AddScoped<QaAlertService>();
+builder.Services.AddScoped<QaCandidateService>();
 builder.Services.AddScoped<TranscriptSegmentService>();
 builder.Services.AddScoped<AdminUserService>();
 builder.Services.AddScoped<TeacherService>();
@@ -1068,6 +1069,59 @@ app.MapGet("/api/admin/sessions", async (
     return Results.Ok(sessions);
 }).RequireAuthorization();
 
+app.MapGet("/api/admin/qa-candidates", async (
+    ClaimsPrincipal user,
+    DashboardQueryService dashboardQueryService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) = GetUserInfo(user);
+    var candidates = await dashboardQueryService.GetVisibleQaCandidatesAsync(
+        userId,
+        role,
+        cancellationToken);
+
+    return Results.Ok(candidates);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/qa-candidates/{candidateId:guid}/review", async (
+    ClaimsPrincipal user,
+    Guid candidateId,
+    ReviewQaCandidateRequest body,
+    DashboardQueryService dashboardQueryService,
+    QaCandidateService candidateService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) = GetUserInfo(user);
+
+    if (!await dashboardQueryService.CanAccessCandidateAsync(
+            candidateId,
+            userId,
+            role,
+            cancellationToken))
+    {
+        return Results.NotFound();
+    }
+
+    try
+    {
+        var candidate = await candidateService.ReviewAsync(
+            candidateId,
+            userId,
+            body,
+            cancellationToken);
+
+        return Results.Ok(candidate);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(new { error = ex.Message });
+    }
+});
+
 app.MapGet("/api/admin/sessions/{sessionId:guid}/events", async (
     ClaimsPrincipal user,
     Guid sessionId,
@@ -1378,6 +1432,36 @@ app.MapPost("/api/worker/qa-alerts", async (
         cancellationToken);
 
     return Results.Ok(new { created = true });
+});
+
+app.MapPost("/api/worker/qa-candidates", async (
+    HttpRequest request,
+    CreateQaCandidateRequest body,
+    QaCandidateService candidateService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        var candidate = await candidateService.CreateAsync(
+            body,
+            cancellationToken);
+
+        return Results.Ok(candidate);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(new { error = ex.Message });
+    }
 });
 
 app.MapPost("/api/worker/recordings/{recordingId:guid}/transcript-segments", async (

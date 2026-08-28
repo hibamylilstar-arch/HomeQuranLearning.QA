@@ -121,6 +121,39 @@ export interface SessionListItem {
   disconnectSeconds: number;
 }
 
+export interface QaCandidateListItem {
+  id: string;
+  recordingId: string;
+  recordingFileName: string;
+  sessionId: string | null;
+  teacherId: string | null;
+  teacherName: string;
+  qaRuleId: string | null;
+  rulePhrase: string | null;
+  confirmedQaAlertId: string | null;
+  policyVersion: string;
+  analysisVersion: string;
+  sourceTrackIndex: number;
+  audioLayoutVersion: number;
+  triggerStartSeconds: number;
+  triggerEndSeconds: number;
+  contextStartSeconds: number;
+  contextEndSeconds: number;
+  transcript: string;
+  languageFamily: string;
+  intentCategory: string;
+  triggerConfidence: number | null;
+  asrConfidence: number | null;
+  intentConfidence: number | null;
+  analysisIdempotencyKey: string;
+  status: string;
+  reviewedByUserId: string | null;
+  reviewedAtUtc: string | null;
+  reviewReason: string | null;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+}
+
 export interface TranscriptSegmentListItem {
   id: string;
   recordingId: string;

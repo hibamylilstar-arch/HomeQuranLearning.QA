@@ -23,4 +23,6 @@ public sealed class QaAlert
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public DateTimeOffset UpdatedAtUtc { get; set; }
+
+    public QaCandidate? ConfirmedCandidate { get; set; }
 }

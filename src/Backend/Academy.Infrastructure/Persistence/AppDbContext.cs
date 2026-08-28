@@ -16,6 +16,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<RecordingAudioCoverageGap> RecordingAudioCoverageGaps => Set<RecordingAudioCoverageGap>();
     public DbSet<QaRule> QaRules => Set<QaRule>();
     public DbSet<QaAlert> QaAlerts => Set<QaAlert>();
+    public DbSet<QaCandidate> QaCandidates => Set<QaCandidate>();
     public DbSet<TranscriptSegment> TranscriptSegments => Set<TranscriptSegment>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
@@ -104,6 +105,46 @@ public sealed class AppDbContext : DbContext
             entity.HasOne(x => x.QaRule)
                 .WithMany()
                 .HasForeignKey(x => x.QaRuleId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<QaCandidate>(entity =>
+        {
+            entity.ToTable("qa_candidates");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.PolicyVersion).IsRequired().HasMaxLength(128);
+            entity.Property(x => x.AnalysisVersion).IsRequired().HasMaxLength(128);
+            entity.Property(x => x.Transcript).IsRequired().HasMaxLength(4096);
+            entity.Property(x => x.LanguageFamily).IsRequired().HasMaxLength(64);
+            entity.Property(x => x.IntentCategory).IsRequired().HasMaxLength(128);
+            entity.Property(x => x.AnalysisIdempotencyKey).IsRequired().HasMaxLength(512);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
+            entity.Property(x => x.ReviewReason).HasMaxLength(2048);
+            entity.Property(x => x.ReviewVersion).IsConcurrencyToken();
+            entity.HasIndex(x => x.AnalysisIdempotencyKey).IsUnique();
+            entity.HasIndex(x => new
+            {
+                x.RecordingId,
+                x.PolicyVersion,
+                x.AnalysisVersion,
+                x.SourceTrackIndex,
+                x.TriggerStartSeconds,
+                x.TriggerEndSeconds
+            }).IsUnique();
+
+            entity.HasOne(x => x.Recording)
+                .WithMany(x => x.QaCandidates)
+                .HasForeignKey(x => x.RecordingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.QaRule)
+                .WithMany()
+                .HasForeignKey(x => x.QaRuleId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(x => x.ConfirmedQaAlert)
+                .WithOne(x => x.ConfirmedCandidate)
+                .HasForeignKey<QaCandidate>(x => x.ConfirmedQaAlertId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 

@@ -3,6 +3,7 @@ import type {
   RecordingListItem,
   QaRuleListItem,
   QaAlertListItem,
+  QaCandidateListItem,
   UserListItem,
   TeacherListItem,
   ManagerAssignmentListItem,
@@ -88,6 +89,21 @@ export async function getQaRules(): Promise<QaRuleListItem[]> {
 
 export async function getQaAlerts(): Promise<QaAlertListItem[]> {
   return proxyFetch<QaAlertListItem[]>(["qa-alerts"]);
+}
+
+export async function getQaCandidates(): Promise<QaCandidateListItem[]> {
+  return proxyFetch<QaCandidateListItem[]>(["qa-candidates"]);
+}
+
+export async function reviewQaCandidate(
+  candidateId: string,
+  decision: "Confirmed" | "Dismissed",
+  reason: string
+): Promise<QaCandidateListItem> {
+  return proxyFetch<QaCandidateListItem>(["qa-candidates", candidateId, "review"], {
+    method: "POST",
+    body: JSON.stringify({ decision, reason }),
+  });
 }
 
 export async function getPlaybackUrl(recordingId: string): Promise<string> {

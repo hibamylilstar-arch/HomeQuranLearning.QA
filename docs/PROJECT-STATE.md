@@ -8,21 +8,21 @@ Chat history is not authoritative. Repository state + this file are the durable 
 
 ## Canonical checkpoint
 
-- Branch: `codex/7a-6-attendance-operations`
-- Current phase base commit: `9d6a8a9ffe3d1ee24c92d570938fdb50009b432b`
+- Branch: `codex/7a-5c-multilingual-qa-classifier`
+- Current phase base commit: `a4bf911` (7A-5C branch base; 7A-6 browser proof closed)
 - S1 implementation commit: `ca18589d2d027a07b300cc86fbeadda49540f968`
 - S1 closure commit: `c68f6e2b5f6088447243afa494e17eeb7716748a`
 - S1.1 release parent: `a97cd465cef4811b58491a781eb5e02fc63771e6`
 - Origin: 7A-6 implementation was pushed at `e638e635261830ce8e1af8af41e80d835149563d`
-- Subject: `7A-6 attendance operations/reporting`
+- Subject: `7A-5C multilingual QA classifier and evaluation`
 - Latest closed product phase: `7A-5A — teacher-audio provenance implementation`
 - Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
-- Current product phase: `7A-6 — attendance operations/reporting`
+- Current product phase: `7A-5C — multilingual QA classifier and evaluation`
 - Current phase status: `WAITING_RELEASE_APPROVAL`
-- Next engineering gate: Owner approval for the completed attendance browser-proof phase
+- Next engineering gate: Owner approval for the completed 7A-5C classifier/evaluation phase
 - Waiting human test: no
-- Waiting release approval: no
-- Last verified checkpoint: 7A-6 was fully verified and pushed at `e638e635`; closure documentation is synchronized
+- Waiting release approval: yes
+- Last verified checkpoint: 7A-5C classifier/evaluation implementation is verified on top of the clean 7A-6 browser-proof checkpoint `a4bf911`
 - Tests already passed for S1.1: targeted deleted-recording regression 1/1; full unit 76/76; integration 2/2; Agent 1/1; full solution build GREEN with 0 warnings and 0 errors; runtime HTTP Deleted 400 / Uploaded 200 proof GREEN; final diff/status review and `git diff --check` GREEN
 - Dashboard gates completed: full dashboard lint/build, backend unit/integration gates, authenticated session-evidence API proof, role-scope proof, authenticated browser evidence-timeline/filter proof and final runtime cleanup
 - 7A-2 gates completed: worker self-test 6/6 markers; full unit tests 81/81; integration tests 3/3; full solution build 0 warnings/0 errors; local API persistence/retry proof; exact proof-row cleanup and baseline restoration; runtime OFF
@@ -42,6 +42,7 @@ Chat history is not authoritative. Repository state + this file are the durable 
 - 7A-5B candidate foundation gates completed (2026-08-29): proven layout-1 teacher-track candidates now persist with policy/analysis versions, deterministic idempotency, trigger plus ±10-second context, transcript/language/intent/confidence and review audit fields. Owner/Admin and assigned-Manager scoped APIs expose candidates; Confirm alone creates a linked QA alert and Dismiss creates none. Unit tests 87/87, integration tests 5/5, Release build 0 warnings/0 errors, EF migration `20260828201740_AddQaCandidates` applied, dashboard production build and TypeScript checks GREEN; DB baseline remains recordings 2, devices 3, coverage gaps 0, candidates 0. Runtime remains OFF.
 - 7A-6 attendance operations gates completed (2026-08-29): daily report now includes teacher attendance status and the complete completed-session list while preserving reducer semantics. Dashboard adds clickable status cards, Student Attendance and Teacher Attendance tabs, search/status filters, evidence detail table and 30-second refresh. Backend unit tests 87/87, integration tests 5/5, Release build 0 warnings/0 errors, dashboard lint/TypeScript/production build GREEN. No migration or runtime data mutation required.
 - 7A-6 browser proof completed (2026-08-29): authenticated Owner dashboard loaded Attendance Report; status cards rendered, Present card changed the operational filter, Teacher Attendance tab activated, empty-state table rendered safely, and browser console error count was 0. Dashboard/API remain available for Owner inspection; no test data was created.
+- 7A-5C implementation checkpoint (2026-08-29): the production-wired `spikes/SttSpike/qa_worker.py` now extracts timestamped teacher-track context windows, applies the versioned `7A-5C-lexical-v1` fail-closed classifier, and posts review candidates to `/api/worker/qa-candidates`; it no longer creates final alerts directly. Arabic-recitation windows and isolated `fee`/`fi` tokens are excluded, while supported parent/contact/financial contexts become candidates. The checked-in 10-case synthetic corpus reports TP=4, FP=0, TN=6, FN=0 (policy coverage only, not a production accuracy claim). Python compile, classifier self-test, evaluator and worker candidate-only-order self-test are GREEN; Docker worker now copies the classifier module.
 - S1.1 release files: `docs/PROJECT-STATE.md`, `src/Backend/Academy.Api/Program.cs`, `src/Backend/Academy.Application/Exceptions/RecordingUnavailableException.cs`, `src/Backend/Academy.Application/Services/RecordingService.cs`, `tests/Academy.UnitTests/RecordingServiceTests.cs`
 - Temporary data: all 7A-4 automated and physical proof rows/objects/devices were removed by exact identity; the current recordings baseline is the two Owner-approved retained controls
 - Product runtime expected after latest proof: OFF

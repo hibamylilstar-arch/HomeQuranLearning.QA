@@ -9,6 +9,16 @@ import wave
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
+from qa_context_classifier import (
+    ANALYSIS_VERSION,
+    POLICY_VERSION,
+    TranscriptWindow,
+    analysis_idempotency_key,
+    build_context_window,
+    classify_window,
+    estimate_asr_confidence,
+)
+
 
 BACKEND_BASE_URL = os.environ.get(
     "BACKEND_BASE_URL",
@@ -126,19 +136,43 @@ def get_active_rules():
     )
 
 
-def create_alert(
+def create_candidate(
     recording_id,
     qa_rule_id,
-    matched_phrase,
-    timestamp_utc,
+    source_track_index,
+    trigger_start_seconds,
+    trigger_end_seconds,
+    transcript,
+    language_family,
+    intent_category,
+    trigger_confidence,
+    asr_confidence,
+    intent_confidence,
 ):
     return http_post_json(
-        "/api/worker/qa-alerts",
+        "/api/worker/qa-candidates",
         {
             "recordingId": recording_id,
             "qaRuleId": qa_rule_id,
-            "matchedPhrase": matched_phrase,
-            "timestampUtc": timestamp_utc,
+            "policyVersion": POLICY_VERSION,
+            "analysisVersion": ANALYSIS_VERSION,
+            "sourceTrackIndex": source_track_index,
+            "audioLayoutVersion": EXPECTED_AUDIO_LAYOUT_VERSION,
+            "triggerStartSeconds": trigger_start_seconds,
+            "triggerEndSeconds": trigger_end_seconds,
+            "transcript": transcript[:4096],
+            "languageFamily": language_family,
+            "intentCategory": intent_category,
+            "triggerConfidence": trigger_confidence,
+            "asrConfidence": asr_confidence,
+            "intentConfidence": intent_confidence,
+            "analysisIdempotencyKey": analysis_idempotency_key(
+                recording_id,
+                qa_rule_id,
+                trigger_start_seconds,
+                trigger_end_seconds,
+                source_track_index,
+            ),
         },
         WORKER_API_KEY,
     )
@@ -335,6 +369,10 @@ def build_transcript_index(segments):
                 start_index,
                 cursor,
                 float(segment.start),
+                max(
+                    float(segment.start) + 0.01,
+                    float(getattr(segment, "end", float(segment.start) + 1.0)),
+                ),
             )
         )
 
@@ -356,11 +394,43 @@ def locate_phrase_offset(
     if match_index < 0:
         return None
 
-    for start_index, end_index, offset in ranges:
+    for start_index, end_index, offset, _ in ranges:
         if start_index <= match_index < end_index:
             return offset
 
     return ranges[0][2] if ranges else 0.0
+
+
+def locate_phrase_interval(transcript, ranges, phrase):
+    phrase = normalize_text(phrase)
+
+    if not phrase:
+        return None
+
+    match_index = transcript.find(phrase)
+
+    if match_index < 0:
+        return None
+
+    match_end = match_index + len(phrase)
+    start_offset = None
+    end_offset = None
+
+    for start_index, end_index, offset, segment_end in ranges:
+        if start_offset is None and start_index <= match_index < end_index:
+            start_offset = offset
+
+        if start_index < match_end <= end_index:
+            end_offset = segment_end
+            break
+
+    if start_offset is None:
+        start_offset = ranges[0][2] if ranges else 0.0
+
+    if end_offset is None:
+        end_offset = ranges[-1][3] if ranges else start_offset + 1.0
+
+    return start_offset, max(start_offset + 0.01, end_offset)
 
 
 def find_rule_matches(segments, rules):
@@ -381,20 +451,23 @@ def find_rule_matches(segments, rules):
         if not phrase:
             continue
 
-        offset = locate_phrase_offset(
+        interval = locate_phrase_interval(
             transcript,
             ranges,
             phrase,
         )
 
-        if offset is None:
+        if interval is None:
             continue
+
+        offset, end_offset = interval
 
         matches.append(
             {
                 "ruleId": rule.get("id"),
                 "phrase": phrase,
                 "offsetSeconds": offset,
+                "endOffsetSeconds": end_offset,
             }
         )
 
@@ -528,23 +601,62 @@ def process_recording(recording):
         print(f"Transcript: {transcript}")
         print(f"Rule matches: {len(matches)}")
 
+        transcript_windows = [
+            TranscriptWindow(
+                start_seconds=float(segment.start),
+                end_seconds=max(
+                    float(segment.start) + 0.01,
+                    float(getattr(segment, "end", float(segment.start) + 1.0)),
+                ),
+                text=(getattr(segment, "text", "") or "").strip(),
+                language=getattr(info, "language", None),
+                avg_log_probability=getattr(segment, "avg_logprob", None),
+                no_speech_probability=getattr(segment, "no_speech_prob", None),
+            )
+            for segment in segments
+            if (getattr(segment, "text", "") or "").strip()
+        ]
+        asr_confidence = estimate_asr_confidence(transcript_windows)
+
         for match in matches:
-            timestamp_utc = timestamp_for_offset(
-                recording_started_at,
-                match["offsetSeconds"],
+            trigger_start = match["offsetSeconds"]
+            trigger_end = match["endOffsetSeconds"]
+            context_text, _, _, context_windows = build_context_window(
+                transcript_windows,
+                trigger_start,
+                trigger_end,
+            )
+            classification = classify_window(
+                context_text,
+                language_hint=getattr(info, "language", None),
+                rule_phrase=match["phrase"],
+                asr_confidence=asr_confidence,
             )
 
             print(
                 f"MATCH: {match['phrase']} "
-                f"at +{match['offsetSeconds']:.3f}s "
-                f"({timestamp_utc})"
+                f"at +{trigger_start:.3f}s-+{trigger_end:.3f}s "
+                f"language={classification.language_family} "
+                f"intent={classification.intent_category} "
+                f"candidate={classification.should_create_candidate}"
             )
+            print(f"Classifier: {classification.reason}")
 
-            create_alert(
+            if not classification.should_create_candidate:
+                continue
+
+            create_candidate(
                 recording_id,
                 match["ruleId"],
-                match["phrase"],
-                timestamp_utc,
+                teacher_audio_track_index,
+                trigger_start,
+                trigger_end,
+                context_text,
+                classification.language_family,
+                classification.intent_category,
+                classification.trigger_confidence,
+                classification.asr_confidence,
+                classification.intent_confidence,
             )
 
         mark_processed(recording_id)
@@ -723,6 +835,56 @@ def run_self_test():
         }
     ]
 
+    # Orchestration proof: a supported match reaches the candidate endpoint,
+    # never the final-alert endpoint, and marking processed is last.
+    original_functions = {
+        "download_file": download_file,
+        "extract_teacher_audio": extract_teacher_audio,
+        "get_model": get_model,
+        "persist_transcript_segments": persist_transcript_segments,
+        "get_active_rules": get_active_rules,
+        "create_candidate": create_candidate,
+        "mark_processed": mark_processed,
+    }
+    calls = []
+
+    class FakeModel:
+        def transcribe(self, _path):
+            return iter([
+                SimpleNamespace(
+                    start=2.0,
+                    end=5.0,
+                    text="Please talk to your mother",
+                    avg_logprob=-0.2,
+                    no_speech_prob=0.01,
+                )
+            ]), SimpleNamespace(language="en")
+
+    try:
+        globals()["download_file"] = lambda _url, path: (calls.append("download"), open(path, "wb").write(b"x"))
+        globals()["extract_teacher_audio"] = lambda _source, _target, _index: calls.append("extract")
+        globals()["get_model"] = lambda: FakeModel()
+        globals()["persist_transcript_segments"] = lambda *_args: calls.append("persist")
+        globals()["get_active_rules"] = lambda: [{"id": "rule-parent", "phrase": "mother", "isActive": True}]
+        globals()["create_candidate"] = lambda *args: (calls.append(("candidate", args[1], args[2], args[3], args[4])), {"status": "Pending"})[1]
+        globals()["mark_processed"] = lambda *_args: calls.append("processed")
+        assert process_recording({
+            "recordingId": "recording-proof",
+            "fileName": "proof.mp4",
+            "startedAtUtc": "2026-08-29T00:00:00Z",
+            "presignedUrl": "https://example.invalid/proof.mp4",
+            "audioLayoutVersion": 1,
+            "teacherAudioTrackIndex": 1,
+            "teacherAudioProvenanceStatus": "Proven",
+        })
+    finally:
+        globals().update(original_functions)
+
+    assert calls == [
+        "download", "extract", "persist",
+        ("candidate", "rule-parent", 1, 2.0, 5.0), "processed",
+    ]
+
     print("QA_WORKER_TRANSCRIPT_INDEX_OK")
     print("QA_WORKER_CROSS_SEGMENT_MATCH_OK")
     print("QA_WORKER_RULE_LINK_OK")
@@ -730,6 +892,7 @@ def run_self_test():
     print("QA_WORKER_SEGMENT_PAYLOAD_OK")
     print("QA_WORKER_UNICODE_OUTPUT_OK")
     print("QA_WORKER_TEACHER_AUDIO_PROVENANCE_OK")
+    print("QA_WORKER_CANDIDATE_ONLY_ORDER_OK")
     print("QA_WORKER_SELF_TEST_OK")
 
 

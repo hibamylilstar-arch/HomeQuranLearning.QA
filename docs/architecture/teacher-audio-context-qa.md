@@ -2,9 +2,11 @@
 
 ## Status
 
-7A-5A is released at `a67ff8a` under the approved high-risk scope. The additive
-recording provenance slice is closed; 7A-5B candidate persistence and 7A-5C
-multilingual classification remain separate future phases.
+7A-5A is released at `a67ff8a` under the approved high-risk scope and 7A-5B
+candidate persistence is closed. 7A-5C is in progress with a deterministic,
+versioned lexical baseline and reproducible synthetic evaluation. It remains
+fail-closed: Arabic-recitation windows and isolated ambiguous tokens produce
+no candidate, and only candidate review can create a final alert.
 
 ## Problem proven from current source
 
@@ -264,12 +266,18 @@ does-not-equal-alert tests, browser review proof and retention-isolation tests.
 ### 7A-5C — multilingual classifier and evaluation
 
 - Add windowed VAD/transcription, language/recitation and intent decisions with
-  versioned outputs.
+  versioned outputs. The current baseline consumes timestamped Whisper speech
+  segments, applies Unicode/script and surrounding-vocabulary decisions, and
+  posts only to `/api/worker/qa-candidates`.
 - Establish an approved synthetic/test corpus for Arabic Quran/Qaida,
   Urdu/Hindi, English and mixed speech, including `fee`/`fi` ambiguity.
 - Tune thresholds from measured precision/recall; never claim zero false
   positives or zero missed evidence.
 - Add random audit sampling of non-candidate windows to estimate missed events.
+
+The checked-in baseline corpus and evaluator are under
+`spikes/SttSpike/qa_classifier_eval.py`. Its metrics are synthetic-policy
+coverage only and are not a production accuracy claim.
 
 Required proof: reproducible evaluation report, Arabic-recitation exclusion,
 parent/off-lesson positive cases, allowed-lesson negative cases, mixed/uncertain

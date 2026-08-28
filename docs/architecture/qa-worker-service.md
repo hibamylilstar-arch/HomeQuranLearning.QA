@@ -26,11 +26,14 @@ Do not treat this worker as unused experimental code unless deployment wiring is
 GET  /api/worker/recordings/pending
 POST /api/worker/recordings/{recordingId}/mark-qa-processed
 GET  /api/worker/qa-rules
-POST /api/worker/qa-alerts
+POST /api/worker/qa-candidates
 POST /api/worker/recordings/{recordingId}/transcript-segments
 ```
 
 Worker authentication uses `X-Api-Key`.
+
+`/api/worker/qa-alerts` remains a backend compatibility endpoint for confirmed
+review actions; the worker does not call it directly.
 
 ## Phase 7A-1 behavior
 
@@ -38,9 +41,9 @@ Worker authentication uses `X-Api-Key`.
 - download MP4
 - transcribe with reused faster-whisper model
 - normalize/index transcript segments
-- evaluate active QA rules
-- map match to speech timing
-- create alert with exact `QaRuleId`
+- evaluate active QA rules against timestamped teacher-track context windows
+- classify language/recitation and allowed-vs-suspicious intent
+- persist a deterministic review candidate only when context is sufficiently supported
 - mark processed only after QA path succeeds
 
 Failure leaves the recording pending.
@@ -65,8 +68,10 @@ findings.
 7A-5A now provides a discrete teacher-microphone track and fail-closed
 provenance validation in the same MP4. The worker extracts only the declared
 track and rejects legacy, missing, unavailable or undecodable teacher audio.
-Multilingual/recitation-aware windowing and the human-confirmed candidate
-lifecycle remain later slices. See `teacher-audio-context-qa.md`.
+The 7A-5C baseline is deterministic and fail-closed: Arabic-recitation windows,
+isolated ambiguous tokens and uncertain contexts do not create candidates.
+Candidates are never final alerts; only authorized human confirmation creates a
+linked QA alert. See `teacher-audio-context-qa.md`.
 
 ## Phase 7A-1 proof
 

@@ -85,8 +85,6 @@ services:
     image: postgres:16-alpine
     container_name: academy-postgres
     restart: unless-stopped
-    env_file:
-      - .env.production
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -100,6 +98,11 @@ services:
       retries: 5
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   redis:
     image: redis:7-alpine
@@ -114,14 +117,17 @@ services:
       retries: 5
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   minio:
     image: minio/minio:latest
     container_name: academy-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
-    env_file:
-      - .env.production
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -134,6 +140,11 @@ services:
       retries: 5
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   api:
     build:
@@ -145,6 +156,7 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       HttpsRedirection__Enabled: "false"
+      RecordingRetention__Enabled: "false"
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       AgentApiKey: ${AGENT_API_KEY}
       WorkerApiKey: ${WORKER_API_KEY}
@@ -165,6 +177,11 @@ services:
         condition: service_healthy
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   dashboard:
     build:
@@ -179,6 +196,11 @@ services:
       - api
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   worker:
     build:
@@ -196,15 +218,23 @@ services:
       - api
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.11.3-alpine
     container_name: academy-caddy
     restart: unless-stopped
     environment:
       ACADEMY_HOST: ${ACADEMY_HOST}
+      ACME_EMAIL: ${ACME_EMAIL}
+      PILOT_ALLOWED_CIDRS: ${PILOT_ALLOWED_CIDRS}
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -214,6 +244,11 @@ services:
       - dashboard
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
 volumes:
   postgres_data:
@@ -232,16 +267,54 @@ networks:
 # Caddyfile
 # ---------------------------------------------------------------
 $caddyfile = @'
-http://{$ACADEMY_HOST} {
-    handle /api/* {
-        reverse_proxy api:8080
+{
+    email {$ACME_EMAIL}
+
+    servers {
+        0rtt off
+    }
+}
+
+{$ACADEMY_HOST} {
+    tls {
+        issuer acme {
+            profile shortlived
+            disable_tlsalpn_challenge
+        }
     }
 
-    handle {
-        reverse_proxy dashboard:3000
+    @pilotAllowed remote_ip {$PILOT_ALLOWED_CIDRS}
+
+    handle @pilotAllowed {
+        handle /api/* {
+            reverse_proxy api:8080
+        }
+
+        handle /health {
+            reverse_proxy api:8080
+        }
+
+        handle {
+            reverse_proxy dashboard:3000
+        }
+    }
+
+    respond "Access denied" 403
+
+    header {
+        -Server
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "camera=(), geolocation=(), microphone=()"
     }
 
     encode gzip
+
+    log {
+        output stdout
+        format json
+    }
 }
 '@
 
@@ -257,8 +330,15 @@ POSTGRES_USER=academy
 POSTGRES_PASSWORD=CHANGE_ME_STRONG_DB_PASSWORD
 POSTGRES_DB=homequranlearning_qa
 
-# Public VPS IPv4 used for temporary HTTP staging. Replace with the real IP.
+# Public VPS IPv4 used for the HTTPS real-academy pilot. Replace with the real IP.
 ACADEMY_HOST=203.0.113.10
+
+# Let's Encrypt account contact. Use an actively monitored address.
+ACME_EMAIL=operations@example.com
+
+# Exact public /32 addresses allowed to reach the pilot. Separate entries with spaces.
+# Include the Owner/Admin review location and every approved teacher-laptop network.
+PILOT_ALLOWED_CIDRS=203.0.113.20/32 203.0.113.21/32
 
 MINIO_ROOT_USER=academy_minio
 MINIO_ROOT_PASSWORD=CHANGE_ME_STRONG_MINIO_PASSWORD
@@ -278,6 +358,7 @@ SEED_OWNER_PASSWORD=CHANGE_ME_STRONG_OWNER_PASSWORD
 # ---------------------------------------------------------------
 $requirements = @'
 faster-whisper==1.2.1
+av==18.1.0
 '@
 
 # Write all files

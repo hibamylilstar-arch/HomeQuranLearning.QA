@@ -6,6 +6,12 @@ import Image from "next/image";
 import { useAuth } from "@/components/AuthProvider";
 import { loginUser } from "@/lib/auth";
 
+const platformFeatures = [
+  "Live classroom oversight",
+  "Attendance and session intelligence",
+  "Human-reviewed quality evidence",
+];
+
 export default function LoginPage() {
   const router = useRouter();
   const { setUser } = useAuth();
@@ -31,15 +37,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="relative flex min-h-screen min-h-[100svh] justify-center overflow-x-hidden overflow-y-auto bg-slate-950 px-3 py-3 sm:px-6 sm:py-6 lg:px-8">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-32 top-[-9rem] h-96 w-96 rounded-full bg-emerald-500/10 blur-3xl" />
         <div className="absolute -bottom-44 right-[-7rem] h-[30rem] w-[30rem] rounded-full bg-blue-700/15 blur-3xl" />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.035)_1px,transparent_1px)] bg-[size:48px_48px]" />
       </div>
 
-      <div className="relative grid w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900/90 shadow-2xl shadow-black/40 backdrop-blur-xl lg:grid-cols-[1.08fr_0.92fr]">
-        <section className="relative hidden min-h-[640px] overflow-hidden border-r border-white/10 bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950 p-12 lg:flex lg:flex-col lg:justify-between">
+      <div className="relative my-auto grid w-full max-w-5xl overflow-hidden rounded-2xl border border-white/10 bg-slate-900/90 shadow-2xl shadow-black/40 backdrop-blur-xl sm:rounded-3xl lg:grid-cols-[1.08fr_0.92fr]">
+        <section className="relative hidden min-h-0 overflow-hidden border-r border-white/10 bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950 p-8 lg:flex lg:flex-col lg:justify-between xl:p-12">
           <div className="absolute right-[-7rem] top-20 h-72 w-72 rounded-full border border-amber-400/15" />
           <div className="absolute right-[-4rem] top-32 h-52 w-52 rounded-full border border-emerald-400/15" />
 
@@ -68,11 +74,7 @@ export default function LoginPage() {
           </div>
 
           <div className="relative grid gap-3">
-            {[
-              "Live classroom oversight",
-              "Attendance and session intelligence",
-              "Human-reviewed quality evidence",
-            ].map((item) => (
+            {platformFeatures.map((item) => (
               <div key={item} className="flex items-center gap-3 text-sm text-slate-300">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-400/10 text-xs text-emerald-300">
                   ✓
@@ -83,7 +85,7 @@ export default function LoginPage() {
           </div>
         </section>
 
-        <section className="flex min-h-[640px] flex-col justify-center bg-white px-6 py-12 sm:px-12 lg:px-14">
+        <section className="flex min-h-0 flex-col justify-center bg-white px-6 py-8 sm:px-10 sm:py-10 lg:px-10 xl:px-14 xl:py-12">
           <div className="mx-auto w-full max-w-sm">
             <div className="mb-8 flex items-center gap-4 lg:hidden">
               <div className="h-16 w-16 overflow-hidden rounded-full ring-1 ring-slate-200 shadow-md">
@@ -163,6 +165,17 @@ export default function LoginPage() {
               <p className="mt-3 text-xs font-medium text-slate-400">
                 System engineering by Abdul Wahid
               </p>
+
+              <div className="mt-5 grid gap-2 border-t border-slate-100 pt-5 sm:grid-cols-3 lg:hidden">
+                {platformFeatures.map((item) => (
+                  <div key={item} className="flex items-start gap-2 text-[11px] leading-4 text-slate-500">
+                    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-[9px] text-emerald-700">
+                      ✓
+                    </span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>

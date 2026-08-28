@@ -1,10 +1,8 @@
-﻿services:
+services:
   postgres:
     image: postgres:16-alpine
     container_name: academy-postgres
     restart: unless-stopped
-    env_file:
-      - .env.production
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -18,6 +16,11 @@
       retries: 5
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   redis:
     image: redis:7-alpine
@@ -32,14 +35,17 @@
       retries: 5
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   minio:
     image: minio/minio:latest
     container_name: academy-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
-    env_file:
-      - .env.production
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -52,6 +58,11 @@
       retries: 5
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   api:
     build:
@@ -63,6 +74,7 @@
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       HttpsRedirection__Enabled: "false"
+      RecordingRetention__Enabled: "false"
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       AgentApiKey: ${AGENT_API_KEY}
       WorkerApiKey: ${WORKER_API_KEY}
@@ -83,6 +95,11 @@
         condition: service_healthy
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   dashboard:
     build:
@@ -97,6 +114,11 @@
       - api
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   worker:
     build:
@@ -114,15 +136,23 @@
       - api
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.11.3-alpine
     container_name: academy-caddy
     restart: unless-stopped
     environment:
       ACADEMY_HOST: ${ACADEMY_HOST}
+      ACME_EMAIL: ${ACME_EMAIL}
+      PILOT_ALLOWED_CIDRS: ${PILOT_ALLOWED_CIDRS}
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -132,6 +162,11 @@
       - dashboard
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
 volumes:
   postgres_data:

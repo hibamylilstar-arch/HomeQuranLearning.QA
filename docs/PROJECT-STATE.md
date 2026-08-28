@@ -8,21 +8,21 @@ Chat history is not authoritative. Repository state + this file are the durable 
 
 ## Canonical checkpoint
 
-- Branch: `codex/vps-staging-preparation`
-- Current phase base commit: `a983841` (7A-5C closure; VPS-preparation branch base)
+- Branch: `codex/real-data-vps-pilot`
+- Current phase base commit: `f4426c1` (VPS-preparation/login-copy closure)
 - S1 implementation commit: `ca18589d2d027a07b300cc86fbeadda49540f968`
 - S1 closure commit: `c68f6e2b5f6088447243afa494e17eeb7716748a`
 - S1.1 release parent: `a97cd465cef4811b58491a781eb5e02fc63771e6`
 - Origin: 7A-6 implementation was pushed at `e638e635261830ce8e1af8af41e80d835149563d`
-- Subject: `VPS staging and production preparation`
+- Subject: `Secured real-data VPS pilot preparation and responsive login`
 - Latest closed product phase: `7A-5C — multilingual QA classifier and evaluation`
 - Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
-- Current product phase: `VPS staging and production preparation`
-- Current phase status: `CLOSED`
-- Next engineering gate: next phase discussion; no VPS access or deployment action starts without `GO`
+- Current product phase: `Secured real-data VPS pilot preparation`
+- Current phase status: `WAITING_RELEASE_APPROVAL`
+- Next engineering gate: Owner release review; no staging, commit or push before exact `APPROVE`
 - Waiting human test: no
-- Waiting release approval: no
-- Last verified checkpoint: branded direct-IP VPS staging preparation was committed and pushed at `20f2fdb0de75a395717a9de86b7b28703278e5b0`
+- Waiting release approval: yes
+- Last verified checkpoint: secured public-IPv4 HTTPS pilot configuration, package guardrails, responsive login and the complete local release gates are GREEN; changes remain unstaged on `codex/real-data-vps-pilot`
 - Tests already passed for S1.1: targeted deleted-recording regression 1/1; full unit 76/76; integration 2/2; Agent 1/1; full solution build GREEN with 0 warnings and 0 errors; runtime HTTP Deleted 400 / Uploaded 200 proof GREEN; final diff/status review and `git diff --check` GREEN
 - Dashboard gates completed: full dashboard lint/build, backend unit/integration gates, authenticated session-evidence API proof, role-scope proof, authenticated browser evidence-timeline/filter proof and final runtime cleanup
 - 7A-2 gates completed: worker self-test 6/6 markers; full unit tests 81/81; integration tests 3/3; full solution build 0 warnings/0 errors; local API persistence/retry proof; exact proof-row cleanup and baseline restoration; runtime OFF
@@ -44,11 +44,12 @@ Chat history is not authoritative. Repository state + this file are the durable 
 - 7A-6 browser proof completed (2026-08-29): authenticated Owner dashboard loaded Attendance Report; status cards rendered, Present card changed the operational filter, Teacher Attendance tab activated, empty-state table rendered safely, and browser console error count was 0. Dashboard/API remain available for Owner inspection; no test data was created.
 - 7A-5C implementation checkpoint (2026-08-29): the production-wired `spikes/SttSpike/qa_worker.py` now extracts timestamped teacher-track context windows, applies the versioned `7A-5C-lexical-v1` fail-closed classifier, and posts review candidates to `/api/worker/qa-candidates`; it no longer creates final alerts directly. Arabic-recitation windows and isolated `fee`/`fi` tokens are excluded, while supported parent/contact/financial contexts become candidates. The checked-in 10-case synthetic corpus reports TP=4, FP=0, TN=6, FN=0 (policy coverage only, not a production accuracy claim). Python compile, classifier self-test, evaluator and worker candidate-only-order self-test are GREEN; Docker worker now copies the classifier module. Released in `411bbac`.
 - VPS preparation checkpoint (2026-08-29): Owner approved high-risk VPS staging/production preparation and selected direct public-IPv4 HTTP staging before domain/TLS. The production Compose now routes only through Caddy port 80, keeps API/dashboard ports internal, uses an environment-supplied IPv4 host, and explicitly disables API HTTPS redirection for this bounded staging mode. Commercial branding is `Home Quran Learning Operations Suite`; the Admin/Manager entry surface is `Operations & Quality Console`, the laptop package identity is `Home Quran Learning Classroom Agent`, and the developer credit is `Abdul Wahid`. The supplied academy logo is shown through a circular crop without the source image's white square. Login browser proof, console-error check, Compose config, secure-value validator, PowerShell parser, dashboard lint/build, Release solution build (0 warnings/errors), unit 87/87 and integration 5/5 are GREEN. No VPS, DNS, database, recording or secret was mutated. Direct-IP staging is synthetic/test-only because credentials and Agent API keys are not encrypted in transit. Released in `20f2fdb`.
+- Real-data VPS pilot preparation checkpoint (2026-08-29): Owner explicitly approved `APPROVE HIGH-RISK REAL-DATA VPS PILOT`. Direct public IPv4 now uses Caddy `2.11.3` with publicly trusted short-lived ACME certificates, HTTPS 443, HTTP-01 renewal, exact public `/32` source allowlisting and private API/dashboard/data services. Production Compose disables automated recording retention because deletion of real recordings needs a separate approval, and every service has bounded Docker logs. Validators reject private/documentation hosts, broad CIDRs, placeholder/weak/reused secrets, unexpected public ports, unpinned Caddy, invalid syntax, enabled retention and public-HTTP pilot packages. The pilot Agent package requires HTTPS and is treated as credential-bearing. The login page now scrolls safely on short screens and exposes all feature text on mobile/tablet. Browser proof passed at 320x568, 360x568, 768x1024 and 1366x650 with zero horizontal overflow and zero console errors; dashboard lint/build, Release solution build (0 warnings/errors), unit 87/87, integration 5/5, PowerShell parsing, deployment self-test and generator sync are GREEN. The Owner VPS was reachable through an Owner terminal, but Codex has no non-interactive SSH authentication; no remote file, service, firewall, database, recording, secret or deployment was changed. The requested old VPS project copy remains untouched until an exact read-only active-path/mount/volume inventory proves a safe retirement target.
 - S1.1 release files: `docs/PROJECT-STATE.md`, `src/Backend/Academy.Api/Program.cs`, `src/Backend/Academy.Application/Exceptions/RecordingUnavailableException.cs`, `src/Backend/Academy.Application/Services/RecordingService.cs`, `tests/Academy.UnitTests/RecordingServiceTests.cs`
 - Temporary data: all 7A-4 automated and physical proof rows/objects/devices were removed by exact identity; the current recordings baseline is the two Owner-approved retained controls
 - Product runtime expected after latest proof: OFF
 
-S1, S1.1, S1.2, dashboard operational hardening, 7A-2, 7A-3, 7A-4, 7A-5A, 7A-5B, 7A-5C, 7A-6 and VPS direct-IP staging preparation are CLOSED after full validation, Owner approval and push.
+S1, S1.1, S1.2, dashboard operational hardening, 7A-2, 7A-3, 7A-4, 7A-5A, 7A-5B, 7A-5C, 7A-6 and VPS direct-IP staging preparation are CLOSED after full validation, Owner approval and push. Secured real-data VPS pilot preparation is `WAITING_RELEASE_APPROVAL` and remains unstaged.
 
 ## Current runtime snapshot
 

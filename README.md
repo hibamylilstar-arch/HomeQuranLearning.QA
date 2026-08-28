@@ -15,13 +15,13 @@ Private internal QA, attendance and monitoring platform for the HomeQuranLearnin
 
 ## Current checkpoint
 
-`a983841 docs: close 7A-5C classifier checkpoint`
+`f4426c1 fix(dashboard): refine login role copy`
 
 Latest closed phase: `7A-5C — multilingual QA classifier and evaluation`
 
-Latest released phase: `VPS direct-IP staging preparation and commercial branding` (`20f2fdb`).
+Latest released phase: `VPS direct-IP staging preparation and commercial branding` (`20f2fdb`, closure at `f4426c1`).
 
-Next action: discuss the next phase. VPS staging execution does not begin until the Owner replies `GO`; see `docs/operations/vps-staging-runbook.md`.
+Current phase: secured real-data VPS pilot preparation is `WAITING_RELEASE_APPROVAL`. It adds public-IP HTTPS, exact source allowlisting, hardened package/config validation and responsive login proof. No remote deployment or old-VPS-folder deletion has occurred; see `docs/operations/vps-staging-runbook.md`.
 
 ## Important documentation
 
@@ -38,9 +38,10 @@ Next action: discuss the next phase. VPS staging execution does not begin until 
 
 ## Development policy
 
-The project is local-first during development. VPS staging is now authorized, but
-production activation remains a separate release decision with measured backup,
-retention, multi-laptop and rollback proof.
+Local approved branches remain the engineering source. A bounded real-academy
+VPS pilot is authorized, but release, deployment, retention, expansion and final
+production activation remain evidence-based gates with measured backup, storage,
+accuracy and rollback proof.
 
 Do not push major-phase changes without a completed validation summary and explicit owner approval.
 

@@ -62,3 +62,25 @@ Status: accepted 2026-08-28.
   immediate silent deletion; it requires a safe deferred impact evaluation.
 - Capacity expansion must allow retention to increase without a product code
   change.
+
+## PILOT-001 — Secured real-academy VPS pilot
+
+Status: accepted 2026-08-29; supersedes synthetic-only direct-IP staging.
+
+- The approved VPS pilot uses real academy sessions from a bounded cohort of
+  four or five authorized teacher laptops.
+- Domain registration remains deferred, but real credentials, Agent traffic,
+  recordings and evidence require publicly trusted HTTPS for the VPS IPv4
+  address. Plain HTTP and certificate-bypass behavior are prohibited.
+- Access is restricted to exact approved public IPv4 `/32` sources during the
+  pilot. Only the reverse proxy publishes host application ports.
+- Rollout is one laptop first, then one additional laptop at a time after device
+  identity, heartbeat, headset provenance, upload, playback, worker, scope and
+  recovery proof.
+- Authorized humans review candidates and sampled no-candidate windows. Report
+  false positives and false negatives; do not claim production accuracy or
+  create automatic disciplinary findings from the classifier.
+- Pilot evidence is a secondary monitoring copy, not the academy's sole system
+  of record.
+- Automated retention/deletion of real recordings stays disabled until a
+  separate high-risk approval follows a dry-run impact and preservation review.

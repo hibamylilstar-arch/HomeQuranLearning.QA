@@ -1,11 +1,49 @@
-http://{$ACADEMY_HOST} {
-    handle /api/* {
-        reverse_proxy api:8080
+{
+    email {$ACME_EMAIL}
+
+    servers {
+        0rtt off
+    }
+}
+
+{$ACADEMY_HOST} {
+    tls {
+        issuer acme {
+            profile shortlived
+            disable_tlsalpn_challenge
+        }
     }
 
-    handle {
-        reverse_proxy dashboard:3000
+    @pilotAllowed remote_ip {$PILOT_ALLOWED_CIDRS}
+
+    handle @pilotAllowed {
+        handle /api/* {
+            reverse_proxy api:8080
+        }
+
+        handle /health {
+            reverse_proxy api:8080
+        }
+
+        handle {
+            reverse_proxy dashboard:3000
+        }
+    }
+
+    respond "Access denied" 403
+
+    header {
+        -Server
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "camera=(), geolocation=(), microphone=()"
     }
 
     encode gzip
+
+    log {
+        output stdout
+        format json
+    }
 }

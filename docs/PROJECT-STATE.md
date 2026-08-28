@@ -18,8 +18,8 @@ Chat history is not authoritative. Repository state + this file are the durable 
 - Latest closed product phase: `7A-5A — teacher-audio provenance implementation`
 - Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
 - Current product phase: `7A-6 — attendance operations/reporting`
-- Current phase status: `CLOSED`
-- Next engineering gate: next phase discussion; 7A-5C classifier remains deferred
+- Current phase status: `WAITING_RELEASE_APPROVAL`
+- Next engineering gate: Owner approval for the completed attendance browser-proof phase
 - Waiting human test: no
 - Waiting release approval: no
 - Last verified checkpoint: 7A-6 was fully verified and pushed at `e638e635`; closure documentation is synchronized
@@ -41,6 +41,7 @@ Chat history is not authoritative. Repository state + this file are the durable 
 - 7A-5A headset proof completed (2026-08-29): controlled Agent run selected `Headset (pro2)`, reported `TeacherAudioStatus: Proven`, finalized a 30.592-second two-track MP4, uploaded it successfully through the local API, and PyAV extracted the declared teacher track to 16 kHz mono WAV. Exact six proof recordings/objects and 12 generated heartbeats were removed; baseline returned to recordings 2, devices 3, heartbeats 1361, audio gaps 0. The Owner-requested headset verification is now complete.
 - 7A-5B candidate foundation gates completed (2026-08-29): proven layout-1 teacher-track candidates now persist with policy/analysis versions, deterministic idempotency, trigger plus ±10-second context, transcript/language/intent/confidence and review audit fields. Owner/Admin and assigned-Manager scoped APIs expose candidates; Confirm alone creates a linked QA alert and Dismiss creates none. Unit tests 87/87, integration tests 5/5, Release build 0 warnings/0 errors, EF migration `20260828201740_AddQaCandidates` applied, dashboard production build and TypeScript checks GREEN; DB baseline remains recordings 2, devices 3, coverage gaps 0, candidates 0. Runtime remains OFF.
 - 7A-6 attendance operations gates completed (2026-08-29): daily report now includes teacher attendance status and the complete completed-session list while preserving reducer semantics. Dashboard adds clickable status cards, Student Attendance and Teacher Attendance tabs, search/status filters, evidence detail table and 30-second refresh. Backend unit tests 87/87, integration tests 5/5, Release build 0 warnings/0 errors, dashboard lint/TypeScript/production build GREEN. No migration or runtime data mutation required.
+- 7A-6 browser proof completed (2026-08-29): authenticated Owner dashboard loaded Attendance Report; status cards rendered, Present card changed the operational filter, Teacher Attendance tab activated, empty-state table rendered safely, and browser console error count was 0. Dashboard/API remain available for Owner inspection; no test data was created.
 - S1.1 release files: `docs/PROJECT-STATE.md`, `src/Backend/Academy.Api/Program.cs`, `src/Backend/Academy.Application/Exceptions/RecordingUnavailableException.cs`, `src/Backend/Academy.Application/Services/RecordingService.cs`, `tests/Academy.UnitTests/RecordingServiceTests.cs`
 - Temporary data: all 7A-4 automated and physical proof rows/objects/devices were removed by exact identity; the current recordings baseline is the two Owner-approved retained controls
 - Product runtime expected after latest proof: OFF

@@ -169,7 +169,10 @@ public sealed class DailyAttendanceReportService
                 confirmedAbsences,
 
             UnresolvedSessions =
-                unresolvedSessions
+                unresolvedSessions,
+
+            Sessions =
+                dailySessions.Select(MapItem).ToList()
         };
     }
 
@@ -210,6 +213,10 @@ public sealed class DailyAttendanceReportService
 
             StudentAttendanceStatus =
                 session.StudentAttendanceStatus
+                    .ToString(),
+
+            TeacherAttendanceStatus =
+                session.TeacherAttendanceStatus
                     .ToString(),
 
             AttendanceReviewStatus =

@@ -33,6 +33,12 @@ public sealed class DailyAttendanceReportDto
         get;
         init;
     } = Array.Empty<DailyAttendanceReportItemDto>();
+
+    public IReadOnlyList<DailyAttendanceReportItemDto> Sessions
+    {
+        get;
+        init;
+    } = Array.Empty<DailyAttendanceReportItemDto>();
 }
 
 public sealed class DailyAttendanceReportItemDto
@@ -56,6 +62,8 @@ public sealed class DailyAttendanceReportItemDto
     public DateTimeOffset ScheduledEndUtc { get; init; }
 
     public string StudentAttendanceStatus { get; init; } = string.Empty;
+
+    public string TeacherAttendanceStatus { get; init; } = string.Empty;
 
     public string AttendanceReviewStatus { get; init; } = string.Empty;
 

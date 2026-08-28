@@ -188,6 +188,7 @@ export interface DailyAttendanceReportItem {
   scheduledStartUtc: string;
   scheduledEndUtc: string;
   studentAttendanceStatus: string;
+  teacherAttendanceStatus: string;
   attendanceReviewStatus: string;
   attendanceNotes?: string | null;
   activeSeconds: number;
@@ -208,4 +209,5 @@ export interface DailyAttendanceReport {
   pendingReviewSessions: number;
   confirmedAbsences: DailyAttendanceReportItem[];
   unresolvedSessions: DailyAttendanceReportItem[];
+  sessions: DailyAttendanceReportItem[];
 }

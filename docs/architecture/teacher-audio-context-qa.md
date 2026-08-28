@@ -2,9 +2,9 @@
 
 ## Status
 
-7A-5A is implemented locally under the approved high-risk scope. The additive
-recording provenance slice is release-gated; 7A-5B candidate persistence and
-7A-5C multilingual classification remain separate future phases.
+7A-5A is released at `a67ff8a` under the approved high-risk scope. The additive
+recording provenance slice is closed; 7A-5B candidate persistence and 7A-5C
+multilingual classification remain separate future phases.
 
 ## Problem proven from current source
 
@@ -231,7 +231,7 @@ silently bundled into audio capture work.
 
 ## Implementation slices and gates
 
-### 7A-5A — audio provenance (implemented locally; release pending)
+### 7A-5A — audio provenance (closed at `a67ff8a`)
 
 - Add microphone endpoint selection and capture with hot-plug recovery.
 - Produce primary mixed audio plus discrete teacher track in the same MP4.

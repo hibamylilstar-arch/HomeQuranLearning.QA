@@ -8,7 +8,7 @@ Canonical checkpoint:
 - Current phase base: `ee42315`
 - Latest closed product phase: `7A-4 — controlled local multi-laptop readiness`
 - Current product phase: `7A-5 — teacher-audio provenance and context-aware multilingual QA`
-- Phase status: `WAITING_RELEASE_APPROVAL`; dashboard operational hardening is released at `e127a19`, 7A-2 at `f4617e0`, 7A-3 at `a2b8aae` and 7A-4 at `ee42315`.
+- Phase status: `CLOSED`; dashboard operational hardening is released at `e127a19`, 7A-2 at `f4617e0`, 7A-3 at `a2b8aae`, 7A-4 at `ee42315` and 7A-5A at `a67ff8a`.
 - Current QA limitation: legacy layout-0 recordings capture system/loopback audio only and remain non-attributable. The approved 7A-5A slice now adds and persists proven teacher-microphone provenance for new layout-1 recordings; built-in-mic and real `Headset (pro2)` pipeline proofs are complete. Candidate/classifier work has not started.
 
 Canonical resumable state: `docs/PROJECT-STATE.md`

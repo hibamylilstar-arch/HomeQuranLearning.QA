@@ -109,7 +109,7 @@ export default function LoginPage() {
               Welcome back
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Sign in with your authorized Owner, Admin or Manager account.
+              Sign in with your authorized Admin or Manager account.
             </p>
 
             <form onSubmit={handleSubmit} className="mt-9 space-y-5">

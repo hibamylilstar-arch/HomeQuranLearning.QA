@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -36,9 +37,17 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen: boo
       {mobileOpen && <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />}
 
       <aside className={"fixed inset-y-0 left-0 z-50 w-64 transform bg-slate-950 border-r border-slate-800 text-slate-300 transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 " + (mobileOpen ? "translate-x-0" : "-translate-x-full") + " flex flex-col"}>
-        <div className="flex h-16 shrink-0 flex-col justify-center border-b border-slate-800 px-6 bg-slate-950">
-          <span className="text-sm font-bold text-white tracking-wide uppercase">QA Monitoring</span>
-          <span className="text-[10px] uppercase tracking-wider text-emerald-500 font-bold">Enterprise Suite</span>
+        <div className="flex h-16 shrink-0 items-center justify-center border-b border-slate-800 bg-slate-950">
+          <div className="h-12 w-12 overflow-hidden rounded-full" aria-label="Home Quran Learning Operations Suite">
+            <Image
+              src="/branding/homequranlearning-logo.jpg"
+              alt="Home Quran Learning — Learn with Faith"
+              width={64}
+              height={64}
+              priority
+              className="h-full w-full scale-[1.12] object-cover"
+            />
+          </div>
         </div>
 
         <div className="flex flex-1 flex-col overflow-y-auto px-3 py-4 custom-scrollbar bg-slate-950">

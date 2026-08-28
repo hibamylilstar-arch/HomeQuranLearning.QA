@@ -143,6 +143,8 @@ services:
     restart: unless-stopped
     environment:
       ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HttpsRedirection__Enabled: "false"
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       AgentApiKey: ${AGENT_API_KEY}
       WorkerApiKey: ${WORKER_API_KEY}
@@ -161,8 +163,6 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    ports:
-      - "8080:8080"
     networks:
       - academy
 
@@ -177,8 +177,6 @@ services:
       NODE_ENV: production
     depends_on:
       - api
-    ports:
-      - "3000:3000"
     networks:
       - academy
 
@@ -199,11 +197,31 @@ services:
     networks:
       - academy
 
+  caddy:
+    image: caddy:2-alpine
+    container_name: academy-caddy
+    restart: unless-stopped
+    environment:
+      ACADEMY_HOST: ${ACADEMY_HOST}
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - dashboard
+    networks:
+      - academy
+
 volumes:
   postgres_data:
   redis_data:
   minio_data:
   worker_hf_cache:
+  caddy_data:
+  caddy_config:
 
 networks:
   academy:
@@ -214,7 +232,7 @@ networks:
 # Caddyfile
 # ---------------------------------------------------------------
 $caddyfile = @'
-qa.homequranlearning.com {
+http://{$ACADEMY_HOST} {
     handle /api/* {
         reverse_proxy api:8080
     }
@@ -238,6 +256,9 @@ $envProduction = @'
 POSTGRES_USER=academy
 POSTGRES_PASSWORD=CHANGE_ME_STRONG_DB_PASSWORD
 POSTGRES_DB=homequranlearning_qa
+
+# Public VPS IPv4 used for temporary HTTP staging. Replace with the real IP.
+ACADEMY_HOST=203.0.113.10
 
 MINIO_ROOT_USER=academy_minio
 MINIO_ROOT_PASSWORD=CHANGE_ME_STRONG_MINIO_PASSWORD

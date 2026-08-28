@@ -61,6 +61,8 @@
     restart: unless-stopped
     environment:
       ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HttpsRedirection__Enabled: "false"
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       AgentApiKey: ${AGENT_API_KEY}
       WorkerApiKey: ${WORKER_API_KEY}
@@ -79,8 +81,6 @@
         condition: service_healthy
       minio:
         condition: service_healthy
-    ports:
-      - "8080:8080"
     networks:
       - academy
 
@@ -95,8 +95,6 @@
       NODE_ENV: production
     depends_on:
       - api
-    ports:
-      - "3000:3000"
     networks:
       - academy
 
@@ -117,11 +115,31 @@
     networks:
       - academy
 
+  caddy:
+    image: caddy:2-alpine
+    container_name: academy-caddy
+    restart: unless-stopped
+    environment:
+      ACADEMY_HOST: ${ACADEMY_HOST}
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - dashboard
+    networks:
+      - academy
+
 volumes:
   postgres_data:
   redis_data:
   minio_data:
   worker_hf_cache:
+  caddy_data:
+  caddy_config:
 
 networks:
   academy:

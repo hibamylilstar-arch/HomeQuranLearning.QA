@@ -15,13 +15,13 @@ Private internal QA, attendance and monitoring platform for the HomeQuranLearnin
 
 ## Current checkpoint
 
-`e127a19 fix(dashboard): harden operational monitoring workflows`
+`a983841 docs: close 7A-5C classifier checkpoint`
 
-Latest closed phase: `S1.2 - TeamsHelper startup and lifecycle stabilization`
+Latest closed phase: `7A-5C — multilingual QA classifier and evaluation`
 
-Current engineering phase: `7A-4 — controlled local multi-laptop readiness` (validated; release approval pending).
+Current engineering phase: `VPS staging and production preparation` (high-risk approval received; staging access validation in progress).
 
-Next action: Owner release approval for the validated 7A-4 change set. VPS staging remains deferred.
+Next action: validate the approved production Compose configuration and obtain secure VPS/DNS access facts. See `docs/operations/vps-staging-runbook.md`.
 
 ## Important documentation
 
@@ -38,7 +38,9 @@ Next action: Owner release approval for the validated 7A-4 change set. VPS stagi
 
 ## Development policy
 
-The project is local-first. Production/VPS deployment remains deferred until the planned local product is substantially implemented, tested and stable.
+The project is local-first during development. VPS staging is now authorized, but
+production activation remains a separate release decision with measured backup,
+retention, multi-laptop and rollback proof.
 
 Do not push major-phase changes without a completed validation summary and explicit owner approval.
 

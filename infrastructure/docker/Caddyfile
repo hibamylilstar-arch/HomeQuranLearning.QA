@@ -1,4 +1,4 @@
-﻿qa.homequranlearning.com {
+http://{$ACADEMY_HOST} {
     handle /api/* {
         reverse_proxy api:8080
     }

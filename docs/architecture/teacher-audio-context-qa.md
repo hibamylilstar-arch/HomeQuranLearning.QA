@@ -3,7 +3,7 @@
 ## Status
 
 7A-5A is released at `a67ff8a` under the approved high-risk scope and 7A-5B
-candidate persistence is closed. 7A-5C is in progress with a deterministic,
+candidate persistence is closed. 7A-5C is released at `411bbac` with a deterministic,
 versioned lexical baseline and reproducible synthetic evaluation. It remains
 fail-closed: Arabic-recitation windows and isolated ambiguous tokens produce
 no candidate, and only candidate review can create a final alert.

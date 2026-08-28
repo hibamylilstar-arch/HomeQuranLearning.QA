@@ -8,7 +8,7 @@ Canonical checkpoint:
 - Current phase base: `a4bf911`
 - Latest closed product phase: `7A-6 — attendance operations/reporting`
 - Current product phase: `7A-5 — teacher-audio provenance and context-aware multilingual QA`
-- Phase status: `IN_PROGRESS`; dashboard operational hardening is released at `e127a19`, 7A-2 at `f4617e0`, 7A-3 at `a2b8aae`, 7A-4 at `ee42315`, 7A-5A at `a67ff8a`, 7A-5B candidate persistence is closed, and 7A-6 attendance operations is released.
+- Phase status: `CLOSED`; dashboard operational hardening is released at `e127a19`, 7A-2 at `f4617e0`, 7A-3 at `a2b8aae`, 7A-4 at `ee42315`, 7A-5A at `a67ff8a`, 7A-5B candidate persistence is closed, 7A-5C classifier/evaluation at `411bbac`, and 7A-6 attendance operations is released.
 - Current QA limitation: legacy layout-0 recordings capture system/loopback audio only and remain non-attributable. New layout-1 recordings have proven teacher-microphone provenance. 7A-5C now adds a versioned, fail-closed lexical baseline that classifies timestamped teacher-track windows and posts review candidates only; production accuracy is not yet claimed.
 
 Canonical resumable state: `docs/PROJECT-STATE.md`

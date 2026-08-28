@@ -8,32 +8,32 @@ Chat history is not authoritative. Repository state + this file are the durable 
 
 ## Canonical checkpoint
 
-- Branch: `codex/s1.2-teamshelper-lifecycle`
+- Branch: `codex/dashboard-completion`
 - Base commit: `32202b3b4202515a684373bfbf6500e8a4e7eef7`
 - S1 implementation commit: `ca18589d2d027a07b300cc86fbeadda49540f968`
 - S1 closure commit: `c68f6e2b5f6088447243afa494e17eeb7716748a`
 - S1.1 release parent: `a97cd465cef4811b58491a781eb5e02fc63771e6`
 - Origin: local `main` and `origin/main` synchronized after S1.1 release verification
 - Subject: `fix(recordings): handle unavailable playback cleanly`
-- Latest closed product phase: `S1.1 - deleted recording playback stabilization`
+- Latest closed product phase: `S1.2 - TeamsHelper startup and lifecycle stabilization`
 - Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
-- Current product phase: `S1.2 - TeamsHelper startup and lifecycle stabilization`
+- Current product phase: `Dashboard completion - evidence and operational views`
 - Current phase status: `WAITING_RELEASE_APPROVAL`
-- Next engineering gate: Owner release approval for the completed S1.2 lifecycle stabilization phase
+- Next engineering gate: Owner release approval for the completed dashboard evidence/operational slice
 - Waiting human test: no
 - Waiting release approval: yes
-- Last verified checkpoint: S1.2 baseline captured from clean commit `d8dd5a10bd422b83602f4773381066b596329915`; active user `DESKTOP-PUFUU3U\SAMSUNG` is in session 5; TeamsHelper process count zero; Academy Agent process count zero; no Academy/TeamsHelper scheduled task exists; API/Agent/FFmpeg are OFF
+- Last verified checkpoint: Dashboard phase baseline captured from clean pushed commit `e35ac810f01745d01856798ece764f57dbdc13c4`; API/Agent/FFmpeg are OFF; Docker PostgreSQL, Redis, MinIO, LiveKit, LiveKit Ingress and ingress-manager are running; database counts are sessions=20, session_events=163 and recordings=148
 - Tests already passed for S1.1: targeted deleted-recording regression 1/1; full unit 76/76; integration 2/2; Agent 1/1; full solution build GREEN with 0 warnings and 0 errors; runtime HTTP Deleted 400 / Uploaded 200 proof GREEN; final diff/status review and `git diff --check` GREEN
-- Tests still required for S1.2: launcher/task-definition tests, existing helper probes, Agent tests, full solution build/unit/integration gates, local task/process/pipe restart proof, cleanup and final runtime baseline
+- Dashboard gates completed: full dashboard lint/build, backend unit/integration gates, authenticated session-evidence API proof, role-scope proof, authenticated browser evidence-timeline/filter proof and final runtime cleanup
 - S1.1 release files: `docs/PROJECT-STATE.md`, `src/Backend/Academy.Api/Program.cs`, `src/Backend/Academy.Application/Exceptions/RecordingUnavailableException.cs`, `src/Backend/Academy.Application/Services/RecordingService.cs`, `tests/Academy.UnitTests/RecordingServiceTests.cs`
 - Temporary data: the isolated S1.1 Deleted-recording proof row was removed; proof row count returned to zero and the recordings baseline returned to 148
 - Product runtime expected after latest proof: OFF
 
-S1 and S1.1 are CLOSED after full validation and release approval. S1.2 is complete pending release approval. `7A-2` has not started.
+S1, S1.1 and S1.2 are CLOSED after full validation, owner approval and push. Dashboard completion is now in progress. `7A-2` has not started.
 
 ## Current runtime snapshot
 
-Verified 2026-08-27:
+Verified 2026-08-28:
 
 - `.dev-runtime/Runtime.ps1`: API OFF, Agent OFF, FFmpeg 0
 - Docker: PostgreSQL, Redis, MinIO, LiveKit, LiveKit Ingress and ingress-manager running
@@ -291,7 +291,7 @@ Protected behavior:
 - Uploaded recording presigned-URL behavior is unchanged.
 - Download endpoint behavior, recording lifecycle, storage, LiveKit, Teams, attendance and QA processing semantics are unchanged.
 
-## S1.2 - complete pending release approval
+## S1.2 - closed
 
 Goal:
 
@@ -333,9 +333,29 @@ S1.2 runtime proof completed (2026-08-28):
 - Clean full solution build is GREEN with 0 warnings and 0 errors after stopping the runtime Agent process. Agent lifecycle tests 3/3, unit tests 76/76 and integration tests 2/2 are GREEN. All helper probes remain GREEN.
 - Temporary publish output and earlier AppData test copies are not part of the repository or active task. They remain for explicit cleanup because the current command policy rejected recursive deletion outside the repository; no production data was touched.
 
+Dashboard implementation checkpoint (2026-08-28):
+
+- Added a read-only, role-scoped `/api/admin/sessions/{sessionId}/events` endpoint. It reuses the existing session access policy and returns purpose-limited event fields without exposing idempotency keys.
+- Added dashboard session filters for teacher, student, course/device search, status, student attendance and date, plus a raw session evidence timeline with explicit attendance/SOP separation.
+- Fixed the dashboard authentication lifecycle: login now reads the canonical `/auth/me` profile after the HttpOnly cookie is set, updates the shared AuthProvider state and keeps logout cleanup in a `finally` path. Unauthenticated dashboard routes redirect to `/login`.
+- Pinned the dashboard development script to Next Webpack mode because the local Windows Turbopack runtime reproduced API route 404s; Webpack returned the expected 401/200 responses.
+- Backend role-scope tests cover assigned and unassigned Manager session-event access. The event DTO intentionally excludes `IdempotencyKey`.
+
+Dashboard proof completed (2026-08-28):
+
+- Dashboard lint: 0 errors, 0 warnings.
+- Dashboard production build: GREEN; auth, proxy and sessions routes generated.
+- Full solution build: GREEN, 0 warnings, 0 errors.
+- Full unit tests: 78/78 GREEN; integration tests: 2/2 GREEN.
+- Authenticated local login flow: login 200, `/api/auth/me` 200, Owner profile active, HttpOnly cookie present.
+- Authenticated Next proxy flow: sessions 200 with 20 records; selected completed session events 200 with 6 events.
+- Direct API authorization: unauthenticated events request 401; missing/inaccessible event request 404.
+- Browser proof: unauthenticated `/sessions` redirected to `/login`; approved local Owner login reached the authenticated dashboard; Sessions showed all 20 records; the selected completed session rendered six ordered raw evidence events; a no-match search produced the expected 0-of-20 empty state; Clear filters restored 20-of-20; logout returned to `/login`.
+- Temporary runtime cleanup: API, dashboard dev servers and FFmpeg are OFF; Docker infrastructure and the Windows QA worker were not changed.
+
 Next recoverable action:
 
-- Review the unstaged S1.2 diff, record the cleanup warning above, and prepare the release approval summary. Do not commit or push until the Owner explicitly approves.
+- Keep the complete dashboard phase diff unstaged and wait for the Owner's exact `APPROVE` keyword before staging, committing and normally pushing the reported files.
 
 ## Current engineering gate - post-S1 reassessment
 
@@ -344,12 +364,12 @@ S1 closed the immediate role and resource-scope defects. Remaining stabilization
 1. Full granular permission-catalog enforcement remains future Owner Control Plane phase O1 work; S1 intentionally applies existing role and assignment boundaries only.
 2. The running QA worker service process could not be refreshed under the current host permissions, although current source/runtime probes are green.
 3. The historical `Deleted`-recording HTTP 500 follow-up was resolved and released in S1.1. Runtime proof returned Deleted 400, Uploaded 200, and S1 authorization ordering remains unchanged.
-4. TeamsHelper lacks a verified durable launcher/installer/startup mechanism; S1.2 is the active bounded phase for this gap.
+4. TeamsHelper durable launcher/installer/startup was implemented and runtime-proven in S1.2; the remaining cleanup warning is limited to old temporary publish/test copies outside the repository.
 5. Manual-session workflow is incomplete.
 6. Agent configuration contains environment-specific FFmpeg/device assumptions and recording is disabled by default.
 7. Production Compose omits some live/reverse-proxy components and needs deliberate deployment design later.
 
-After S1 closure, reassess the remaining stabilization observations before starting `7A-2`. `7A-2` remains the next planned QA feature, not an unconditional next action.
+Dashboard completion is the active phase by explicit Owner reprioritization. `7A-2` remains deferred and is not an unconditional next action.
 
 ## Planned QA phase — 7A-2 (not started)
 

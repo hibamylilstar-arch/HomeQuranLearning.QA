@@ -15,13 +15,13 @@ Private internal QA, attendance and monitoring platform for the HomeQuranLearnin
 
 ## Current checkpoint
 
-`d8dd5a1 fix(recordings): handle unavailable playback cleanly`
+`e35ac81 fix(agent): stabilize TeamsHelper lifecycle`
 
-Latest closed phase: `S1.1 - deleted recording playback stabilization`
+Latest closed phase: `S1.2 - TeamsHelper startup and lifecycle stabilization`
 
-Current engineering phase: `S1.2 - TeamsHelper startup and lifecycle stabilization`.
+Current engineering phase: `Dashboard completion - evidence and operational views`.
 
-Next planned QA feature remains `7A-2`; it has not started.
+Next planned QA feature remains `7A-2`; it is deferred while dashboard completion is in progress.
 
 ## Important documentation
 

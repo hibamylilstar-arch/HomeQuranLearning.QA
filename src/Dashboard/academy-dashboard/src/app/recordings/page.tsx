@@ -64,15 +64,21 @@ export default function RecordingsPage() {
   }
 
   useEffect(() => {
-    refreshRecordings()
-      .catch((err) =>
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Error loading recordings"
+    const timer = window.setTimeout(() => {
+      void refreshRecordings()
+        .catch((err) =>
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Error loading recordings"
+          )
         )
-      )
-      .finally(() => setLoading(false));
+        .finally(() => setLoading(false));
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, []);
 
   const filteredRecordings = useMemo(() => {

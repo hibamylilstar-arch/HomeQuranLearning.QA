@@ -26,7 +26,13 @@ export default function QaRulesPage() {
   }
 
   useEffect(() => {
-    loadRules();
+    const timer = window.setTimeout(() => {
+      void loadRules();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, []);
 
   async function handleCreate(e: React.FormEvent) {

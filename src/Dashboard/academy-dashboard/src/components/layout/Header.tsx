@@ -1,17 +1,12 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
-import { fetchCurrentUser, AuthUser } from "@/lib/auth";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function Header({ setMobileOpen }: { setMobileOpen: (val: boolean) => void }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const { user } = useAuth();
 
-  useEffect(() => {
-    fetchCurrentUser().then(setUser).catch(() => {});
-  }, []);
-
-  const rawName = user?.fullName || "Administrator";
-  const rawRole = user?.role || "Owner";
+  const rawName = user?.fullName || "Authenticated user";
+  const rawRole = user?.role || "User";
   
   const displayName = rawName.toLowerCase() === rawRole.toLowerCase() ? "System Administrator" : rawName;
   const displayRole = rawRole;

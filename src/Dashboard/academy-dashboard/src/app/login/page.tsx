@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
 import { loginUser } from "@/lib/auth";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { setUser } = useAuth();
   const [email, setEmail] = useState("owner@academy.local");
   const [password, setPassword] = useState("OwnerPass123!");
   const [error, setError] = useState("");
@@ -15,8 +19,9 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await loginUser(email, password);
-      window.location.href = "/";
+      const authenticatedUser = await loginUser(email, password);
+      setUser(authenticatedUser);
+      router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

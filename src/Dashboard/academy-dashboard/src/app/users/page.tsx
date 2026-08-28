@@ -27,7 +27,13 @@ export default function UsersPage() {
   }
 
   useEffect(() => {
-    loadUsers();
+    const timer = window.setTimeout(() => {
+      void loadUsers();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, []);
 
   async function handleCreate(e: React.FormEvent) {

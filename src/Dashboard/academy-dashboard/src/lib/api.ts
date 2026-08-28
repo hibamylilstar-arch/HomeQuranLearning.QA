@@ -10,6 +10,7 @@ import type {
   CourseListItem,
   ScheduleListItem,
   SessionListItem,
+  SessionEventListItem,
   DailyAttendanceReport,
 } from "@/types";
 
@@ -160,6 +161,16 @@ export async function createSchedule(
 
 export async function getSessions(): Promise<SessionListItem[]> {
   return proxyFetch<SessionListItem[]>(["sessions"]);
+}
+
+export async function getSessionEvents(
+  sessionId: string
+): Promise<SessionEventListItem[]> {
+  return proxyFetch<SessionEventListItem[]>([
+    "sessions",
+    sessionId,
+    "events",
+  ]);
 }
 
 export async function getDailyAttendanceReport(

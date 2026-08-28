@@ -1031,6 +1031,33 @@ app.MapGet("/api/admin/sessions", async (
     return Results.Ok(sessions);
 }).RequireAuthorization();
 
+app.MapGet("/api/admin/sessions/{sessionId:guid}/events", async (
+    ClaimsPrincipal user,
+    Guid sessionId,
+    DashboardQueryService dashboardQueryService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) =
+        GetUserInfo(user);
+
+    if (userId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    var events =
+        await dashboardQueryService
+            .GetVisibleSessionEventsAsync(
+                sessionId,
+                userId,
+                role,
+                cancellationToken);
+
+    return events is null
+        ? Results.NotFound()
+        : Results.Ok(events);
+}).RequireAuthorization();
+
 app.MapPatch("/api/admin/sessions/{sessionId:guid}/attendance-review", async (
     ClaimsPrincipal user,
     Guid sessionId,

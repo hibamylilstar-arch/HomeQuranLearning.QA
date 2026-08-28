@@ -121,6 +121,15 @@ export interface SessionListItem {
   disconnectSeconds: number;
 }
 
+export interface SessionEventListItem {
+  id: string;
+  eventType: string;
+  occurredAtUtc: string;
+  source: string | null;
+  details: string | null;
+  createdAtUtc: string;
+}
+
 export interface DailyAttendanceReportItem {
   sessionId: string;
   teacherId: string;

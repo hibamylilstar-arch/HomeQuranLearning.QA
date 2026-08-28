@@ -1,16 +1,15 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { logoutUser } from "@/lib/auth";
+import { usePathname } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen: boolean, setMobileOpen: (val: boolean) => void }) {
   const pathname = usePathname();
-  const router = useRouter();
+  const { logout } = useAuth();
 
   const handleLogout = async () => {
-    try { await logoutUser(); } catch { }
-    router.push("/login");
+    await logout();
   };
 
   const navItems = [

@@ -170,7 +170,8 @@ public class DashboardQueryServiceTests
             qaRepo.Object,
             deviceRepo.Object,
             assignRepo.Object,
-            sessionRepo.Object);
+            sessionRepo.Object,
+            Mock.Of<ISessionEventRepository>());
 
         // Act
         var result = await service.GetVisibleRecordingsAsync(managerUserId, UserRole.Manager.ToString());
@@ -225,7 +226,8 @@ public class DashboardQueryServiceTests
             qaRepo.Object,
             deviceRepo.Object,
             assignRepo.Object,
-            sessionRepo.Object);
+            sessionRepo.Object,
+            Mock.Of<ISessionEventRepository>());
 
         // Act
         var result = await service.GetVisibleDevicesAsync(managerUserId, UserRole.Manager.ToString());

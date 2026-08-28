@@ -181,17 +181,94 @@ public sealed class DashboardResourceAccessTests
         Assert.False(allowed);
     }
 
+    [Fact]
+    public async Task GetVisibleSessionEvents_ManagerAssignedTeacher_ReturnsPurposeLimitedEvents()
+    {
+        var managerId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var session = CreateSession(teacherId, SessionStatus.Completed);
+        var occurredAt = DateTimeOffset.UtcNow.AddMinutes(-2);
+        var eventRepository = new Mock<ISessionEventRepository>();
+
+        eventRepository
+            .Setup(x => x.GetForSessionAsync(
+                session.Id,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<SessionEvent>
+            {
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    SessionId = session.Id,
+                    EventType = SessionEventType.StudentCallConnected,
+                    OccurredAtUtc = occurredAt,
+                    Source = "TeamsUIAutomation",
+                    Details = "Signal=StudentCallConnected",
+                    CreatedAtUtc = occurredAt.AddSeconds(1)
+                }
+            });
+
+        var service = CreateService(
+            new Mock<IRecordingRepository>(),
+            CreateSessionRepository(session),
+            CreateAssignmentRepository(managerId, teacherId),
+            eventRepository);
+
+        var visible = await service.GetVisibleSessionEventsAsync(
+            session.Id,
+            managerId,
+            UserRole.Manager.ToString());
+
+        var item = Assert.Single(visible!);
+        Assert.Equal("StudentCallConnected", item.EventType);
+        Assert.Equal("TeamsUIAutomation", item.Source);
+        Assert.Equal("Signal=StudentCallConnected", item.Details);
+        eventRepository.Verify(
+            x => x.GetForSessionAsync(
+                session.Id,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetVisibleSessionEvents_ManagerUnassignedTeacher_ReturnsNull()
+    {
+        var managerId = Guid.NewGuid();
+        var session = CreateSession(Guid.NewGuid(), SessionStatus.Completed);
+        var eventRepository = new Mock<ISessionEventRepository>();
+
+        var service = CreateService(
+            new Mock<IRecordingRepository>(),
+            CreateSessionRepository(session),
+            CreateAssignmentRepository(managerId, Guid.NewGuid()),
+            eventRepository);
+
+        var visible = await service.GetVisibleSessionEventsAsync(
+            session.Id,
+            managerId,
+            UserRole.Manager.ToString());
+
+        Assert.Null(visible);
+        eventRepository.Verify(
+            x => x.GetForSessionAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     private static DashboardQueryService CreateService(
         Mock<IRecordingRepository> recordings,
         Mock<ISessionRepository> sessions,
-        Mock<IManagerTeacherAssignmentRepository> assignments)
+        Mock<IManagerTeacherAssignmentRepository> assignments,
+        Mock<ISessionEventRepository>? sessionEvents = null)
     {
         return new DashboardQueryService(
             recordings.Object,
             Mock.Of<IQaAlertRepository>(),
             Mock.Of<IDeviceRepository>(),
             assignments.Object,
-            sessions.Object);
+            sessions.Object,
+            sessionEvents?.Object ?? Mock.Of<ISessionEventRepository>());
     }
 
     private static Mock<IRecordingRepository> CreateRecordingRepository(

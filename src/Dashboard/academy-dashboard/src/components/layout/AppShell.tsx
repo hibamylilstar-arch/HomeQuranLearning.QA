@@ -1,11 +1,36 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !user && pathname !== "/login") {
+      router.replace("/login");
+    }
+  }, [loading, pathname, router, user]);
+
+  if (pathname === "/login") {
+    return <>{children}</>;
+  }
+
+  if (loading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6">
+        <p className="text-sm font-medium text-slate-400">
+          Checking dashboard access...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950">

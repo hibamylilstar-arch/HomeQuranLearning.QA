@@ -365,7 +365,8 @@ public sealed class DashboardAttendanceAccessTests
             Mock.Of<IQaAlertRepository>(),
             Mock.Of<IDeviceRepository>(),
             assignmentRepository.Object,
-            sessionRepository.Object);
+            sessionRepository.Object,
+            Mock.Of<ISessionEventRepository>());
     }
 
     private static Mock<IManagerTeacherAssignmentRepository>

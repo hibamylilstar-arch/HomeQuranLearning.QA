@@ -4,13 +4,13 @@
 
 Canonical checkpoint:
 
-- Working branch: `codex/s1.2-teamshelper-lifecycle`
+- Working branch: `codex/dashboard-completion`
 - Base commit: `32202b3`
 - Base subject: `chore(codex): add autonomous project governance`
-- Latest closed product phase: `S1 - access and attendance stabilization`
-- Current product phase: `S1.2 - TeamsHelper startup and lifecycle stabilization`
-- Phase status: `WAITING_RELEASE_APPROVAL`; S1.2 local install/runtime recovery proof is complete.
-- Next planned QA feature: `7A-2`; it has not started.
+- Latest closed product phase: `S1.2 - TeamsHelper startup and lifecycle stabilization`
+- Current product phase: `Dashboard completion - evidence and operational views`
+- Phase status: `WAITING_RELEASE_APPROVAL`; implementation and local automated/runtime/browser gates are green.
+- Next planned QA feature: `7A-2`; it remains deferred and has not started.
 
 Canonical resumable state: `docs/PROJECT-STATE.md`
 
@@ -297,9 +297,11 @@ These counts are historical proof only, not permanent invariants.
 
 ## Next engineering work
 
-Immediate work: a narrow stabilization phase for current authorization gaps and stale runtime/service proof. TeamsHelper startup and manual-session gaps remain later stabilization work.
+The local dashboard evidence/operational vertical slice is implemented and backend/runtime/browser-proven on the `codex/dashboard-completion` branch. It now exposes a role-scoped raw session-event timeline, historical session filters and a guarded login/logout lifecycle. The phase is waiting for explicit Owner release approval. The VPS remains deferred until local dashboard and stability gates are green.
 
-The next QA feature remains `7A-2 — durable timestamped transcript segments`, but it must not start until stabilization scope is discussed/approved and normal phase gates are followed.
+The dashboard proof includes 0-error/0-warning lint, a successful production build, full backend build/tests, authenticated login and proxy HTTP checks, 401 unauthenticated behavior and 404 missing/inaccessible event behavior. Browser proof verified the unauthenticated redirect, approved Owner login, 20-session rendering, the six-event raw timeline, filter empty-state/recovery and logout back to `/login`.
+
+The next QA feature remains `7A-2 — durable timestamped transcript segments`, but it is deferred while dashboard completion is in progress.
 
 Likely concerns:
 
@@ -326,7 +328,7 @@ Evidence clip extraction remains a later coherent phase.
 
 ## Production
 
-Production/VPS is not the current next phase.
+Production/VPS remains deferred until local dashboard, stability and controlled multi-laptop readiness gates are green.
 
 ## Owner Control Plane direction
 

@@ -12,19 +12,22 @@ public sealed class DashboardQueryService
     private readonly IDeviceRepository _deviceRepository;
     private readonly IManagerTeacherAssignmentRepository _assignmentRepository;
     private readonly ISessionRepository _sessionRepository;
+    private readonly ISessionEventRepository _sessionEventRepository;
 
     public DashboardQueryService(
         IRecordingRepository recordingRepository,
         IQaAlertRepository qaAlertRepository,
         IDeviceRepository deviceRepository,
         IManagerTeacherAssignmentRepository assignmentRepository,
-        ISessionRepository sessionRepository)
+        ISessionRepository sessionRepository,
+        ISessionEventRepository sessionEventRepository)
     {
         _recordingRepository = recordingRepository;
         _qaAlertRepository = qaAlertRepository;
         _deviceRepository = deviceRepository;
         _assignmentRepository = assignmentRepository;
         _sessionRepository = sessionRepository;
+        _sessionEventRepository = sessionEventRepository;
     }
 
     public async Task<IReadOnlyList<RecordingListItem>> GetVisibleRecordingsAsync(
@@ -257,6 +260,38 @@ public sealed class DashboardQueryService
 
         return teacherIds.Contains(
             session.TeacherId);
+    }
+
+    public async Task<IReadOnlyList<SessionEventDto>?> GetVisibleSessionEventsAsync(
+        Guid sessionId,
+        Guid userId,
+        string role,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await CanAccessSessionAsync(
+                sessionId,
+                userId,
+                role,
+                cancellationToken))
+        {
+            return null;
+        }
+
+        var events = await _sessionEventRepository.GetForSessionAsync(
+            sessionId,
+            cancellationToken);
+
+        return events
+            .Select(x => new SessionEventDto
+            {
+                Id = x.Id,
+                EventType = x.EventType.ToString(),
+                OccurredAtUtc = x.OccurredAtUtc,
+                Source = x.Source,
+                Details = x.Details,
+                CreatedAtUtc = x.CreatedAtUtc
+            })
+            .ToList();
     }
 
     public async Task<bool> CanAccessRecordingAsync(

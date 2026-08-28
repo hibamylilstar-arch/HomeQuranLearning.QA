@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getDevices, getRecordings, getQaRules } from "@/lib/api";
 import Link from "next/link";
+import type { DeviceListItem } from "@/types";
 
 export default function OverviewPage() {
   const [deviceCount, setDeviceCount] = useState(0);
@@ -21,7 +22,11 @@ export default function OverviewPage() {
         ]);
 
         setDeviceCount(devices.length);
-        setOnlineCount(devices.filter((d: any) => d.isOnline || d.status === "Online").length);
+        setOnlineCount(
+          devices.filter(
+            (device: DeviceListItem) => device.status === "Online"
+          ).length
+        );
         setRecordingCount(recordings.length);
         setRuleCount(rules.length);
       } catch (err) {

@@ -28,7 +28,13 @@ export default function StudentsPage() {
   }
 
   useEffect(() => {
-    loadData();
+    const timer = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, []);
 
   async function handleCreate(e: React.FormEvent) {

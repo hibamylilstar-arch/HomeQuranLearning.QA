@@ -25,7 +25,13 @@ export default function TeachersPage() {
   }
 
   useEffect(() => {
-    loadTeachers();
+    const timer = window.setTimeout(() => {
+      void loadTeachers();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, []);
 
   async function handleCreate(e: React.FormEvent) {

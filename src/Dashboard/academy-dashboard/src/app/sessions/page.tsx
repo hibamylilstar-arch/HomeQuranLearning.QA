@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getSessions,
   getTeachers,
@@ -9,6 +9,7 @@ import {
   getDevices,
   createSession,
   reviewSessionAttendance,
+  getSessionEvents,
 } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 import type {
@@ -17,6 +18,7 @@ import type {
   StudentListItem,
   CourseListItem,
   DeviceListItem,
+  SessionEventListItem,
 } from "@/types";
 
 const reviewableAttendanceStatuses = [
@@ -62,6 +64,18 @@ function reviewBadgeClass(status: string) {
   }
 }
 
+const evidenceDescriptions: Record<string, string> = {
+  TeacherGreetingSent: "Teacher evidence: greeting sent",
+  CallAttempted: "Teacher evidence: call attempted",
+  StudentCallConnected: "Student presence: call connected",
+  CallEnded: "Call lifecycle: ended",
+  LessonShared: "Teacher + student evidence: lesson shared",
+};
+
+function formatEventType(eventType: string) {
+  return eventType.replace(/([a-z])([A-Z])/g, "$1 $2");
+}
+
 export default function SessionsPage() {
   const { user, loading: authLoading } = useAuth();
 
@@ -85,6 +99,30 @@ export default function SessionsPage() {
   const [selectedSession, setSelectedSession] =
     useState<SessionListItem | null>(null);
 
+  const [evidenceSession, setEvidenceSession] =
+    useState<SessionListItem | null>(null);
+
+  const [sessionEvents, setSessionEvents] =
+    useState<SessionEventListItem[]>([]);
+
+  const [eventsLoading, setEventsLoading] =
+    useState(false);
+
+  const [eventsError, setEventsError] =
+    useState("");
+
+  const [searchQuery, setSearchQuery] =
+    useState("");
+
+  const [statusFilter, setStatusFilter] =
+    useState("ALL");
+
+  const [studentAttendanceFilter, setStudentAttendanceFilter] =
+    useState("ALL");
+
+  const [dateFilter, setDateFilter] =
+    useState("");
+
   const [reviewTeacherStatus, setReviewTeacherStatus] =
     useState("Present");
 
@@ -100,6 +138,61 @@ export default function SessionsPage() {
   const canCreateSession =
     user?.role === "Owner" ||
     user?.role === "Admin";
+
+  const filteredSessions = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return sessions.filter((session) => {
+      const matchesSearch =
+        query.length === 0 ||
+        [
+          session.teacherFullName,
+          session.studentFullName,
+          session.courseName,
+          session.deviceName,
+        ].some((value) => value.toLowerCase().includes(query));
+
+      const matchesStatus =
+        statusFilter === "ALL" ||
+        session.status === statusFilter;
+
+      const matchesAttendance =
+        studentAttendanceFilter === "ALL" ||
+        session.studentAttendanceStatus === studentAttendanceFilter;
+
+      const matchesDate =
+        dateFilter.length === 0 ||
+        new Date(session.startedAtUtc)
+          .toISOString()
+          .slice(0, 10) === dateFilter;
+
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesAttendance &&
+        matchesDate
+      );
+    });
+  }, [
+    dateFilter,
+    searchQuery,
+    sessions,
+    statusFilter,
+    studentAttendanceFilter,
+  ]);
+
+  const hasStudentConnectionEvidence = sessionEvents.some(
+    (event) => event.eventType === "StudentCallConnected"
+  );
+
+  const hasLessonEvidence = sessionEvents.some(
+    (event) => event.eventType === "LessonShared"
+  );
+
+  const hasLessonSopIssue =
+    evidenceSession?.status === "Completed" &&
+    hasStudentConnectionEvidence &&
+    !hasLessonEvidence;
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -188,6 +281,33 @@ export default function SessionsPage() {
           ? err.message
           : "Error creating session"
       );
+    }
+  }
+
+  async function toggleSessionEvents(session: SessionListItem) {
+    if (evidenceSession?.id === session.id) {
+      setEvidenceSession(null);
+      setSessionEvents([]);
+      setEventsError("");
+      return;
+    }
+
+    setEvidenceSession(session);
+    setSessionEvents([]);
+    setEventsError("");
+    setEventsLoading(true);
+
+    try {
+      const events = await getSessionEvents(session.id);
+      setSessionEvents(events);
+    } catch (err) {
+      setEventsError(
+        err instanceof Error
+          ? err.message
+          : "Could not load session evidence"
+      );
+    } finally {
+      setEventsLoading(false);
     }
   }
 
@@ -441,10 +561,100 @@ export default function SessionsPage() {
         </div>
       )}
 
+      <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-800">
+              Session Filters
+            </h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Search historical sessions without changing their stored evidence.
+            </p>
+          </div>
+          <p className="text-[11px] font-medium text-slate-400">
+            Showing {filteredSessions.length} of {sessions.length}
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-slate-600">
+              Search
+            </label>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Teacher, student, course..."
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-slate-600">
+              Session Status
+            </label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="ALL">All statuses</option>
+              <option value="Live">Live</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-slate-600">
+              Student Attendance
+            </label>
+            <select
+              value={studentAttendanceFilter}
+              onChange={(e) => setStudentAttendanceFilter(e.target.value)}
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="ALL">All attendance</option>
+              <option value="Present">Present</option>
+              <option value="Late">Late</option>
+              <option value="Absent">Absent</option>
+              <option value="NeedsReview">Needs review</option>
+              <option value="Unknown">Unknown</option>
+              <option value="Excused">Excused</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-slate-600">
+              Session Date
+            </label>
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSearchQuery("");
+            setStatusFilter("ALL");
+            setStudentAttendanceFilter("ALL");
+            setDateFilter("");
+          }}
+          className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+        >
+          Clear filters
+        </button>
+      </section>
+
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
           <h3 className="text-sm font-semibold text-slate-800">
-            Recorded Sessions ({sessions.length})
+            Recorded Sessions ({filteredSessions.length})
           </h3>
         </div>
 
@@ -465,17 +675,19 @@ export default function SessionsPage() {
             </thead>
 
             <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
-              {sessions.length === 0 ? (
+              {filteredSessions.length === 0 ? (
                 <tr>
                   <td
                     colSpan={9}
                     className="px-6 py-8 text-center text-slate-400"
                   >
-                    No session records found.
+                    {sessions.length === 0
+                      ? "No session records found."
+                      : "No sessions match the current filters."}
                   </td>
                 </tr>
               ) : (
-                sessions.map((session) => {
+                filteredSessions.map((session) => {
                   const completed =
                     session.status.toLowerCase() === "completed";
 
@@ -554,23 +766,35 @@ export default function SessionsPage() {
                       </td>
 
                       <td className="px-4 py-4">
-                        {completed ? (
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
-                            onClick={() =>
-                              openAttendanceReview(session)
-                            }
-                            className="whitespace-nowrap rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700 transition-colors hover:bg-indigo-100"
+                            onClick={() => void toggleSessionEvents(session)}
+                            className="whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-700 transition-colors hover:bg-slate-50"
                           >
-                            {session.attendanceReviewStatus === "Reviewed"
-                              ? "Edit Review"
-                              : "Review"}
+                            {evidenceSession?.id === session.id
+                              ? "Hide Evidence"
+                              : "Evidence"}
                           </button>
-                        ) : (
-                          <span className="text-[10px] font-medium uppercase text-slate-400">
-                            Complete first
-                          </span>
-                        )}
+
+                          {completed ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openAttendanceReview(session)
+                              }
+                              className="whitespace-nowrap rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700 transition-colors hover:bg-indigo-100"
+                            >
+                              {session.attendanceReviewStatus === "Reviewed"
+                                ? "Edit Review"
+                                : "Review"}
+                            </button>
+                          ) : (
+                            <span className="text-[10px] font-medium uppercase text-slate-400">
+                              Complete first
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -580,6 +804,82 @@ export default function SessionsPage() {
           </table>
         </div>
       </div>
+
+      {evidenceSession && (
+        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-1 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">
+                Session Evidence Timeline
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                {evidenceSession.teacherFullName}
+                {" / "}
+                {evidenceSession.studentFullName}
+                {" · "}
+                {new Date(evidenceSession.startedAtUtc).toLocaleString()}
+              </p>
+            </div>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Raw evidence · attendance conclusions shown separately
+            </span>
+          </div>
+
+          {hasLessonSopIssue && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+              <p className="font-semibold">Lesson delivery SOP issue</p>
+              <p className="mt-1">
+                A connected student call is recorded, but no LessonShared evidence
+                was found for this completed session. Student absence is not inferred
+                from this condition; review the teacher&apos;s lesson delivery.
+              </p>
+            </div>
+          )}
+
+          {eventsLoading ? (
+            <p className="text-xs font-medium text-slate-500">
+              Loading session evidence...
+            </p>
+          ) : eventsError ? (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700">
+              {eventsError}
+            </div>
+          ) : sessionEvents.length === 0 ? (
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-5 text-center text-xs text-slate-500">
+              No evidence events were recorded for this session.
+            </p>
+          ) : (
+            <ol className="relative ml-2 space-y-4 border-l border-slate-200 pl-6">
+              {sessionEvents.map((event) => (
+                <li key={event.id} className="relative">
+                  <span className="absolute -left-[31px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-indigo-500 ring-1 ring-indigo-200" />
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-900">
+                        {formatEventType(event.eventType)}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">
+                        {evidenceDescriptions[event.eventType] ??
+                          "Operational session evidence"}
+                      </p>
+                      {(event.source || event.details) && (
+                        <p className="mt-1 break-words text-[11px] text-slate-600">
+                          {[event.source, event.details]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      )}
+                    </div>
+                    <time className="whitespace-nowrap text-[10px] font-medium text-slate-400">
+                      {new Date(event.occurredAtUtc).toLocaleString()}
+                    </time>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      )}
 
       {selectedSession && (
         <form

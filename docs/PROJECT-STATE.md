@@ -8,7 +8,7 @@ Chat history is not authoritative. Repository state + this file are the durable 
 
 ## Canonical checkpoint
 
-- Branch: `codex/7a-2-transcript-segments`
+- Branch: `codex/7a-4-local-multilaptop-readiness`
 - Base commit: `32202b3b4202515a684373bfbf6500e8a4e7eef7`
 - S1 implementation commit: `ca18589d2d027a07b300cc86fbeadda49540f968`
 - S1 closure commit: `c68f6e2b5f6088447243afa494e17eeb7716748a`
@@ -17,22 +17,29 @@ Chat history is not authoritative. Repository state + this file are the durable 
 - Subject: `fix(recordings): handle unavailable playback cleanly`
 - Latest closed product phase: `Dashboard completion - evidence and operational views`
 - Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
-- Current product phase: `7A-3 — QA transcript review and evidence workflow`
+- Current product phase: `7A-4 — controlled local multi-laptop readiness`
 - Current phase status: `WAITING_RELEASE_APPROVAL`
-- Next engineering gate: Owner release approval for the completed 7A-3 change
-- Waiting human test: none
+- Next engineering gate: Owner approval for the validated 7A-4 commit and normal push
+- Waiting human test: no
 - Waiting release approval: yes
-- Last verified checkpoint: 7A-3 implementation and browser proof completed on branch `codex/7a-3-qa-transcript-review`; runtime OFF and database counts sessions=20, session_events=163, recordings=2, qa_alerts=0 and transcript_segments=0 after Owner-approved recording cleanup
+- Last verified checkpoint: 7A-3 was pushed as `a2b8aae`; 7A-4 automated and physical proof completed on branch `codex/7a-4-local-multilaptop-readiness`; exact cleanup restored sessions=20, session_events=163, recordings=2, qa_alerts=0, transcript_segments=0 and devices=3
 - Tests already passed for S1.1: targeted deleted-recording regression 1/1; full unit 76/76; integration 2/2; Agent 1/1; full solution build GREEN with 0 warnings and 0 errors; runtime HTTP Deleted 400 / Uploaded 200 proof GREEN; final diff/status review and `git diff --check` GREEN
 - Dashboard gates completed: full dashboard lint/build, backend unit/integration gates, authenticated session-evidence API proof, role-scope proof, authenticated browser evidence-timeline/filter proof and final runtime cleanup
 - 7A-2 gates completed: worker self-test 6/6 markers; full unit tests 81/81; integration tests 3/3; full solution build 0 warnings/0 errors; local API persistence/retry proof; exact proof-row cleanup and baseline restoration; runtime OFF
 - 7A-3 gates completed: dashboard lint and production build GREEN; authenticated Owner browser proof for QA Alerts → Recording QA Review; two timestamped segments rendered; click-to-seek set video position to 3.0s and highlighted the segment; browser console errors 0; six test recordings, dependent alerts, test object and orphan test device cleaned
 - Owner-approved high-risk recording cleanup: 141 remaining recordings and dependent QA evidence removed; exactly two approved samples retained (`15541c8f-2a67-4bdd-9b0d-cc3ff020960d` Uploaded and `eeb925e3-e28f-4eb6-81d3-33650560c73d` Pending); no MinIO objects remained; sessions/events/devices were preserved
+- 7A-4 automated readiness: three unique device identities, repeated heartbeats, isolated recording submissions and idempotent retries passed; exact proof cleanup restored baseline.
+- 7A-4 physical readiness: `DESKTOP-RAAFV2I` registered a fresh identity, recovered after Wi-Fi loss, uploaded device-scoped recordings, appeared in the authenticated dashboard and produced playable screen evidence. All physical-test objects/rows/device/heartbeats were removed by exact identity and the database baseline was restored.
+- 7A-4 storage correction: recording defaults and the local package now use H.264 veryfast/CRF 32 with a 700 kbps video cap and AAC 64 kbps mono. The physical 50.4-second sample was 3,075,494 bytes at 488 kbps with readable 1366x768 text. Conservative capacity planning uses 764 kbps for 90 recorded-hours/day with unchanged 3-day normal / 7-day QA retention; 200 GB is unsafe if all recordings remain QA evidence.
+- 7A-4 system-audio proof: the physical 48.2-second sample contained 64.8 kbps AAC at 32 kHz mono and non-silent audio at -22.1 dB mean level. Whisper detected the speech and persisted eight timestamped Urdu transcript segments before marking the recording processed.
+- 7A-4 Unicode worker repair: the physical transcript exposed repeated Windows `charmap` failures when the service printed non-Latin text. The worker now configures stdout/stderr as UTF-8 and the NSSM batch launcher sets Python UTF-8 environment flags. Forced-cp1252 self-test and manual end-to-end processing of the same recording passed. The already-running Windows service could not be restarted without elevation and will load the fix at its next service/host restart.
+- 7A-4 package preparation: `scripts/Prepare-LocalAgentTestPackage.ps1` publishes self-contained Agent and TeamsHelper binaries, writes LAN/test-only configuration with live streaming disabled, and emits operator instructions under `publish\local-agent-test` (ignored by Git). The compressed v3 package was generated and checksum-verified.
+- 7A-4 final gates: solution Release build 0 warnings/0 errors; Agent tests 7/7; unit tests 81/81; integration tests 3/3; dashboard lint and production build GREEN; QA worker self-test including Unicode output GREEN; PowerShell parser and `git diff --check` GREEN; API, Agent, dashboard and FFmpeg OFF.
 - S1.1 release files: `docs/PROJECT-STATE.md`, `src/Backend/Academy.Api/Program.cs`, `src/Backend/Academy.Application/Exceptions/RecordingUnavailableException.cs`, `src/Backend/Academy.Application/Services/RecordingService.cs`, `tests/Academy.UnitTests/RecordingServiceTests.cs`
-- Temporary data: the isolated S1.1 Deleted-recording proof row was removed; proof row count returned to zero and the recordings baseline returned to 148
+- Temporary data: all 7A-4 automated and physical proof rows/objects/devices were removed by exact identity; the current recordings baseline is the two Owner-approved retained controls
 - Product runtime expected after latest proof: OFF
 
-S1, S1.1, S1.2, dashboard operational hardening and 7A-2 are CLOSED after full validation, Owner approval and push. 7A-3 is fully validated and is waiting for release approval.
+S1, S1.1, S1.2, dashboard operational hardening, 7A-2 and 7A-3 are CLOSED after full validation, Owner approval and push. 7A-4 is fully validated and waiting for Owner release approval.
 
 ## Current runtime snapshot
 
@@ -358,7 +365,7 @@ Dashboard proof completed (2026-08-28):
 
 Next recoverable action:
 
-- Obtain release approval for 7A-2. After the phase is pushed and closed, discuss the next coherent local phase; keep VPS, Owner Control Plane and APK work deferred.
+- Obtain release approval for 7A-4. After the phase is pushed and closed, discuss the next coherent local phase; keep VPS, Owner Control Plane and APK work deferred.
 
 ## Current engineering gate - post-S1 reassessment
 
@@ -372,7 +379,7 @@ S1 closed the immediate role and resource-scope defects. Remaining stabilization
 6. Agent configuration contains environment-specific FFmpeg/device assumptions and recording is disabled by default.
 7. Production Compose omits some live/reverse-proxy components and needs deliberate deployment design later.
 
-7A-2 is released at `f4617e0`. 7A-3 is the active local phase; VPS, Owner Control Plane and APK remain deferred.
+7A-2 is released at `f4617e0` and 7A-3 at `a2b8aae`. 7A-4 is validated and waiting for release approval; VPS, Owner Control Plane and APK remain deferred.
 
 ## QA phase — 7A-2 (implementation complete; release approval pending)
 

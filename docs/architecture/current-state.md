@@ -4,13 +4,13 @@
 
 Canonical checkpoint:
 
-- Working branch: `codex/7a-3-qa-transcript-review`
+- Working branch: `codex/7a-4-local-multilaptop-readiness`
 - Base commit: `32202b3`
 - Base subject: `chore(codex): add autonomous project governance`
 - Latest closed product phase: `Dashboard completion - evidence and operational views`
-- Current product phase: `7A-3 — QA transcript review and evidence workflow`
-- Phase status: `WAITING_RELEASE_APPROVAL`; dashboard operational hardening is released at `e127a19` and 7A-2 at `f4617e0`.
-- Current QA feature: transcript review and evidence workflow (implemented and validated; release approval pending).
+- Current product phase: `7A-4 — controlled local multi-laptop readiness`
+- Phase status: `WAITING_RELEASE_APPROVAL`; dashboard operational hardening is released at `e127a19`, 7A-2 at `f4617e0` and 7A-3 at `a2b8aae`.
+- Current QA feature: multi-device registration, recording isolation, bounded recording storage and Unicode-safe QA worker output (automated and physical proof complete; release approval pending).
 
 Canonical resumable state: `docs/PROJECT-STATE.md`
 

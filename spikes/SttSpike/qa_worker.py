@@ -1,4 +1,5 @@
 import json
+import io
 import os
 import sys
 import tempfile
@@ -36,6 +37,21 @@ DOWNLOAD_TIMEOUT_SECONDS = int(
 )
 
 _model = None
+
+
+def configure_utf8_stream(stream):
+    reconfigure = getattr(stream, "reconfigure", None)
+
+    if callable(reconfigure):
+        reconfigure(
+            encoding="utf-8",
+            errors="backslashreplace",
+        )
+
+
+def configure_utf8_output():
+    configure_utf8_stream(sys.stdout)
+    configure_utf8_stream(sys.stderr)
 
 
 def http_get_json(path, api_key):
@@ -421,6 +437,21 @@ def process_recording(recording):
 
 
 def run_self_test():
+    unicode_buffer = io.BytesIO()
+    unicode_stream = io.TextIOWrapper(
+        unicode_buffer,
+        encoding="cp1252",
+    )
+
+    configure_utf8_stream(unicode_stream)
+    unicode_stream.write("اردو हिन्दी العربية")
+    unicode_stream.flush()
+
+    assert (
+        unicode_buffer.getvalue().decode("utf-8")
+        == "اردو हिन्दी العربية"
+    )
+
     started = parse_utc(
         "2026-08-27T06:00:00Z"
     )
@@ -533,6 +564,7 @@ def run_self_test():
     print("QA_WORKER_RULE_LINK_OK")
     print("QA_WORKER_TIMESTAMP_ALIGNMENT_OK")
     print("QA_WORKER_SEGMENT_PAYLOAD_OK")
+    print("QA_WORKER_UNICODE_OUTPUT_OK")
     print("QA_WORKER_SELF_TEST_OK")
 
 
@@ -566,6 +598,8 @@ def main():
 
 
 if __name__ == "__main__":
+    configure_utf8_output()
+
     if "--self-test" in sys.argv:
         run_self_test()
     else:

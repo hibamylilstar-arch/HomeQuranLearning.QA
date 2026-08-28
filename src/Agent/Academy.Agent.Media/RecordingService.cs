@@ -7,6 +7,20 @@ namespace Academy.Agent.Media;
 
 public sealed class RecordingService : IRecordingService
 {
+    private static readonly HashSet<string> SupportedVideoPresets =
+        new(StringComparer.Ordinal)
+        {
+            "ultrafast",
+            "superfast",
+            "veryfast",
+            "faster",
+            "fast",
+            "medium",
+            "slow",
+            "slower",
+            "veryslow"
+        };
+
     private readonly RecordingOptions _defaultOptions;
 
     private Process? _ffmpegProcess;
@@ -85,19 +99,12 @@ public sealed class RecordingService : IRecordingService
                 : 2;
 
         string arguments =
-            $"-y " +
-            $"-f lavfi -i \"ddagrab=framerate={_currentOptions.FrameRate}:dup_frames=1\" " +
-            $"-thread_queue_size 1024 " +
-            $"-f {audioFormat} -ar {_audioSampleRate} -ac {_audioChannels} " +
-            $"-i \"udp://127.0.0.1:{RecordingAudioUdpPort}?fifo_size=500000&overrun_nonfatal=1\" " +
-            $"-vf \"hwdownload,format=bgra,setpts=N/({_currentOptions.FrameRate}*TB)\" " +
-            $"-af \"aresample=async=1:first_pts=0\" " +
-            $"-c:v libx264 -preset ultrafast -pix_fmt yuv420p " +
-            $"-crf {_currentOptions.VideoCrf} " +
-            $"-g {_currentOptions.FrameRate * 2} -bf 0 " +
-            $"-c:a aac -b:a {_currentOptions.AudioBitrate} -ar 48000 -ac 2 " +
-            $"-movflags +faststart " +
-            $"\"{outputPath}\"";
+            BuildFfmpegArguments(
+                outputPath,
+                _currentOptions,
+                audioFormat,
+                _audioSampleRate,
+                _audioChannels);
 
         var startInfo = new ProcessStartInfo
         {
@@ -123,6 +130,82 @@ public sealed class RecordingService : IRecordingService
             cancellationToken);
 
         return Task.CompletedTask;
+    }
+
+    internal static string BuildFfmpegArguments(
+        string outputPath,
+        RecordingOptions options,
+        string audioFormat,
+        int inputAudioSampleRate,
+        int inputAudioChannels)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (string.IsNullOrWhiteSpace(outputPath) ||
+            outputPath.Contains('"'))
+        {
+            throw new ArgumentException(
+                "Recording output path is invalid.",
+                nameof(outputPath));
+        }
+
+        if (options.FrameRate is < 1 or > 60)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options.FrameRate),
+                "Recording frame rate must be between 1 and 60.");
+        }
+
+        if (options.VideoCrf is < 0 or > 51)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options.VideoCrf),
+                "Recording video CRF must be between 0 and 51.");
+        }
+
+        if (!SupportedVideoPresets.Contains(options.VideoPreset))
+        {
+            throw new ArgumentException(
+                "Recording video preset is not supported.",
+                nameof(options.VideoPreset));
+        }
+
+        if (options.VideoMaxBitrateKbps <= 0 ||
+            options.VideoBufferSizeKbps <= 0 ||
+            options.AudioBitrateKbps <= 0 ||
+            options.AudioSampleRate <= 0 ||
+            options.AudioChannels is < 1 or > 2)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "Recording bitrate and audio output settings must be positive and valid.");
+        }
+
+        if (audioFormat is not ("f32le" or "s16le") ||
+            inputAudioSampleRate <= 0 ||
+            inputAudioChannels is < 1 or > 8)
+        {
+            throw new ArgumentException(
+                "Recording audio input settings are invalid.");
+        }
+
+        return
+            $"-y " +
+            $"-f lavfi -i \"ddagrab=framerate={options.FrameRate}:dup_frames=1\" " +
+            $"-thread_queue_size 1024 " +
+            $"-f {audioFormat} -ar {inputAudioSampleRate} -ac {inputAudioChannels} " +
+            $"-i \"udp://127.0.0.1:{RecordingAudioUdpPort}?fifo_size=500000&overrun_nonfatal=1\" " +
+            $"-vf \"hwdownload,format=bgra,setpts=N/({options.FrameRate}*TB)\" " +
+            $"-af \"aresample=async=1:first_pts=0\" " +
+            $"-c:v libx264 -preset {options.VideoPreset} -pix_fmt yuv420p " +
+            $"-crf {options.VideoCrf} " +
+            $"-maxrate {options.VideoMaxBitrateKbps}k " +
+            $"-bufsize {options.VideoBufferSizeKbps}k " +
+            $"-g {options.FrameRate * 2} " +
+            $"-c:a aac -b:a {options.AudioBitrateKbps}k " +
+            $"-ar {options.AudioSampleRate} -ac {options.AudioChannels} " +
+            $"-movflags +faststart " +
+            $"\"{outputPath}\"";
     }
 
     private void OnAudioDataAvailable(

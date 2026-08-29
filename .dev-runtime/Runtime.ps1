@@ -7,6 +7,9 @@ param(
         "StartAgent",
         "StopAgent",
         "RestartAgent",
+        "StartTeams",
+        "StopTeams",
+        "RestartTeams",
         "StartAll",
         "StopAll",
         "Status"
@@ -77,6 +80,35 @@ function Stop-AcademyApi {
 function Stop-AcademyAgent {
 
     Write-Host "Stopping Academy Agent..." -ForegroundColor Yellow
+
+    $teamsTask =
+        Get-ScheduledTask `
+            -TaskName "AcademyAgent.TeamsHelper" `
+            -ErrorAction SilentlyContinue
+
+    if ($null -ne $teamsTask) {
+
+        Write-Host "Stopping TeamsHelper scheduled task..."
+
+        Stop-ScheduledTask `
+            -TaskName "AcademyAgent.TeamsHelper" `
+            -ErrorAction SilentlyContinue
+    }
+
+    Get-CimInstance Win32_Process |
+    Where-Object {
+        $_.Name -eq "Academy.Agent.TeamsHelper.exe" -or
+        $_.CommandLine -like "*Academy.Agent.TeamsHelper*"
+    } |
+    ForEach-Object {
+
+        Write-Host "  TeamsHelper PID $($_.ProcessId)"
+
+        Stop-Process `
+            -Id $_.ProcessId `
+            -Force `
+            -ErrorAction SilentlyContinue
+    }
 
     $processes =
         @(
@@ -178,6 +210,156 @@ function Start-AcademyApi {
 }
 
 
+
+function Stop-AcademyTeams {
+
+    Write-Host "Stopping Academy TeamsHelper..." -ForegroundColor Yellow
+
+    Stop-ScheduledTask `
+        -TaskName "AcademyAgent.TeamsHelper" `
+        -ErrorAction SilentlyContinue
+
+    Get-CimInstance Win32_Process |
+    Where-Object {
+        $_.Name -eq "Academy.Agent.TeamsHelper.exe"
+    } |
+    ForEach-Object {
+
+        Write-Host "  TeamsHelper PID $($_.ProcessId)"
+
+        Stop-Process `
+            -Id $_.ProcessId `
+            -Force `
+            -ErrorAction SilentlyContinue
+    }
+
+    Start-Sleep -Seconds 1
+
+    Write-Host "TeamsHelper stopped." -ForegroundColor Green
+}
+
+
+function Start-AcademyTeams {
+
+    $agent =
+        @(
+            Get-CimInstance Win32_Process |
+            Where-Object {
+                $_.Name -eq "Academy.Agent.Service.exe" -or
+                (
+                    $_.Name -eq "dotnet.exe" -and
+                    $_.CommandLine -like "*Academy.Agent.Service*"
+                )
+            }
+        )
+
+    if ($agent.Count -eq 0) {
+
+        Write-Host "TeamsHelper not started: Agent is OFF." `
+            -ForegroundColor Red
+
+        return
+    }
+
+    $existing =
+        @(
+            Get-CimInstance Win32_Process |
+            Where-Object {
+                $_.Name -eq "Academy.Agent.TeamsHelper.exe"
+            }
+        )
+
+    if ($existing.Count -gt 0) {
+
+        Write-Host "TeamsHelper already running." `
+            -ForegroundColor Yellow
+
+        return
+    }
+
+    $task =
+        Get-ScheduledTask `
+            -TaskName "AcademyAgent.TeamsHelper" `
+            -ErrorAction SilentlyContinue
+
+    if ($null -eq $task) {
+
+        Write-Host "TeamsHelper task definition not found." `
+            -ForegroundColor Red
+
+        return
+    }
+
+    $action =
+        $task.Actions |
+        Select-Object -First 1
+
+    if ($null -eq $action) {
+
+        Write-Host "TeamsHelper task action not found." `
+            -ForegroundColor Red
+
+        return
+    }
+
+    $exe =
+        [Environment]::ExpandEnvironmentVariables(
+            $action.Execute
+        )
+
+    if (-not (Test-Path $exe)) {
+
+        Write-Host "TeamsHelper executable not found: $exe" `
+            -ForegroundColor Red
+
+        return
+    }
+
+    $startParams = @{
+        FilePath    = $exe
+        WindowStyle = "Hidden"
+        PassThru    = $true
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace(
+            $action.Arguments)) {
+
+        $startParams.ArgumentList =
+            $action.Arguments
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace(
+            $action.WorkingDirectory)) {
+
+        $startParams.WorkingDirectory =
+            $action.WorkingDirectory
+    }
+
+    $process =
+        Start-Process @startParams
+
+    Start-Sleep -Seconds 2
+
+    $running =
+        @(
+            Get-CimInstance Win32_Process |
+            Where-Object {
+                $_.Name -eq "Academy.Agent.TeamsHelper.exe"
+            }
+        )
+
+    if ($running.Count -eq 0) {
+
+        Write-Host "TeamsHelper failed to stay running." `
+            -ForegroundColor Red
+
+        return
+    }
+
+    Write-Host "TeamsHelper started. PID $($process.Id)" `
+        -ForegroundColor Green
+}
+
 function Start-AcademyAgent {
 
     $existing =
@@ -250,6 +432,14 @@ function Show-AcademyStatus {
             }
         )
 
+    $teamsHelper =
+        @(
+            Get-CimInstance Win32_Process |
+            Where-Object {
+                $_.Name -eq "Academy.Agent.TeamsHelper.exe"
+            }
+        )
+
     if ($api.Count -gt 0) {
         Write-Host "API    : ON" -ForegroundColor Green
     }
@@ -262,6 +452,13 @@ function Show-AcademyStatus {
     }
     else {
         Write-Host "Agent  : OFF" -ForegroundColor DarkGray
+    }
+
+    if ($teamsHelper.Count -gt 0) {
+        Write-Host "Teams  : ON" -ForegroundColor Green
+    }
+    else {
+        Write-Host "Teams  : OFF" -ForegroundColor DarkGray
     }
 
     Write-Host "FFmpeg : $($ffmpeg.Count)"
@@ -297,6 +494,19 @@ switch ($Action) {
     "RestartAgent" {
         Stop-AcademyAgent
         Start-AcademyAgent
+    }
+
+    "StartTeams" {
+        Start-AcademyTeams
+    }
+
+    "StopTeams" {
+        Stop-AcademyTeams
+    }
+
+    "RestartTeams" {
+        Stop-AcademyTeams
+        Start-AcademyTeams
     }
 
     "StartAll" {

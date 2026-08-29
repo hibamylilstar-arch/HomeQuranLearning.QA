@@ -132,6 +132,12 @@ export async function createUser(
   });
 }
 
+export async function setUserStatus(userId: string, isActive: boolean): Promise<void> { await proxyFetch(["users", userId, "status"], { method: "PATCH" }, new URLSearchParams({ isActive: String(isActive) })); }
+
+export async function resetUserPassword(userId: string, password: string): Promise<void> { await proxyFetch(["users", userId, "reset-password"], { method: "POST", body: JSON.stringify({ password }) }); }
+
+export async function deleteUser(userId: string): Promise<void> { await proxyFetch(["users", userId], { method: "DELETE" }); }
+
 export async function getTeachers(): Promise<TeacherListItem[]> {
   return proxyFetch<TeacherListItem[]>(["teachers"]);
 }

@@ -4,11 +4,11 @@
 
 Canonical checkpoint:
 
-- Working branch: `codex/real-data-vps-pilot`
+- Working branch: `codex/final-classroom-agent-installer`
 - Current phase base: `f4426c1`
 - Latest closed product phase: `7A-6 — attendance operations/reporting`
-- Current product phase: secured real-data VPS pilot preparation
-- Phase status: `CLOSED`; the HTTPS/allowlisted pilot configuration and responsive-login work were released at `b61c1d2`.
+- Current product phase: production rollout and classroom installer completion
+- Phase status: `IN_PROGRESS`; production routing, roaming Agent access, Owner user management, responsive dashboard and classroom installer are being finalized for VPS rollout.
 - Current QA limitation: legacy layout-0 recordings capture system/loopback audio only and remain non-attributable. New layout-1 recordings have proven teacher-microphone provenance. 7A-5C now adds a versioned, fail-closed lexical baseline that classifies timestamped teacher-track windows and posts review candidates only; production accuracy is not yet claimed.
 
 Canonical resumable state: `docs/PROJECT-STATE.md`
@@ -24,9 +24,9 @@ Expected scale:
 - roughly 2–3 hour peak windows
 - mostly stable teacher/device mapping with occasional substitutions
 
-## Local engineering and VPS pilot policy
+## Production engineering and VPS policy
 
-Local approved branches remain the engineering source. The Owner explicitly approved a bounded real-academy VPS pilot on 2026-08-29. Deployment must use an immutable approved release, public-IP HTTPS, exact public `/32` source allowlisting, one laptop before expansion, human-reviewed accuracy evidence and disabled destructive retention until a separate approval.
+Git remains the engineering source of truth. Production uses public HTTPS, application authentication, RBAC and outbound-only teacher Agents. Roaming teacher devices are not trusted or restricted by source IP. Releases are verified locally, committed/pushed normally, deployed to the VPS, then health/runtime verified. Destructive database/evidence operations and secret/security mutations remain separately protected.
 
 ## Stack
 

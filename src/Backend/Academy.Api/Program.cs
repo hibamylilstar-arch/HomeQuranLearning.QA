@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 const string OwnerOrAdminPolicy = "OwnerOrAdmin";
+const string OwnerOnlyPolicy = "OwnerOnly";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -102,6 +103,7 @@ builder.Services.AddAuthorization(options =>
         policy => policy.RequireRole(
             UserRole.Owner.ToString(),
             UserRole.Admin.ToString()));
+    options.AddPolicy(OwnerOnlyPolicy, policy => policy.RequireRole(UserRole.Owner.ToString()));
 });
 
 builder.Services.AddCors(options =>
@@ -707,7 +709,7 @@ app.MapPost("/api/admin/users", async (
     {
         return Results.BadRequest(new { message = ex.Message });
     }
-}).RequireAuthorization(OwnerOrAdminPolicy);
+}).RequireAuthorization(OwnerOnlyPolicy);
 
 app.MapPatch("/api/admin/users/{userId:guid}/status", async (
     ClaimsPrincipal user,
@@ -726,7 +728,20 @@ app.MapPatch("/api/admin/users/{userId:guid}/status", async (
     {
         return Results.BadRequest(new { message = ex.Message });
     }
-}).RequireAuthorization(OwnerOrAdminPolicy);
+}).RequireAuthorization(OwnerOnlyPolicy);
+
+app.MapPost("/api/admin/users/{userId:guid}/reset-password", async (Guid userId, ResetUserPasswordRequest body, AdminUserService adminUserService, CancellationToken cancellationToken) =>
+{
+    try { await adminUserService.ResetPasswordAsync(userId, body.Password, cancellationToken); return Results.Ok(new { updated = true }); }
+    catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
+}).RequireAuthorization(OwnerOnlyPolicy);
+
+app.MapDelete("/api/admin/users/{userId:guid}", async (Guid userId, AdminUserService adminUserService, CancellationToken cancellationToken) =>
+{
+    try { await adminUserService.DeleteUserAsync(userId, cancellationToken); return Results.Ok(new { deleted = true }); }
+    catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
+    catch (Microsoft.EntityFrameworkCore.DbUpdateException) { return Results.Conflict(new { message = "Account has preserved history. Disable it instead." }); }
+}).RequireAuthorization(OwnerOnlyPolicy);
 
 app.MapGet("/api/admin/teachers", async (
     ClaimsPrincipal user,
@@ -1542,8 +1557,14 @@ static async Task SeedOwnerAsync(WebApplication app)
 
     await dbContext.Database.MigrateAsync();
 
-    string seedEmail = app.Configuration["SeedOwner:Email"] ?? "owner@academy.local";
+    string? seedEmail = app.Configuration["SeedOwner:Email"];
+    string? seedPassword = app.Configuration["SeedOwner:Password"];
 
+    if (string.IsNullOrWhiteSpace(seedEmail) && string.IsNullOrWhiteSpace(seedPassword))
+        return;
+
+    if (string.IsNullOrWhiteSpace(seedEmail) || string.IsNullOrWhiteSpace(seedPassword))
+        throw new InvalidOperationException("SeedOwner requires both Email and Password.");
     bool exists = await dbContext.Users.AnyAsync(u => u.Email == seedEmail);
 
     if (!exists)
@@ -1553,8 +1574,7 @@ static async Task SeedOwnerAsync(WebApplication app)
             Id = Guid.NewGuid(),
             FullName = app.Configuration["SeedOwner:FullName"] ?? "Owner",
             Email = seedEmail,
-            PasswordHash = passwordHasher.Hash(
-                app.Configuration["SeedOwner:Password"] ?? "OwnerPass123!"),
+            PasswordHash = passwordHasher.Hash(seedPassword!),
             Role = UserRole.Owner,
             IsActive = true,
             CreatedAtUtc = DateTimeOffset.UtcNow,

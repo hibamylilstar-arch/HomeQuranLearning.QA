@@ -43,6 +43,9 @@ public sealed class AdminUserService
         CreateUserRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (request.Role == UserRole.Owner)
+            throw new InvalidOperationException("Owner accounts cannot be created here.");
+
         var existing = await _userRepository.GetByEmailAsync(request.Email, cancellationToken);
         if (existing is not null)
         {
@@ -74,6 +77,25 @@ public sealed class AdminUserService
         };
     }
 
+    private static void EnsureManageable(User user)
+    {
+        if (user.Role == UserRole.Owner)
+            throw new InvalidOperationException("Owner accounts are protected.");
+    }
+
+    public async Task ResetPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(password) || password.Length < 8) throw new InvalidOperationException("Password must be at least 8 characters.");
+        var user = await _userRepository.GetByIdAsync(userId, cancellationToken) ?? throw new InvalidOperationException("User not found.");
+        EnsureManageable(user); user.PasswordHash = _passwordHasher.Hash(password); user.UpdatedAtUtc = DateTimeOffset.UtcNow; _userRepository.Update(user); await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteUserAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await _userRepository.GetByIdAsync(userId, cancellationToken) ?? throw new InvalidOperationException("User not found.");
+        EnsureManageable(user); _userRepository.Remove(user); await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task UpdateUserStatusAsync(
         Guid userId,
         bool isActive,
@@ -81,6 +103,8 @@ public sealed class AdminUserService
     {
         var user = await _userRepository.GetByIdAsync(userId, cancellationToken)
             ?? throw new InvalidOperationException("User not found.");
+
+        EnsureManageable(user);
 
         user.IsActive = isActive;
         user.UpdatedAtUtc = DateTimeOffset.UtcNow;

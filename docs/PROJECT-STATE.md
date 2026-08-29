@@ -8,52 +8,52 @@ Chat history is not authoritative. Repository state + this file are the durable 
 
 ## Canonical checkpoint
 
-- Branch: `codex/real-data-vps-pilot`
-- Current phase base commit: `f4426c1` (VPS-preparation/login-copy closure)
-- S1 implementation commit: `ca18589d2d027a07b300cc86fbeadda49540f968`
-- S1 closure commit: `c68f6e2b5f6088447243afa494e17eeb7716748a`
-- S1.1 release parent: `a97cd465cef4811b58491a781eb5e02fc63771e6`
-- Origin: 7A-6 implementation was pushed at `e638e635261830ce8e1af8af41e80d835149563d`
-- Subject: `VPS public dashboard access`
-- Latest closed product phase: `7A-5C — multilingual QA classifier and evaluation`
-- Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
-- Current product phase: `VPS public dashboard access`
-- Current phase status: `WAITING_RELEASE_APPROVAL`
-- Next engineering gate: close the verified public-dashboard checkpoint, then discuss the bounded one-laptop real-data pilot
-- Waiting human test: no
-- Waiting release approval: yes (durable public-dashboard deployment-proof checkpoint only)
-- Last verified checkpoint: commit `d337a8f` was deployed to the VPS; Windows and mobile dashboard login succeeded over HTTPS
-- Tests already passed for S1.1: targeted deleted-recording regression 1/1; full unit 76/76; integration 2/2; Agent 1/1; full solution build GREEN with 0 warnings and 0 errors; runtime HTTP Deleted 400 / Uploaded 200 proof GREEN; final diff/status review and `git diff --check` GREEN
-- Dashboard gates completed: full dashboard lint/build, backend unit/integration gates, authenticated session-evidence API proof, role-scope proof, authenticated browser evidence-timeline/filter proof and final runtime cleanup
-- 7A-2 gates completed: worker self-test 6/6 markers; full unit tests 81/81; integration tests 3/3; full solution build 0 warnings/0 errors; local API persistence/retry proof; exact proof-row cleanup and baseline restoration; runtime OFF
-- 7A-3 gates completed: dashboard lint and production build GREEN; authenticated Owner browser proof for QA Alerts → Recording QA Review; two timestamped segments rendered; click-to-seek set video position to 3.0s and highlighted the segment; browser console errors 0; six test recordings, dependent alerts, test object and orphan test device cleaned
-- Owner-approved high-risk recording cleanup: 141 remaining recordings and dependent QA evidence removed; exactly two approved samples retained (`15541c8f-2a67-4bdd-9b0d-cc3ff020960d` Uploaded and `eeb925e3-e28f-4eb6-81d3-33650560c73d` Pending); no MinIO objects remained; sessions/events/devices were preserved
-- 7A-4 automated readiness: three unique device identities, repeated heartbeats, isolated recording submissions and idempotent retries passed; exact proof cleanup restored baseline.
-- 7A-4 physical readiness: `DESKTOP-RAAFV2I` registered a fresh identity, recovered after Wi-Fi loss, uploaded device-scoped recordings, appeared in the authenticated dashboard and produced playable screen evidence. All physical-test objects/rows/device/heartbeats were removed by exact identity and the database baseline was restored.
-- 7A-4 storage correction: recording defaults and the local package now use H.264 veryfast/CRF 32 with a 700 kbps video cap and AAC 64 kbps mono. The physical 50.4-second sample was 3,075,494 bytes at 488 kbps with readable 1366x768 text. Conservative capacity planning uses 764 kbps for 90 recorded-hours/day with unchanged 3-day normal / 7-day QA retention; 200 GB is unsafe if all recordings remain QA evidence.
-- 7A-4 system-audio proof: the physical 48.2-second sample contained 64.8 kbps AAC at 32 kHz mono and non-silent audio at -22.1 dB mean level. Whisper detected the speech and persisted eight timestamped Urdu transcript segments before marking the recording processed.
-- 7A-4 Unicode worker repair: the physical transcript exposed repeated Windows `charmap` failures when the service printed non-Latin text. The worker now configures stdout/stderr as UTF-8 and the NSSM batch launcher sets Python UTF-8 environment flags. Forced-cp1252 self-test and manual end-to-end processing of the same recording passed. The already-running Windows service could not be restarted without elevation and will load the fix at its next service/host restart.
-- 7A-4 package preparation: `scripts/Prepare-LocalAgentTestPackage.ps1` publishes self-contained Agent and TeamsHelper binaries, writes LAN/test-only configuration with live streaming disabled, and emits operator instructions under `publish\local-agent-test` (ignored by Git). The compressed v3 package was generated and checksum-verified.
-- 7A-4 final gates: solution Release build 0 warnings/0 errors; Agent tests 7/7; unit tests 81/81; integration tests 3/3; dashboard lint and production build GREEN; QA worker self-test including Unicode output GREEN; PowerShell parser and `git diff --check` GREEN; API, Agent, dashboard and FFmpeg OFF.
-- 7A-5A automated implementation gates: solution Release build 0 warnings/0 errors; Agent tests 9/9; backend unit tests 84/84; integration tests 5/5; worker self-test 8/8 markers; Python compile and PowerShell parser GREEN; migration applied without data loss; two-track FFmpeg/finalizer proof showed video 16.200s and both audio tracks 16.192s; no-microphone proof produced `Unavailable` and worker fail-closed; API first-submit/identical-retry/divergent-retry/upload/pending/download/extraction proof GREEN; exact proof rows/objects removed and baseline restored (recordings 2, devices 3, heartbeats 1361, audio gaps 0); runtime OFF.
-- 7A-5A human-test package: rebuilt self-contained `publish/local-agent-test-v4.zip` from the current source with recording enabled, live streaming disabled, default-communications microphone selection instructions and old-Agent replacement guidance. SHA-256: `9815A5A1661706710E09D4C28491D879B2C55509FD8A8F3FCD36B4C66477F79A`.
-- 7A-5A provisional acceptance: built-in laptop microphone capture was accepted for the technical pipeline proof (recording, two-track layout, persistence, upload and worker validation) before the real headset run; no candidate/classifier or retention implementation is included.
-- 7A-5A headset proof completed (2026-08-29): controlled Agent run selected `Headset (pro2)`, reported `TeacherAudioStatus: Proven`, finalized a 30.592-second two-track MP4, uploaded it successfully through the local API, and PyAV extracted the declared teacher track to 16 kHz mono WAV. Exact six proof recordings/objects and 12 generated heartbeats were removed; baseline returned to recordings 2, devices 3, heartbeats 1361, audio gaps 0. The Owner-requested headset verification is now complete.
-- 7A-5B candidate foundation gates completed (2026-08-29): proven layout-1 teacher-track candidates now persist with policy/analysis versions, deterministic idempotency, trigger plus ±10-second context, transcript/language/intent/confidence and review audit fields. Owner/Admin and assigned-Manager scoped APIs expose candidates; Confirm alone creates a linked QA alert and Dismiss creates none. Unit tests 87/87, integration tests 5/5, Release build 0 warnings/0 errors, EF migration `20260828201740_AddQaCandidates` applied, dashboard production build and TypeScript checks GREEN; DB baseline remains recordings 2, devices 3, coverage gaps 0, candidates 0. Runtime remains OFF.
-- 7A-6 attendance operations gates completed (2026-08-29): daily report now includes teacher attendance status and the complete completed-session list while preserving reducer semantics. Dashboard adds clickable status cards, Student Attendance and Teacher Attendance tabs, search/status filters, evidence detail table and 30-second refresh. Backend unit tests 87/87, integration tests 5/5, Release build 0 warnings/0 errors, dashboard lint/TypeScript/production build GREEN. No migration or runtime data mutation required.
-- 7A-6 browser proof completed (2026-08-29): authenticated Owner dashboard loaded Attendance Report; status cards rendered, Present card changed the operational filter, Teacher Attendance tab activated, empty-state table rendered safely, and browser console error count was 0. Dashboard/API remain available for Owner inspection; no test data was created.
-- 7A-5C implementation checkpoint (2026-08-29): the production-wired `spikes/SttSpike/qa_worker.py` now extracts timestamped teacher-track context windows, applies the versioned `7A-5C-lexical-v1` fail-closed classifier, and posts review candidates to `/api/worker/qa-candidates`; it no longer creates final alerts directly. Arabic-recitation windows and isolated `fee`/`fi` tokens are excluded, while supported parent/contact/financial contexts become candidates. The checked-in 10-case synthetic corpus reports TP=4, FP=0, TN=6, FN=0 (policy coverage only, not a production accuracy claim). Python compile, classifier self-test, evaluator and worker candidate-only-order self-test are GREEN; Docker worker now copies the classifier module. Released in `411bbac`.
-- VPS preparation checkpoint (2026-08-29): Owner approved high-risk VPS staging/production preparation and selected direct public-IPv4 HTTP staging before domain/TLS. The production Compose now routes only through Caddy port 80, keeps API/dashboard ports internal, uses an environment-supplied IPv4 host, and explicitly disables API HTTPS redirection for this bounded staging mode. Commercial branding is `Home Quran Learning Operations Suite`; the Admin/Manager entry surface is `Operations & Quality Console`, the laptop package identity is `Home Quran Learning Classroom Agent`, and the developer credit is `Abdul Wahid`. The supplied academy logo is shown through a circular crop without the source image's white square. Login browser proof, console-error check, Compose config, secure-value validator, PowerShell parser, dashboard lint/build, Release solution build (0 warnings/errors), unit 87/87 and integration 5/5 are GREEN. No VPS, DNS, database, recording or secret was mutated. Direct-IP staging is synthetic/test-only because credentials and Agent API keys are not encrypted in transit. Released in `20f2fdb`.
-- Real-data VPS pilot preparation checkpoint (2026-08-29): Owner explicitly approved `APPROVE HIGH-RISK REAL-DATA VPS PILOT`. Direct public IPv4 now uses Caddy `2.11.3` with publicly trusted short-lived ACME certificates, HTTPS 443, HTTP-01 renewal, exact public `/32` source allowlisting and private API/dashboard/data services. Production Compose disables automated recording retention because deletion of real recordings needs a separate approval, and every service has bounded Docker logs. Validators reject private/documentation hosts, broad CIDRs, placeholder/weak/reused secrets, unexpected public ports, unpinned Caddy, invalid syntax, enabled retention and public-HTTP pilot packages. The pilot Agent package requires HTTPS and is treated as credential-bearing. The login page now scrolls safely on short screens and exposes all feature text on mobile/tablet. Browser proof passed at 320x568, 360x568, 768x1024 and 1366x650 with zero horizontal overflow and zero console errors; dashboard lint/build, Release solution build (0 warnings/errors), unit 87/87, integration 5/5, PowerShell parsing, deployment self-test and generator sync are GREEN. Released at `b61c1d2`. The Owner VPS was reachable through an Owner terminal, but Codex has no non-interactive SSH authentication; no remote file, service, firewall, database, recording or secret was changed. The requested old VPS project copy remains untouched until an exact read-only active-path/mount/volume inventory proves a safe retirement target.
-- VPS inventory/cleanup checkpoint (2026-08-29): Read-only inventory found no running application containers, Docker volumes, Compose files, Academy services/processes or candidate project directories on the Owner VPS. The only project artifact was the exact inactive archive `/root/HomeQuranLearning.QA.zip` (583,331,380 bytes); Owner-authorized deletion removed only that file and verified `OLD_PROJECT_ARCHIVE_DELETED=YES`. No database, recording, secret, Docker volume or active service was touched. The VPS is ready for secure environment preparation and immutable HTTPS pilot deployment.
-- VPS TLS diagnosis/fix checkpoint (2026-08-29): External Windows PowerShell/curl/Chrome clients failed before HTTP with `tlsv1 alert internal error`, while an OpenSSL probe with explicit SNI completed TLS and returned the expected Caddy 403 from the non-allowlisted Docker source. Caddy access logs showed no external HTTPS request, and its adapted config had no default for empty SNI. The documented `default_sni {$ACADEMY_HOST}` fix was added to the checked-in Caddyfile and generator, committed at `96ec0f3`, and deployed to the VPS. Local validation and PowerShell parsing pass; the VPS no-SNI curl completed TLS with `server_name:""` and returned the expected HTTP 403. External Windows proof returned 200 for `/health` and `/login`, and 401 for unauthenticated `/api/auth/me`. API, database, recordings, secrets and volumes were untouched.
-- VPS authentication routing diagnosis checkpoint (2026-08-29): External Caddy logs proved `/api/auth/login` returned 200 directly from the backend, then `/api/auth/me` returned 401 because the Caddy `/api/*` route bypassed Next.js dashboard cookie-setting/proxy handlers. The fix routes `/api/auth/*` and `/api/proxy/*` to the dashboard before the backend catch-all; other API/Agent/worker routes remain backend-directed. Local Caddy validation and deployment self-test pass; remote VPS has not been changed for this fix. Mobile access from a different public IP is expected to remain 403 under the exact pilot `/32` allowlist.
-- VPS public dashboard access checkpoint (2026-08-29): Owner approved public dashboard access from any network. Commit `d337a8f` deployed the bounded route policy: `/api/auth/*` and `/api/proxy/*` stay on Next.js (JWT/cookie enforced), non-API dashboard pages/assets are public over HTTPS, and health, Agent, worker and direct backend API routes retain the exact pilot `/32` allowlist. Local Caddy validation, deployment self-test and PowerShell parsing pass; Windows and mobile login both succeeded. API, database, recordings, secrets and volumes were untouched.
-- S1.1 release files: `docs/PROJECT-STATE.md`, `src/Backend/Academy.Api/Program.cs`, `src/Backend/Academy.Application/Exceptions/RecordingUnavailableException.cs`, `src/Backend/Academy.Application/Services/RecordingService.cs`, `tests/Academy.UnitTests/RecordingServiceTests.cs`
-- Temporary data: all 7A-4 automated and physical proof rows/objects/devices were removed by exact identity; the current recordings baseline is the two Owner-approved retained controls
-- Product runtime expected after latest proof: OFF
-
-S1, S1.1, S1.2, dashboard operational hardening, 7A-2, 7A-3, 7A-4, 7A-5A, 7A-5B, 7A-5C, 7A-6, VPS direct-IP staging preparation and secured real-data VPS pilot preparation are CLOSED after full validation, Owner approval and push.
+- Branch: `codex/final-classroom-agent-installer`
+- HEAD: `9ff6abf9633b4231ddab3eb73ea0cdde2f11145f`
+- Status: `READY_FOR_PRODUCTION_DEPLOYMENT`
+- Development mode: production-targeted local development; current branch changes are not deployed.
+- Latest committed checkpoint: production classroom installer / WHIP live-path foundation at `9ff6abf`.
+- Current verified but uncommitted work:
+  - development Runtime now keeps TeamsHelper manual on the admin/development laptop and supports `StartTeams` / `StopTeams`; normal `StartAll` leaves TeamsHelper OFF;
+  - stale Agent `--no-build` launcher behavior was removed so current source is used;
+  - dashboard authentication cookie handling works on local HTTP LAN while preserving Secure cookies behind HTTPS;
+  - dashboard layout is responsive on mobile; Sessions and Attendance use stacked mobile cards; known mojibake in these operational views and the Sessions review separator were repaired;
+  - installer/dashboard branding uses Home Quran Learning product identity and developer/owner credit;
+  - root `AGENTS.md` has been revised to a production-first, low-bureaucracy engineering model.
+- Verification already completed for the current uncommitted dashboard slice:
+  - dashboard lint GREEN;
+  - Next.js production build GREEN;
+  - mobile Sessions and Attendance human visual test GREEN;
+  - Sessions review text renders cleanly as `Active <duration> - Drops <count>`.
+- Runtime/TeamsHelper verification already completed for the current uncommitted runtime slice:
+  - Runtime parser GREEN;
+  - Agent build GREEN;
+  - `StartAll` => API ON / Agent ON / Teams OFF;
+  - `StartTeams` => Teams ON;
+  - `StopTeams` => Teams OFF;
+  - development Teams scheduled task disabled intentionally.
+- Intentionally uncommitted/generated backup files currently include:
+  - `.dev-runtime/Runtime.ps1.before-teams-control`
+  - `.dev-runtime/Start-AcademyAgent.ps1.before-teams-control`
+  - dashboard `*.mobile-backup` files.
+- Known local line-ending/index noise remains in:
+  - `infrastructure/docker/Dockerfile.api`
+  - `infrastructure/docker/Dockerfile.dashboard`
+  - `infrastructure/docker/Dockerfile.worker`
+  - `spikes/SttSpike/requirements.txt`
+  These must not be blindly reset or staged; prove real content differences before action.
+- Current release candidate is locally verified and awaiting commit/push plus VPS rollout. Production routing no longer depends on teacher/reviewer source-IP `/32` allowlists; roaming Classroom Agents use HTTPS and application authentication.
+- Owner can manage Admin/Manager accounts through real backend contracts: enable/disable, password reset and safe delete; Owner accounts are protected.
+- Production Owner seeding no longer has a default email/password fallback.
+- Final Classroom Agent installer built successfully as a self-contained Windows EXE (338.98 MB), SHA256 `02E378637A0252445B75A7BE7203ECF5845DB2694FC8312E037546CC52C7E549`; current build is unsigned and may trigger SmartScreen.
+- Verification: unit 87/87 GREEN; integration 5/5 GREEN; dashboard lint GREEN; dashboard production build GREEN; production config self-test GREEN; installer build GREEN.
+- Historical VPS pilot/deployment work documented later in this file is separate history; do not infer that the current branch or current uncommitted changes are deployed.
+- Next production-development checkpoint:
+  1. reconcile `PROJECT-DECISIONS.md`, `OWNER-CONTROL-PLANE.md`, and relevant architecture state with the revised governance;
+  2. review intended diffs, backups/noise, and secret exposure;
+  3. update this file with the final verified checkpoint;
+  4. create an atomic commit and normal push on the current feature branch;
+  5. start Owner Control Center v1 with real backend contracts only.
 
 ## Current runtime snapshot
 
@@ -426,56 +426,23 @@ download
 
 Evidence clips remain a later phase.
 
-## Owner/Codex workflow decisions
+## Owner/engineering workflow decisions
 
-Maximum safe automation is desired.
+Treat the repository as a real production software project.
 
-Routine Codex work should handle:
-- inspection/search
-- PowerShell
-- source editing
-- builds/tests
-- Docker/PostgreSQL
-- API/Agent/runtime lifecycle
-- browser/dashboard tests
-- safe Teams test automation
-- temporary proof data
-- cleanup
-- failure diagnosis
+Normal low-risk development flow:
 
-No fake fixes, ignored failures, hidden errors or false green reports.
+`inspect relevant state -> implement production-quality slice -> targeted verification -> fix regressions -> update PROJECT-STATE.md -> review intended diff/secrets -> atomic commit -> normal push -> continue`
 
-Human-only gates include real Teams mobile answer/speech/listening, MFA/OTP, physical device interaction and genuine business decisions.
+Rules:
 
-Use checkpoint: `HUMAN TEST REQUIRED`
-
-Dashboard/browser testing should be automated where possible. Never commit passwords/tokens/cookies.
-
-Teams automation is limited to explicitly approved test target. If mobile/student human action is required, stop and wait.
-
-Before every coherent major-phase commit/push, provide detailed release summary and stop at:
-
-`RELEASE APPROVAL REQUIRED`
-
-Owner approval keyword:
-
-`APPROVE`
-
-No major-phase commit/push before APPROVE.
-
-After successful push, report actual commit hash, push result, clean worktree and phase-close summary.
-
-Then explain next major phase in detail and wait for:
-
-`GO`
-
-During autonomous work send concise `CHECKPOINT GREEN X/Y` updates after meaningful milestones.
-
-After laptop restart/new Codex chat, owner should only need:
-
-`Continue project`
-
-Codex must read project state/governance, inspect Git/runtime/source and resume from last verified checkpoint.
+- No fake production endpoints, fake health/metrics, placeholder production controls, hidden credentials, hard-coded device IDs, IP-based trust, or localhost-only production assumptions.
+- Development-only proof data or mocks must be clearly isolated and labelled.
+- Do not require ceremonial `APPROVE` or `GO` gates for ordinary verified low-risk local development commits/pushes.
+- Explicit approval remains mandatory for production/VPS deployment, production migrations/destructive DB actions, secret rotation, production-impacting auth/RBAC/security changes, historical evidence mutation, proven live/recording architecture replacement, Teams attendance semantic changes, system-wide firewall/security changes, driver installation, force/history Git operations, and deployment-changing canonical release/merge actions.
+- Keep `PROJECT-STATE.md` factual and recoverable, not a command diary.
+- Ask the owner to run local commands only when this environment cannot execute them; commands must be exact and copy/paste-safe, preferably single-line when PowerShell continuation could confuse.
+- Human-only actions remain physical/mobile tests, MFA/OTP/login steps, and genuine business decisions.
 
 ## Owner Control Plane — required, not implemented
 
@@ -512,17 +479,19 @@ No product source, migration, or test file belongs in this bootstrap.
 
 ## Production deployment
 
-Direct-IP synthetic VPS staging preparation is approved and awaiting release.
-Production activation, domain/TLS, real academy data and unrestricted laptop
-rollout remain separate high-risk approvals.
+Development is production-targeted. Actual VPS/production deployment remains a separate high-risk action.
+
+Historical VPS pilot/deployment work is documented above. The current `codex/final-classroom-agent-installer` branch and its uncommitted changes are not deployed by this checkpoint.
+
+Before any next VPS mutation, verify the exact remote commit/config/runtime state and obtain explicit high-risk approval for the bounded production action.
 
 ## Resume checklist
 
-1. Read this file.
-2. Read `docs/architecture/current-state.md`.
-3. Inspect branch/HEAD/status.
-4. Inspect staged/uncommitted files.
-5. Inspect runtime.
-6. Determine whether current phase is closed, in progress, waiting human test, waiting release approval or blocked.
-7. If the recorded status is `WAITING_RELEASE_APPROVAL`, do not stage/commit/push or start the next phase.
-8. Resume only from verified state.
+1. Read `AGENTS.md` and this file.
+2. Inspect branch, HEAD, worktree/staged state, and origin when available.
+3. Read only the decisions/architecture documents relevant to the current slice.
+4. Inspect runtime/database/Docker/browser state only if the current slice touches them.
+5. Resume from the latest verified checkpoint; do not redo closed work.
+6. Never discard/reset/clean/stash unexpected human work.
+7. Continue ordinary verified low-risk development without ceremonial release gates.
+8. Stop for explicit approval only when the next action is high-risk under `AGENTS.md`.

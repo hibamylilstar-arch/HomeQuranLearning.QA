@@ -107,7 +107,7 @@ export default function LiveMonitoringPage() {
   if (sessions.length === 0) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <h2 className="text-2xl font-bold tracking-tight text-white">Active QA Streams</h2>
           <button
             type="button"
@@ -125,8 +125,8 @@ export default function LiveMonitoringPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="min-w-0 space-y-5 sm:space-y-6">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white">Active QA Streams</h2>
           <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-slate-400">Live WebRTC Monitoring Feeds</p>
@@ -140,7 +140,7 @@ export default function LiveMonitoringPage() {
         </button>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6">
         {sessions.map((session) => {
           const feedError = tokenErrors[session.id];
 
@@ -185,7 +185,7 @@ export default function LiveMonitoringPage() {
                 )}
               </div>
 
-              <div className="flex items-center justify-between bg-slate-900/50 px-4 py-3 text-[11px] font-medium text-slate-400">
+              <div className="flex min-w-0 flex-col gap-2 bg-slate-900/50 px-4 py-3 text-[11px] font-medium text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                 <span className="truncate pr-2">Student: <span className="font-semibold text-slate-300">{session.studentFullName}</span></span>
                 <span className="shrink-0 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-slate-300">{session.courseName}</span>
               </div>

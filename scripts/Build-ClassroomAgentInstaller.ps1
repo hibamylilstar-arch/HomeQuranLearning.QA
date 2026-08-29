@@ -259,10 +259,9 @@ try {
                  $_.Name -ne "payload-manifest.json"
              } |
              Sort-Object FullName) {
-        $relativePath =
-            [IO.Path]::GetRelativePath(
-                $payloadRoot,
-                $payloadFile.FullName).Replace("\", "/")
+        $baseUri = [Uri](([IO.Path]::GetFullPath($payloadRoot).TrimEnd("\") + "\"))
+        $fileUri = [Uri]([IO.Path]::GetFullPath($payloadFile.FullName))
+        $relativePath = [Uri]::UnescapeDataString($baseUri.MakeRelativeUri($fileUri).ToString())
 
         $payloadHashes[$relativePath] =
             (Get-FileHash `

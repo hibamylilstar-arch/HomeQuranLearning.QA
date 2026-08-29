@@ -17,9 +17,6 @@
             disable_tlsalpn_challenge
         }
     }
-
-    @pilotAllowed remote_ip {$PILOT_ALLOWED_CIDRS}
-
     # Dashboard auth and its JWT-bearing proxy are safe to expose publicly;
     # the Next.js handlers enforce the session before forwarding data access.
     handle /api/auth/* {
@@ -51,17 +48,7 @@
     handle /health {
         reverse_proxy api:8080
     }
-
-    # Worker and other direct backend APIs remain restricted to the trusted
-    # operations source boundary. Dashboard data continues through its
-    # authenticated Next.js proxy above.
-    handle @pilotAllowed {
-        handle /api/* {
-            reverse_proxy api:8080
-        }
-    }
-
-    # All non-API paths are dashboard pages/assets and may be reached from
+# All non-API paths are dashboard pages/assets and may be reached from
     # any network; data calls still require an authenticated JWT proxy.
     @publicDashboard {
         not path /api/* /health /rtc* /whip/*

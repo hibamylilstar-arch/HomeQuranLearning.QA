@@ -20,9 +20,20 @@ export async function POST(request: Request) {
 
   const response = NextResponse.json({ user: data });
 
+  const forwardedProto =
+    request.headers
+      .get("x-forwarded-proto")
+      ?.split(",")[0]
+      .trim()
+      .toLowerCase();
+
+  const requestIsHttps =
+    forwardedProto
+      ? forwardedProto === "https"
+      : new URL(request.url).protocol === "https:";
   response.cookies.set("qa_auth_token", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: requestIsHttps,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 2, // 2 hours

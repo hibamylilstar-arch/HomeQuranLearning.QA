@@ -12,6 +12,7 @@
     <Product>Home Quran Learning Classroom Agent</Product>
     <Company>Abdul Wahid</Company>
     <Authors>Abdul Wahid</Authors>
+    <Copyright>Copyright © 2026 Abdul Wahid. All rights reserved.</Copyright>
     <Description>Installer for the Home Quran Learning Classroom Agent</Description>
     <Version>1.0.0</Version>
   </PropertyGroup>

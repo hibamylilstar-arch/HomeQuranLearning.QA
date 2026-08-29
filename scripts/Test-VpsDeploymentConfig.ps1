@@ -28,7 +28,6 @@ $baseValues = [ordered]@{
     POSTGRES_DB = "homequranlearning_validation"
     ACADEMY_HOST = "8.8.8.8"
     ACME_EMAIL = "operations@homequranlearning.com"
-    PILOT_ALLOWED_CIDRS = "1.1.1.1/32 8.8.4.4/32"
     MINIO_ROOT_USER = "academy_validation_minio"
     MINIO_ROOT_PASSWORD = "ValidationOnlyMinioPassword_48Chars_B2"
     MINIO_BUCKET = "academy-validation-recordings"
@@ -93,11 +92,6 @@ try {
         -ExpectedMessage "public IPv4"
 
     Assert-ValidatorFailure `
-        -Name "broad_allowlist" `
-        -Overrides @{ PILOT_ALLOWED_CIDRS = "0.0.0.0/0" } `
-        -ExpectedMessage "exact IPv4 /32"
-
-    Assert-ValidatorFailure `
         -Name "weak_secret" `
         -Overrides @{ AGENT_API_KEY = "too-short" } `
         -ExpectedMessage "too short"
@@ -116,7 +110,7 @@ try {
             -PackageProfile RealDataPilot `
             -OutputDirectory (Join-Path $tempRoot "must-not-build") *> $null
 
-        throw "Public HTTP pilot package was not rejected"
+        throw "Public HTTP production package was not rejected"
     }
     catch {
         if ($_.Exception.Message -notmatch "publicly trusted HTTPS") {
@@ -124,7 +118,7 @@ try {
         }
     }
 
-    Write-Output "PILOT_PACKAGE_REJECT_PUBLIC_HTTP=YES"
+    Write-Output "PRODUCTION_PACKAGE_REJECT_PUBLIC_HTTP=YES"
     Write-Output "VPS_CONFIG_SELF_TEST_OK"
 }
 finally {

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -33,12 +33,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-950">
+    <div className="flex h-[100dvh] min-h-0 w-full min-w-0 overflow-hidden bg-slate-950">
       <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
-      <div className="flex flex-1 flex-col overflow-hidden w-full">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Header setMobileOpen={setMobileOpen} />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 w-full custom-scrollbar">
-          <div className="mx-auto w-full max-w-[1600px]">
+        <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-6 lg:p-8">
+          <div className="mx-auto min-w-0 w-full max-w-[1600px]">
             {children}
           </div>
         </main>

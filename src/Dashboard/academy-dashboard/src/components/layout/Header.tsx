@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useAuth } from "@/components/AuthProvider";
 
@@ -12,7 +12,7 @@ export default function Header({ setMobileOpen }: { setMobileOpen: (val: boolean
   const displayRole = rawRole;
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-x-4 border-b border-slate-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 flex h-16 min-w-0 shrink-0 items-center gap-x-3 border-b border-slate-200 bg-white px-3 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
       <button type="button" className="-m-2.5 p-2.5 text-slate-700 lg:hidden" onClick={() => setMobileOpen(true)}>
         <span className="sr-only">Open sidebar</span>
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
@@ -20,7 +20,7 @@ export default function Header({ setMobileOpen }: { setMobileOpen: (val: boolean
         </svg>
       </button>
 
-      <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6 justify-between items-center">
+      <div className="flex min-w-0 flex-1 items-center justify-between gap-x-3 self-stretch lg:gap-x-6">
         <h1 className="text-lg font-semibold text-slate-900 hidden sm:block">Command Center</h1>
         <div className="flex items-center gap-x-4 lg:gap-x-6">
           <div className="flex items-center gap-x-3">

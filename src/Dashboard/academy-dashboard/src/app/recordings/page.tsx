@@ -197,7 +197,7 @@ export default function RecordingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-5 sm:space-y-6">
       <div>
         <h2 className="text-xl font-bold tracking-tight text-slate-900">
           Session Recordings
@@ -214,7 +214,7 @@ export default function RecordingsPage() {
         </div>
       )}
 
-      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3">
+      <div className="grid min-w-0 grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             Search
@@ -309,8 +309,8 @@ export default function RecordingsPage() {
                 key={recording.id}
                 className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
+                <div className="flex min-w-0 flex-col items-start justify-between gap-3 sm:flex-row">
+                  <div className="min-w-0 max-w-full">
                     <div className="text-base font-bold text-indigo-700">
                       {recording.deviceName}
                     </div>
@@ -349,7 +349,7 @@ export default function RecordingsPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+                <div className="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
                   <div>
                     <div className="text-[10px] uppercase text-slate-400">
                       Started

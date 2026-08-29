@@ -247,7 +247,6 @@ services:
     environment:
       ACADEMY_HOST: ${ACADEMY_HOST}
       ACME_EMAIL: ${ACME_EMAIL}
-      PILOT_ALLOWED_CIDRS: ${PILOT_ALLOWED_CIDRS}
     ports:
       - "80:80"
       - "443:443"

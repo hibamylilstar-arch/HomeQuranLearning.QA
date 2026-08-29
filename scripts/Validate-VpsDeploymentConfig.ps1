@@ -93,7 +93,7 @@ if (-not (Test-Path -LiteralPath $environmentPath -PathType Leaf)) {
 }
 
 $required = @(
-    "ACADEMY_HOST", "ACME_EMAIL", "PILOT_ALLOWED_CIDRS",
+    "ACADEMY_HOST", "ACME_EMAIL",
     "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
     "MINIO_ROOT_USER", "MINIO_ROOT_PASSWORD", "MINIO_BUCKET",
     "AGENT_API_KEY", "WORKER_API_KEY", "LIVEKIT_API_KEY",
@@ -133,27 +133,6 @@ if (-not [Net.IPAddress]::TryParse($values["ACADEMY_HOST"], [ref]$parsedAddress)
 if (-not (Test-EmailAddress $values["ACME_EMAIL"]) -or
     $values["ACME_EMAIL"] -match '\.(local|invalid)$|@example\.') {
     throw "ACME_EMAIL must be a monitored, non-placeholder email address"
-}
-
-$allowedCidrs = @(
-    $values["PILOT_ALLOWED_CIDRS"] -split '\s+' |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-)
-
-if ($allowedCidrs.Count -lt 1 -or $allowedCidrs.Count -gt 10) {
-    throw "PILOT_ALLOWED_CIDRS must contain between 1 and 10 exact public IPv4 /32 entries"
-}
-
-foreach ($cidr in $allowedCidrs) {
-    if ($cidr -notmatch '^([^/]+)/32$') {
-        throw "Pilot allowlist entries must be exact IPv4 /32 ranges"
-    }
-
-    [Net.IPAddress]$allowedAddress = $null
-    if (-not [Net.IPAddress]::TryParse($Matches[1], [ref]$allowedAddress) -or
-        -not (Test-PublicIpv4 $allowedAddress)) {
-        throw "Pilot allowlist entries must be public IPv4 /32 ranges"
-    }
 }
 
 if (-not (Test-EmailAddress $values["SEED_OWNER_EMAIL"]) -or
@@ -209,7 +188,7 @@ try {
     $config = $configJson | ConvertFrom-Json
 
     if ($config.services.caddy.image -ne "caddy:2.11.3-alpine") {
-        throw "Caddy must remain pinned to the verified 2.11.3-alpine image for this pilot"
+        throw "Caddy must remain pinned to the verified 2.11.3-alpine production image"
     }
 
     if ($config.services.livekit.image -ne "livekit/livekit-server:v1.13.5") {
@@ -223,19 +202,14 @@ try {
     if ($config.services.'livekit-ingress'.network_mode -ne "host") {
         throw "WHIP ingress requires host networking for WebRTC UDP media"
     }
-
-    if ($config.services.api.environment.RecordingRetention__Enabled -ne "false") {
-        throw "Real-data pilot retention must remain disabled until separate deletion approval"
-    }
-
-    $published = @()
+$published = @()
     foreach ($serviceProperty in $config.services.PSObject.Properties) {
         $loggingProperty = $serviceProperty.Value.PSObject.Properties["logging"]
         if ($null -eq $loggingProperty -or
             $loggingProperty.Value.driver -ne "json-file" -or
             $loggingProperty.Value.options.'max-size' -ne "10m" -or
             $loggingProperty.Value.options.'max-file' -ne "5") {
-            throw "Every pilot service must use bounded 10m x 5 Docker logs"
+            throw "Every production service must use bounded 10m x 5 Docker logs"
         }
 
         $portsProperty = $serviceProperty.Value.PSObject.Properties["ports"]
@@ -329,7 +303,6 @@ try {
             & docker run --rm `
                 --env "ACADEMY_HOST=$($values['ACADEMY_HOST'])" `
                 --env "ACME_EMAIL=$($values['ACME_EMAIL'])" `
-                --env "PILOT_ALLOWED_CIDRS=$($values['PILOT_ALLOWED_CIDRS'])" `
                 --volume "${caddyPath}:/etc/caddy/Caddyfile:ro" `
                 caddy:2.11.3-alpine `
                 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile `
@@ -355,6 +328,4 @@ finally {
 Write-Output "VPS_CONFIG_ENV_OK=YES"
 Write-Output "VPS_COMPOSE_CONFIG_OK=YES"
 Write-Output "VPS_PUBLIC_IPV4_TLS_OK=YES"
-Write-Output "VPS_PILOT_ALLOWLIST_OK=YES"
-Write-Output "VPS_RETENTION_DISABLED_OK=YES"
 Write-Output "VPS_CONFIG_SECRETS_NOT_PRINTED=YES"

@@ -21,7 +21,7 @@ This is not a public multi-tenant SaaS platform.
 6. Current publishing path is FFmpeg RTMP into LiveKit Ingress.
 7. Reliability, retries, historical safety and idempotency are first-class requirements.
 8. QA detection uses speech timing/context rather than processing-time assumptions.
-9. Production/VPS deployment is deferred until local product completeness and stabilization.
+9. Local and VPS environments use the same production-capable architecture; verified releases move through normal test, commit, deploy and runtime verification.
 
 ## Current component map
 

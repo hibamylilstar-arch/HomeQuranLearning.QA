@@ -90,7 +90,10 @@ internal sealed class InstallerForm : Form
                 Location = new Point(184, 119),
                 ForeColor = Color.FromArgb(193, 204, 219),
                 Font = new Font("Segoe UI", 9F),
-                Text = "Developed by Abdul Wahid"
+                Text =
+                    "Developed & owned by Abdul Wahid" +
+                    Environment.NewLine +
+                    "© 2026 Abdul Wahid. All rights reserved."
             };
 
         header.Controls.Add(logo);

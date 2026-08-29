@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -36,12 +36,12 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen: boo
     <>
       {mobileOpen && <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />}
 
-      <aside className={"fixed inset-y-0 left-0 z-50 w-64 transform bg-slate-950 border-r border-slate-800 text-slate-300 transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 " + (mobileOpen ? "translate-x-0" : "-translate-x-full") + " flex flex-col"}>
+      <aside className={"fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-64 max-w-[85vw] transform flex-col border-r border-slate-800 bg-slate-950 text-slate-300 transition-transform duration-200 ease-in-out lg:static lg:h-auto lg:max-w-none lg:translate-x-0 " + (mobileOpen ? "translate-x-0" : "-translate-x-full")}>
         <div className="flex h-16 shrink-0 items-center justify-center border-b border-slate-800 bg-slate-950">
           <div className="h-12 w-12 overflow-hidden rounded-full" aria-label="Home Quran Learning Operations Suite">
             <Image
               src="/branding/homequranlearning-logo.jpg"
-              alt="Home Quran Learning — Learn with Faith"
+              alt="Home Quran Learning â€” Learn with Faith"
               width={64}
               height={64}
               priority
@@ -50,7 +50,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen: boo
           </div>
         </div>
 
-        <div className="flex flex-1 flex-col overflow-y-auto px-3 py-4 custom-scrollbar bg-slate-950">
+        <div className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-slate-950 px-3 py-4">
           <nav className="flex-1 space-y-1">
             {navItems.map((item) => {
               const isActive = item.href === "/" 

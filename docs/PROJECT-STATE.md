@@ -14,12 +14,12 @@ Chat history is not authoritative. Repository state + this file are the durable 
 - S1 closure commit: `c68f6e2b5f6088447243afa494e17eeb7716748a`
 - S1.1 release parent: `a97cd465cef4811b58491a781eb5e02fc63771e6`
 - Origin: 7A-6 implementation was pushed at `e638e635261830ce8e1af8af41e80d835149563d`
-- Subject: `VPS authentication routing repair`
+- Subject: `VPS public dashboard access`
 - Latest closed product phase: `7A-5C — multilingual QA classifier and evaluation`
 - Latest closed governance phase: `CODEX AUTOPILOT GOVERNANCE BOOTSTRAP`
-- Current product phase: `VPS HTTPS pilot deployment`
+- Current product phase: `VPS public dashboard access`
 - Current phase status: `IN_PROGRESS`
-- Next engineering gate: validate and deploy the dashboard-owned authentication/proxy route fix
+- Next engineering gate: release and deploy the bounded public dashboard route policy
 - Waiting human test: no
 - Waiting release approval: no
 - Last verified checkpoint: commit `876431a` closed the VPS HTTPS deployment; external Windows HTTPS returned 200 for `/health` and `/login`, and 401 for unauthenticated `/api/auth/me`
@@ -48,6 +48,7 @@ Chat history is not authoritative. Repository state + this file are the durable 
 - VPS inventory/cleanup checkpoint (2026-08-29): Read-only inventory found no running application containers, Docker volumes, Compose files, Academy services/processes or candidate project directories on the Owner VPS. The only project artifact was the exact inactive archive `/root/HomeQuranLearning.QA.zip` (583,331,380 bytes); Owner-authorized deletion removed only that file and verified `OLD_PROJECT_ARCHIVE_DELETED=YES`. No database, recording, secret, Docker volume or active service was touched. The VPS is ready for secure environment preparation and immutable HTTPS pilot deployment.
 - VPS TLS diagnosis/fix checkpoint (2026-08-29): External Windows PowerShell/curl/Chrome clients failed before HTTP with `tlsv1 alert internal error`, while an OpenSSL probe with explicit SNI completed TLS and returned the expected Caddy 403 from the non-allowlisted Docker source. Caddy access logs showed no external HTTPS request, and its adapted config had no default for empty SNI. The documented `default_sni {$ACADEMY_HOST}` fix was added to the checked-in Caddyfile and generator, committed at `96ec0f3`, and deployed to the VPS. Local validation and PowerShell parsing pass; the VPS no-SNI curl completed TLS with `server_name:""` and returned the expected HTTP 403. External Windows proof returned 200 for `/health` and `/login`, and 401 for unauthenticated `/api/auth/me`. API, database, recordings, secrets and volumes were untouched.
 - VPS authentication routing diagnosis checkpoint (2026-08-29): External Caddy logs proved `/api/auth/login` returned 200 directly from the backend, then `/api/auth/me` returned 401 because the Caddy `/api/*` route bypassed Next.js dashboard cookie-setting/proxy handlers. The fix routes `/api/auth/*` and `/api/proxy/*` to the dashboard before the backend catch-all; other API/Agent/worker routes remain backend-directed. Local Caddy validation and deployment self-test pass; remote VPS has not been changed for this fix. Mobile access from a different public IP is expected to remain 403 under the exact pilot `/32` allowlist.
+- VPS public dashboard access checkpoint (2026-08-29): Owner approved public dashboard access from any network. The bounded route policy keeps `/api/auth/*` and `/api/proxy/*` on Next.js (JWT/cookie enforced), exposes non-API dashboard pages/assets publicly over HTTPS, and retains the exact pilot `/32` allowlist for health, Agent, worker and direct backend API routes. Local Caddy validation, deployment self-test and PowerShell parsing pass; remote VPS has not been changed for this policy.
 - S1.1 release files: `docs/PROJECT-STATE.md`, `src/Backend/Academy.Api/Program.cs`, `src/Backend/Academy.Application/Exceptions/RecordingUnavailableException.cs`, `src/Backend/Academy.Application/Services/RecordingService.cs`, `tests/Academy.UnitTests/RecordingServiceTests.cs`
 - Temporary data: all 7A-4 automated and physical proof rows/objects/devices were removed by exact identity; the current recordings baseline is the two Owner-approved retained controls
 - Product runtime expected after latest proof: OFF

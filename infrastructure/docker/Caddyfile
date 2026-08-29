@@ -20,17 +20,19 @@
 
     @pilotAllowed remote_ip {$PILOT_ALLOWED_CIDRS}
 
+    # Dashboard auth and its JWT-bearing proxy are safe to expose publicly;
+    # the Next.js handlers enforce the session before forwarding data access.
+    handle /api/auth/* {
+        reverse_proxy dashboard:3000
+    }
+
+    handle /api/proxy/* {
+        reverse_proxy dashboard:3000
+    }
+
+    # Keep device, worker, health and direct backend APIs on the exact pilot
+    # source allowlist. Agent credentials never become internet-facing.
     handle @pilotAllowed {
-        # Dashboard-owned routes must stay on Next.js so auth cookies and
-        # the authenticated backend proxy are applied before API access.
-        handle /api/auth/* {
-            reverse_proxy dashboard:3000
-        }
-
-        handle /api/proxy/* {
-            reverse_proxy dashboard:3000
-        }
-
         handle /api/* {
             reverse_proxy api:8080
         }
@@ -38,10 +40,16 @@
         handle /health {
             reverse_proxy api:8080
         }
+    }
 
-        handle {
-            reverse_proxy dashboard:3000
-        }
+    # All non-API paths are dashboard pages/assets and may be reached from
+    # any network; data calls still require an authenticated JWT proxy.
+    @publicDashboard {
+        not path /api/* /health
+    }
+
+    handle @publicDashboard {
+        reverse_proxy dashboard:3000
     }
 
     respond "Access denied" 403

@@ -270,6 +270,10 @@ $caddyfile = @'
 {
     email {$ACME_EMAIL}
 
+    # Browsers and Windows clients commonly omit SNI for an IPv4 literal.
+    # Select this site's certificate explicitly for those no-SNI handshakes.
+    default_sni {$ACADEMY_HOST}
+
     servers {
         0rtt off
     }

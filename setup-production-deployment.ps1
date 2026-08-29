@@ -290,6 +290,16 @@ $caddyfile = @'
     @pilotAllowed remote_ip {$PILOT_ALLOWED_CIDRS}
 
     handle @pilotAllowed {
+        # Dashboard-owned routes must stay on Next.js so auth cookies and
+        # the authenticated backend proxy are applied before API access.
+        handle /api/auth/* {
+            reverse_proxy dashboard:3000
+        }
+
+        handle /api/proxy/* {
+            reverse_proxy dashboard:3000
+        }
+
         handle /api/* {
             reverse_proxy api:8080
         }

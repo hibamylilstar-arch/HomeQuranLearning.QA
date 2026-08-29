@@ -67,7 +67,7 @@ internal sealed class InstallerForm : Form
             new Label
             {
                 AutoSize = true,
-                Location = new Point(180, 40),
+                Location = new Point(180, 30),
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI Semibold", 22F),
                 Text = "Home Quran Learning"
@@ -77,7 +77,7 @@ internal sealed class InstallerForm : Form
             new Label
             {
                 AutoSize = true,
-                Location = new Point(183, 86),
+                Location = new Point(183, 90),
                 ForeColor = Color.FromArgb(189, 221, 197),
                 Font = new Font("Segoe UI Semibold", 13F),
                 Text = "Classroom Agent"

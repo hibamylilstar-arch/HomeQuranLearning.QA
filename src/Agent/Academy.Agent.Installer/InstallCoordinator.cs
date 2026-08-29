@@ -441,7 +441,15 @@ internal sealed class InstallCoordinator
                 "/grant:r",
                 "*S-1-5-18:(OI)(CI)F",
                 "*S-1-5-32-544:(OI)(CI)F",
-                $"*{sid}:(OI)(CI)M",
+                $"*{sid}:(OI)(CI)M"
+            ],
+            [0]);
+
+        RunTool(
+            "icacls.exe",
+            [
+                Path.Combine(InstallerPaths.DataRoot, "*"),
+                "/inheritance:e",
                 "/T",
                 "/C"
             ],

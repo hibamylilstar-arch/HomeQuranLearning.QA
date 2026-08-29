@@ -873,15 +873,37 @@ internal sealed class InstallCoordinator
             ?? throw new InvalidOperationException(
                 $"Could not start {executable}.");
 
-        string stdout =
-            await process.StandardOutput.ReadToEndAsync(
+        using var timeoutCts =
+            CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken);
-        string stderr =
-            await process.StandardError.ReadToEndAsync(
-                cancellationToken);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(15));
 
-        await process.WaitForExitAsync(
-            cancellationToken);
+        Task<string> stdoutTask =
+            process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
+        Task<string> stderrTask =
+            process.StandardError.ReadToEndAsync(timeoutCts.Token);
+
+        try
+        {
+            await process.WaitForExitAsync(timeoutCts.Token);
+        }
+        catch (OperationCanceledException)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+            }
+
+            throw new TimeoutException(
+                $"{executable} did not exit within 15 seconds.");
+        }
+
+        string stdout = await stdoutTask;
+        string stderr = await stderrTask;
 
         if (!allowedExitCodes.Contains(
                 process.ExitCode))

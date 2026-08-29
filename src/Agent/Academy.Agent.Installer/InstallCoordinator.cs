@@ -286,20 +286,19 @@ internal sealed class InstallCoordinator
         }
     }
 
-    private static async Task ValidateVpsAsync(
+    private async Task ValidateVpsAsync(
         string apiBaseUrl,
         CancellationToken cancellationToken)
     {
-        using var client =
-            new HttpClient
-            {
-                Timeout = TimeSpan.FromSeconds(20)
-            };
+        _log.Write("VPS_HEALTH_CHECK_HTTP_STARTED");
 
-        using HttpResponseMessage response =
-            await client.GetAsync(
-                $"{apiBaseUrl.TrimEnd('/')}/health",
-                cancellationToken);
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(10));
+
+        using var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+        using HttpRequestMessage request = new(HttpMethod.Get, $"{apiBaseUrl.TrimEnd('/')}/health");
+        using HttpResponseMessage response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeoutCts.Token).ConfigureAwait(false);
+        _log.Write($"VPS_HEALTH_CHECK_HTTP_COMPLETED Status={(int)response.StatusCode}");
 
 
         if (!response.IsSuccessStatusCode)

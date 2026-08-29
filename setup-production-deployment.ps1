@@ -110,6 +110,8 @@ services:
     restart: unless-stopped
     volumes:
       - redis_data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -167,6 +169,9 @@ services:
       Jwt__Issuer: HomeQuranLearning
       Jwt__Audience: HomeQuranLearning.Dashboard
       Jwt__SigningKey: ${JWT_SIGNING_KEY}
+      LiveKit__Host: wss://${ACADEMY_HOST}
+      LiveKit__ApiKey: ${LIVEKIT_API_KEY}
+      LiveKit__ApiSecret: ${LIVEKIT_API_SECRET}
       SeedOwner__FullName: Owner
       SeedOwner__Email: ${SEED_OWNER_EMAIL}
       SeedOwner__Password: ${SEED_OWNER_PASSWORD}
@@ -224,6 +229,99 @@ services:
         max-size: "10m"
         max-file: "5"
 
+  livekit:
+    image: livekit/livekit-server:v1.13.5
+    container_name: academy-livekit
+    restart: unless-stopped
+    environment:
+      LIVEKIT_CONFIG: |
+        port: 7880
+        rtc:
+          tcp_port: 7881
+          port_range_start: 51000
+          port_range_end: 51100
+          use_external_ip: false
+          node_ip: ${ACADEMY_HOST}
+        redis:
+          address: redis:6379
+        keys:
+          ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
+        ingress:
+          whip_base_url: https://${ACADEMY_HOST}/whip
+        logging:
+          level: info
+    ports:
+      - "127.0.0.1:7880:7880"
+      - "7881:7881"
+      - "51000-51100:51000-51100/udp"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  livekit-ingress:
+    image: livekit/ingress:v1.5.0
+    container_name: academy-livekit-ingress
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      INGRESS_CONFIG_BODY: |
+        api_key: ${LIVEKIT_API_KEY}
+        api_secret: ${LIVEKIT_API_SECRET}
+        ws_url: ws://127.0.0.1:7880
+        redis:
+          address: 127.0.0.1:6379
+        whip_port: 8088
+        http_relay_port: 9090
+        health_port: 7888
+        rtc_config:
+          udp_port: 7885
+          use_external_ip: false
+          node_ip: ${ACADEMY_HOST}
+        logging:
+          level: info
+    depends_on:
+      redis:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  ingress-manager:
+    build:
+      context: ../..
+      dockerfile: src/LiveKitIngressManager/Dockerfile
+    container_name: academy-ingress-manager
+    restart: unless-stopped
+    environment:
+      BACKEND_BASE_URL: http://api:8080
+      WORKER_API_KEY: ${WORKER_API_KEY}
+      LIVEKIT_URL: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+    depends_on:
+      api:
+        condition: service_started
+      livekit:
+        condition: service_started
+    networks:
+      - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
   caddy:
     image: caddy:2.11.3-alpine
     container_name: academy-caddy
@@ -242,6 +340,10 @@ services:
     depends_on:
       - api
       - dashboard
+      - livekit
+      - livekit-ingress
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - academy
     logging:
@@ -299,6 +401,17 @@ $caddyfile = @'
         reverse_proxy dashboard:3000
     }
 
+    # LiveKit browser signalling remains authenticated by its short-lived JWT.
+    handle /rtc* {
+        reverse_proxy livekit:7880
+    }
+
+    # FFmpeg publishes encrypted WHIP signalling through the existing HTTPS
+    # endpoint. WebRTC media continues on the dedicated encrypted UDP path.
+    handle /whip/* {
+        reverse_proxy host.docker.internal:8088
+    }
+
     # Keep device, worker, health and direct backend APIs on the exact pilot
     # source allowlist. Agent credentials never become internet-facing.
     handle @pilotAllowed {
@@ -314,7 +427,7 @@ $caddyfile = @'
     # All non-API paths are dashboard pages/assets and may be reached from
     # any network; data calls still require an authenticated JWT proxy.
     @publicDashboard {
-        not path /api/* /health
+        not path /api/* /health /rtc* /whip/*
     }
 
     handle @publicDashboard {
@@ -368,6 +481,10 @@ MINIO_BUCKET=academy-recordings
 
 AGENT_API_KEY=CHANGE_ME_AGENT_API_KEY
 WORKER_API_KEY=CHANGE_ME_WORKER_API_KEY
+
+# Dedicated LiveKit credentials. Keep all values distinct.
+LIVEKIT_API_KEY=CHANGE_ME_LIVEKIT_API_KEY
+LIVEKIT_API_SECRET=CHANGE_ME_LIVEKIT_API_SECRET
 
 JWT_SIGNING_KEY=CHANGE_ME_LONG_RANDOM_SECRET_KEY
 

@@ -84,3 +84,17 @@ Status: accepted 2026-08-29; supersedes synthetic-only direct-IP staging.
   of record.
 - Automated retention/deletion of real recordings stays disabled until a
   separate high-risk approval follows a dry-run impact and preservation review.
+
+## PROD-001 — Network-independent academy production
+
+Status: accepted 2026-08-29; supersedes PILOT-001 where the earlier pilot network or cohort restrictions conflict.
+
+- The target system is real academy production, not a permanently bounded synthetic or source-IP pilot.
+- Academy-owned Classroom Agent laptops may connect from any Internet provider or public IP.
+- A change of teacher-laptop network must not require VPS firewall or source-allowlist changes.
+- Classroom Agent API traffic must use trusted HTTPS and application/device authentication rather than source IP as the permanent identity boundary.
+- The dashboard must remain reachable from any Internet connection for authenticated Owner/Admin/authorized Manager users.
+- Live monitoring uses HTTPS WHIP signalling and encrypted WebRTC media through the VPS.
+- The first laptop remains a deployment canary for production verification, not a permanent product-capacity restriction.
+- After initial installation, routine Agent upgrades and bug-fix releases must move toward centrally controlled VPS-driven update delivery without requiring manual reinstall on every laptop.
+- Per-device revocable credentials supersede the shared fleet credential as the long-term production authentication model.

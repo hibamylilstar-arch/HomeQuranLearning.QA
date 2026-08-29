@@ -8,6 +8,17 @@ var builder = Host.CreateApplicationBuilder(
         ContentRootPath = AppContext.BaseDirectory
     });
 
+string agentLogDirectory =
+    Path.Combine(
+        Environment.GetFolderPath(
+            Environment.SpecialFolder.CommonApplicationData),
+        "AcademyAgent",
+        "Logs");
+
+builder.Logging.AddProvider(
+    new AgentFileLoggerProvider(
+        agentLogDirectory));
+
 builder.Services.AddWindowsService(options =>
 {
     options.ServiceName = "Academy Agent Service";
@@ -16,6 +27,21 @@ builder.Services.AddWindowsService(options =>
 var cloudOptions = builder.Configuration
     .GetSection("Cloud")
     .Get<CloudOptions>() ?? new CloudOptions();
+
+if (!string.IsNullOrWhiteSpace(
+        cloudOptions.ApiKeyProtectedFile))
+{
+    cloudOptions.ApiKey =
+        WindowsProtectedSecretStore.UnprotectFromFile(
+            cloudOptions.ApiKeyProtectedFile);
+}
+
+if (cloudOptions.Enabled &&
+    string.IsNullOrWhiteSpace(cloudOptions.ApiKey))
+{
+    throw new InvalidOperationException(
+        "The Classroom Agent cloud credential is unavailable.");
+}
 
 builder.Services.AddSingleton(cloudOptions);
 builder.Services.AddSingleton<AgentActivityState>();

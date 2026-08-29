@@ -142,7 +142,7 @@ $config = [ordered]@{
     }
     LiveStreaming = [ordered]@{
         Enabled = $false
-        DeviceId = ""
+        IngestBaseUrl = "rtmp://localhost:1935/live"
         FfmpegPath = $FfmpegPath
     }
 }

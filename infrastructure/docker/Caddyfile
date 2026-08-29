@@ -30,14 +30,33 @@
         reverse_proxy dashboard:3000
     }
 
-    # Keep device, worker, health and direct backend APIs on the exact pilot
-    # source allowlist. Agent credentials never become internet-facing.
+    # LiveKit browser signalling remains authenticated by its short-lived JWT.
+    handle /rtc* {
+        reverse_proxy livekit:7880
+    }
+
+    # FFmpeg publishes encrypted WHIP signalling through the existing HTTPS
+    # endpoint. WebRTC media continues on the dedicated encrypted UDP path.
+    handle /whip/* {
+        reverse_proxy host.docker.internal:8088
+    }
+
+    # Classroom Agents may operate from any Internet connection. Agent routes
+    # are Internet-reachable only over HTTPS and remain application-authenticated.
+    handle /api/agent/* {
+        reverse_proxy api:8080
+    }
+
+    # Public readiness endpoint used by the production installer and operators.
+    handle /health {
+        reverse_proxy api:8080
+    }
+
+    # Worker and other direct backend APIs remain restricted to the trusted
+    # operations source boundary. Dashboard data continues through its
+    # authenticated Next.js proxy above.
     handle @pilotAllowed {
         handle /api/* {
-            reverse_proxy api:8080
-        }
-
-        handle /health {
             reverse_proxy api:8080
         }
     }
@@ -45,7 +64,7 @@
     # All non-API paths are dashboard pages/assets and may be reached from
     # any network; data calls still require an authenticated JWT proxy.
     @publicDashboard {
-        not path /api/* /health
+        not path /api/* /health /rtc* /whip/*
     }
 
     handle @publicDashboard {

@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Agent\Academy.Agent.Cloud\Academy.Agent.Cloud.csproj" />
     <ProjectReference Include="..\..\src\Agent\Academy.Agent.Media\Academy.Agent.Media.csproj" />
     <ProjectReference Include="..\..\src\Agent\Academy.Agent.TeamsHelper\Academy.Agent.TeamsHelper.csproj" />
   </ItemGroup>

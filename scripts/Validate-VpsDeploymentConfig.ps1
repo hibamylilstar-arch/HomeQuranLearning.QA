@@ -96,7 +96,8 @@ $required = @(
     "ACADEMY_HOST", "ACME_EMAIL", "PILOT_ALLOWED_CIDRS",
     "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
     "MINIO_ROOT_USER", "MINIO_ROOT_PASSWORD", "MINIO_BUCKET",
-    "AGENT_API_KEY", "WORKER_API_KEY", "JWT_SIGNING_KEY",
+    "AGENT_API_KEY", "WORKER_API_KEY", "LIVEKIT_API_KEY",
+    "LIVEKIT_API_SECRET", "JWT_SIGNING_KEY",
     "SEED_OWNER_EMAIL", "SEED_OWNER_PASSWORD"
 )
 
@@ -165,6 +166,8 @@ $minimumSecretLengths = @{
     MINIO_ROOT_PASSWORD = 24
     AGENT_API_KEY = 32
     WORKER_API_KEY = 32
+    LIVEKIT_API_KEY = 12
+    LIVEKIT_API_SECRET = 32
     JWT_SIGNING_KEY = 64
     SEED_OWNER_PASSWORD = 16
 }
@@ -209,6 +212,18 @@ try {
         throw "Caddy must remain pinned to the verified 2.11.3-alpine image for this pilot"
     }
 
+    if ($config.services.livekit.image -ne "livekit/livekit-server:v1.13.5") {
+        throw "LiveKit server must remain pinned to v1.13.5"
+    }
+
+    if ($config.services.'livekit-ingress'.image -ne "livekit/ingress:v1.5.0") {
+        throw "LiveKit ingress must remain pinned to v1.5.0"
+    }
+
+    if ($config.services.'livekit-ingress'.network_mode -ne "host") {
+        throw "WHIP ingress requires host networking for WebRTC UDP media"
+    }
+
     if ($config.services.api.environment.RecordingRetention__Enabled -ne "false") {
         throw "Real-data pilot retention must remain disabled until separate deletion approval"
     }
@@ -234,18 +249,70 @@ try {
                 continue
             }
 
-            if ($serviceProperty.Name -ne "caddy") {
-                throw "Only the Caddy service may publish host ports"
-            }
+            $hostIpProperty =
+                $port.PSObject.Properties["host_ip"]
 
-            $published += "{0}:{1}/{2}" -f $port.published, $port.target, $port.protocol
+            $published += [pscustomobject]@{
+                Service = $serviceProperty.Name
+                HostIp = if ($null -eq $hostIpProperty) {
+                    ""
+                }
+                else {
+                    [string]$hostIpProperty.Value
+                }
+                Published = [int]$port.published
+                Target = [int]$port.target
+                Protocol = [string]$port.protocol
+            }
         }
     }
 
-    $expectedPublished = @("80:80/tcp", "443:443/tcp")
-    if ($published.Count -ne $expectedPublished.Count -or
-        @($expectedPublished | Where-Object { $_ -notin $published }).Count -gt 0) {
+    foreach ($port in $published) {
+        $allowed =
+            ($port.Service -eq "caddy" -and
+             $port.Protocol -eq "tcp" -and
+             $port.Published -eq $port.Target -and
+             $port.Target -in @(80, 443)) -or
+            ($port.Service -eq "redis" -and
+             $port.HostIp -eq "127.0.0.1" -and
+             $port.Protocol -eq "tcp" -and
+             $port.Published -eq 6379 -and
+             $port.Target -eq 6379) -or
+            ($port.Service -eq "livekit" -and
+             $port.HostIp -eq "127.0.0.1" -and
+             $port.Protocol -eq "tcp" -and
+             $port.Published -eq 7880 -and
+             $port.Target -eq 7880) -or
+            ($port.Service -eq "livekit" -and
+             [string]::IsNullOrWhiteSpace($port.HostIp) -and
+             $port.Protocol -eq "tcp" -and
+             $port.Published -eq 7881 -and
+             $port.Target -eq 7881) -or
+            ($port.Service -eq "livekit" -and
+             [string]::IsNullOrWhiteSpace($port.HostIp) -and
+             $port.Protocol -eq "udp" -and
+             $port.Published -eq $port.Target -and
+             $port.Target -ge 51000 -and
+             $port.Target -le 51100)
+
+        if (-not $allowed) {
+            throw "Unexpected published port: $($port.Service) $($port.HostIp):$($port.Published)->$($port.Target)/$($port.Protocol)"
+        }
+    }
+
+    if (@($published | Where-Object {
+            $_.Service -eq "caddy" -and $_.Target -in @(80, 443)
+        }).Count -ne 2) {
         throw "Caddy must publish exactly TCP ports 80 and 443"
+    }
+
+    if (@($published | Where-Object {
+            $_.Service -eq "livekit" -and
+            $_.Protocol -eq "udp" -and
+            $_.Target -ge 51000 -and
+            $_.Target -le 51100
+        }).Count -ne 101) {
+        throw "LiveKit must publish the bounded UDP range 51000-51100"
     }
 
     $caddyPath = Join-Path (Split-Path $composePath -Parent) "Caddyfile"
@@ -253,16 +320,32 @@ try {
         throw "Caddyfile not found beside Compose configuration"
     }
 
-    docker run --rm `
-        --env "ACADEMY_HOST=$($values['ACADEMY_HOST'])" `
-        --env "ACME_EMAIL=$($values['ACME_EMAIL'])" `
-        --env "PILOT_ALLOWED_CIDRS=$($values['PILOT_ALLOWED_CIDRS'])" `
-        --volume "${caddyPath}:/etc/caddy/Caddyfile:ro" `
-        caddy:2.11.3-alpine `
-        caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile *> $null
+    $previousErrorActionPreference = $ErrorActionPreference
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "Caddy HTTPS/allowlist configuration validation failed."
+    try {
+        $ErrorActionPreference = "Continue"
+
+        $caddyValidationOutput =
+            & docker run --rm `
+                --env "ACADEMY_HOST=$($values['ACADEMY_HOST'])" `
+                --env "ACME_EMAIL=$($values['ACME_EMAIL'])" `
+                --env "PILOT_ALLOWED_CIDRS=$($values['PILOT_ALLOWED_CIDRS'])" `
+                --volume "${caddyPath}:/etc/caddy/Caddyfile:ro" `
+                caddy:2.11.3-alpine `
+                caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile `
+                2>&1
+
+        $caddyValidationExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    if ($caddyValidationExitCode -ne 0) {
+        $details =
+            ($caddyValidationOutput | Out-String).Trim()
+
+        throw "Caddy HTTPS configuration validation failed. ExitCode=$caddyValidationExitCode Details=$details"
     }
 }
 finally {

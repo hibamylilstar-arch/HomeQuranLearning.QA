@@ -11,4 +11,10 @@ public sealed class PendingQaRecordingDto
     public string PresignedUrl { get; init; } = string.Empty;
 
     public DateTimeOffset StartedAtUtc { get; init; }
+
+    public int AudioLayoutVersion { get; init; }
+
+    public int TeacherAudioTrackIndex { get; init; }
+
+    public string TeacherAudioProvenanceStatus { get; init; } = string.Empty;
 }

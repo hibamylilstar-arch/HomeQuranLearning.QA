@@ -192,6 +192,119 @@ namespace Academy.Infrastructure.Migrations
                     b.ToTable("qa_alerts", (string)null);
                 });
 
+            modelBuilder.Entity("Academy.Domain.Entities.QaCandidate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AnalysisIdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("AnalysisVersion")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<double?>("AsrConfidence")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("AudioLayoutVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ConfirmedQaAlertId")
+                        .HasColumnType("uuid");
+
+                    b.Property<double>("ContextEndSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("ContextStartSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IntentCategory")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<double?>("IntentConfidence")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("LanguageFamily")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("PolicyVersion")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid?>("QaRuleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RecordingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReviewReason")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<int>("ReviewVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("ReviewedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SourceTrackIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Transcript")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<double?>("TriggerConfidence")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("TriggerEndSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("TriggerStartSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AnalysisIdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("ConfirmedQaAlertId")
+                        .IsUnique();
+
+                    b.HasIndex("QaRuleId");
+
+                    b.HasIndex("RecordingId", "PolicyVersion", "AnalysisVersion", "SourceTrackIndex", "TriggerStartSeconds", "TriggerEndSeconds")
+                        .IsUnique();
+
+                    b.ToTable("qa_candidates", (string)null);
+                });
+
             modelBuilder.Entity("Academy.Domain.Entities.QaRule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -227,6 +340,9 @@ namespace Academy.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<int>("AudioLayoutVersion")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -273,6 +389,30 @@ namespace Academy.Infrastructure.Migrations
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
 
+                    b.Property<DateTimeOffset?>("TeacherAudioCoverageStartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TeacherAudioEndpointId")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("TeacherAudioEndpointName")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("TeacherAudioProvenanceStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("TeacherAudioSourceKind")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int?>("TeacherAudioTrackIndex")
+                        .HasColumnType("integer");
+
                     b.Property<Guid?>("TeacherId")
                         .HasColumnType("uuid");
 
@@ -288,6 +428,36 @@ namespace Academy.Infrastructure.Migrations
                     b.HasIndex("TeacherId");
 
                     b.ToTable("recordings", (string)null);
+                });
+
+            modelBuilder.Entity("Academy.Domain.Entities.RecordingAudioCoverageGap", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("EndedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("RecordingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordingId", "StartedAtUtc");
+
+                    b.ToTable("recording_audio_coverage_gaps", (string)null);
                 });
 
             modelBuilder.Entity("Academy.Domain.Entities.Schedule", b =>
@@ -560,6 +730,53 @@ namespace Academy.Infrastructure.Migrations
                     b.ToTable("teachers", (string)null);
                 });
 
+            modelBuilder.Entity("Academy.Domain.Entities.TranscriptSegment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<double?>("AvgLogProbability")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("CompressionRatio")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double>("EndSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<double?>("NoSpeechProbability")
+                        .HasColumnType("double precision");
+
+                    b.Property<Guid>("RecordingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SegmentIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("StartSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordingId", "SegmentIndex")
+                        .IsUnique();
+
+                    b.ToTable("transcript_segments", (string)null);
+                });
+
             modelBuilder.Entity("Academy.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -651,6 +868,31 @@ namespace Academy.Infrastructure.Migrations
                     b.Navigation("Recording");
                 });
 
+            modelBuilder.Entity("Academy.Domain.Entities.QaCandidate", b =>
+                {
+                    b.HasOne("Academy.Domain.Entities.QaAlert", "ConfirmedQaAlert")
+                        .WithOne("ConfirmedCandidate")
+                        .HasForeignKey("Academy.Domain.Entities.QaCandidate", "ConfirmedQaAlertId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Academy.Domain.Entities.QaRule", "QaRule")
+                        .WithMany()
+                        .HasForeignKey("QaRuleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Academy.Domain.Entities.Recording", "Recording")
+                        .WithMany("QaCandidates")
+                        .HasForeignKey("RecordingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ConfirmedQaAlert");
+
+                    b.Navigation("QaRule");
+
+                    b.Navigation("Recording");
+                });
+
             modelBuilder.Entity("Academy.Domain.Entities.Recording", b =>
                 {
                     b.HasOne("Academy.Domain.Entities.Device", "Device")
@@ -674,6 +916,17 @@ namespace Academy.Infrastructure.Migrations
                     b.Navigation("Session");
 
                     b.Navigation("Teacher");
+                });
+
+            modelBuilder.Entity("Academy.Domain.Entities.RecordingAudioCoverageGap", b =>
+                {
+                    b.HasOne("Academy.Domain.Entities.Recording", "Recording")
+                        .WithMany("TeacherAudioCoverageGaps")
+                        .HasForeignKey("RecordingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Recording");
                 });
 
             modelBuilder.Entity("Academy.Domain.Entities.Schedule", b =>
@@ -774,14 +1027,34 @@ namespace Academy.Infrastructure.Migrations
                     b.Navigation("AssignedTeacher");
                 });
 
+            modelBuilder.Entity("Academy.Domain.Entities.TranscriptSegment", b =>
+                {
+                    b.HasOne("Academy.Domain.Entities.Recording", "Recording")
+                        .WithMany()
+                        .HasForeignKey("RecordingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Recording");
+                });
+
             modelBuilder.Entity("Academy.Domain.Entities.Device", b =>
                 {
                     b.Navigation("Heartbeats");
                 });
 
+            modelBuilder.Entity("Academy.Domain.Entities.QaAlert", b =>
+                {
+                    b.Navigation("ConfirmedCandidate");
+                });
+
             modelBuilder.Entity("Academy.Domain.Entities.Recording", b =>
                 {
                     b.Navigation("QaAlerts");
+
+                    b.Navigation("QaCandidates");
+
+                    b.Navigation("TeacherAudioCoverageGaps");
                 });
 
             modelBuilder.Entity("Academy.Domain.Entities.Session", b =>

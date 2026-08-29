@@ -9,22 +9,28 @@ public sealed class DashboardQueryService
 {
     private readonly IRecordingRepository _recordingRepository;
     private readonly IQaAlertRepository _qaAlertRepository;
+    private readonly IQaCandidateRepository _qaCandidateRepository;
     private readonly IDeviceRepository _deviceRepository;
     private readonly IManagerTeacherAssignmentRepository _assignmentRepository;
     private readonly ISessionRepository _sessionRepository;
+    private readonly ISessionEventRepository _sessionEventRepository;
 
     public DashboardQueryService(
         IRecordingRepository recordingRepository,
         IQaAlertRepository qaAlertRepository,
+        IQaCandidateRepository qaCandidateRepository,
         IDeviceRepository deviceRepository,
         IManagerTeacherAssignmentRepository assignmentRepository,
-        ISessionRepository sessionRepository)
+        ISessionRepository sessionRepository,
+        ISessionEventRepository sessionEventRepository)
     {
         _recordingRepository = recordingRepository;
         _qaAlertRepository = qaAlertRepository;
+        _qaCandidateRepository = qaCandidateRepository;
         _deviceRepository = deviceRepository;
         _assignmentRepository = assignmentRepository;
         _sessionRepository = sessionRepository;
+        _sessionEventRepository = sessionEventRepository;
     }
 
     public async Task<IReadOnlyList<RecordingListItem>> GetVisibleRecordingsAsync(
@@ -259,6 +265,84 @@ public sealed class DashboardQueryService
             session.TeacherId);
     }
 
+    public async Task<IReadOnlyList<SessionEventDto>?> GetVisibleSessionEventsAsync(
+        Guid sessionId,
+        Guid userId,
+        string role,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await CanAccessSessionAsync(
+                sessionId,
+                userId,
+                role,
+                cancellationToken))
+        {
+            return null;
+        }
+
+        var events = await _sessionEventRepository.GetForSessionAsync(
+            sessionId,
+            cancellationToken);
+
+        return events
+            .Select(x => new SessionEventDto
+            {
+                Id = x.Id,
+                EventType = x.EventType.ToString(),
+                OccurredAtUtc = x.OccurredAtUtc,
+                Source = x.Source,
+                Details = x.Details,
+                CreatedAtUtc = x.CreatedAtUtc
+            })
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<QaCandidateDto>> GetVisibleQaCandidatesAsync(
+        Guid userId,
+        string role,
+        CancellationToken cancellationToken = default)
+    {
+        var candidates = await _qaCandidateRepository.GetAllAsync(cancellationToken);
+
+        if (role == UserRole.Manager.ToString())
+        {
+            var teacherIds = await GetAssignedTeacherIdsAsync(userId, cancellationToken);
+            candidates = candidates
+                .Where(x => x.Recording?.TeacherId is Guid teacherId && teacherIds.Contains(teacherId))
+                .ToList();
+        }
+        else if (!IsOwnerOrAdmin(role))
+        {
+            return Array.Empty<QaCandidateDto>();
+        }
+
+        return candidates
+            .OrderBy(x => x.Status)
+            .ThenByDescending(x => x.CreatedAtUtc)
+            .Select(ToCandidateDto)
+            .ToList();
+    }
+
+    public async Task<bool> CanAccessCandidateAsync(
+        Guid candidateId,
+        Guid userId,
+        string role,
+        CancellationToken cancellationToken = default)
+    {
+        var candidate = await _qaCandidateRepository.GetByIdAsync(candidateId, cancellationToken);
+
+        if (candidate?.RecordingId is not Guid recordingId)
+        {
+            return false;
+        }
+
+        return await CanAccessRecordingAsync(
+            recordingId,
+            userId,
+            role,
+            cancellationToken);
+    }
+
     public async Task<bool> CanAccessRecordingAsync(
         Guid recordingId,
         Guid userId,
@@ -358,6 +442,43 @@ public sealed class DashboardQueryService
             cancellationToken);
 
         return assignments.Select(x => x.TeacherId).ToHashSet();
+    }
+
+    private static QaCandidateDto ToCandidateDto(QaCandidate candidate)
+    {
+        return new QaCandidateDto
+        {
+            Id = candidate.Id,
+            RecordingId = candidate.RecordingId,
+            RecordingFileName = candidate.Recording?.FileName ?? string.Empty,
+            SessionId = candidate.Recording?.SessionId,
+            TeacherId = candidate.Recording?.TeacherId,
+            TeacherName = candidate.Recording?.Teacher?.FullName ?? string.Empty,
+            QaRuleId = candidate.QaRuleId,
+            RulePhrase = candidate.QaRule?.Phrase,
+            ConfirmedQaAlertId = candidate.ConfirmedQaAlertId,
+            PolicyVersion = candidate.PolicyVersion,
+            AnalysisVersion = candidate.AnalysisVersion,
+            SourceTrackIndex = candidate.SourceTrackIndex,
+            AudioLayoutVersion = candidate.AudioLayoutVersion,
+            TriggerStartSeconds = candidate.TriggerStartSeconds,
+            TriggerEndSeconds = candidate.TriggerEndSeconds,
+            ContextStartSeconds = candidate.ContextStartSeconds,
+            ContextEndSeconds = candidate.ContextEndSeconds,
+            Transcript = candidate.Transcript,
+            LanguageFamily = candidate.LanguageFamily,
+            IntentCategory = candidate.IntentCategory,
+            TriggerConfidence = candidate.TriggerConfidence,
+            AsrConfidence = candidate.AsrConfidence,
+            IntentConfidence = candidate.IntentConfidence,
+            AnalysisIdempotencyKey = candidate.AnalysisIdempotencyKey,
+            Status = candidate.Status.ToString(),
+            ReviewedByUserId = candidate.ReviewedByUserId,
+            ReviewedAtUtc = candidate.ReviewedAtUtc,
+            ReviewReason = candidate.ReviewReason,
+            CreatedAtUtc = candidate.CreatedAtUtc,
+            UpdatedAtUtc = candidate.UpdatedAtUtc
+        };
     }
 
     private static bool IsOwnerOrAdmin(string role)

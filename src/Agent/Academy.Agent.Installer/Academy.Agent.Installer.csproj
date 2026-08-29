@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>HomeQuranLearning.ClassroomAgent.Setup</AssemblyName>
+    <RootNamespace>HomeQuranLearning.ClassroomAgent.Setup</RootNamespace>
+    <Product>Home Quran Learning Classroom Agent</Product>
+    <Company>Abdul Wahid</Company>
+    <Authors>Abdul Wahid</Authors>
+    <Copyright>Copyright © 2026 Abdul Wahid. All rights reserved.</Copyright>
+    <Description>Installer for the Home Quran Learning Classroom Agent</Description>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Academy.Agent.Cloud\Academy.Agent.Cloud.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource
+      Include="$(InstallerPayloadZip)"
+      Condition="'$(InstallerPayloadZip)' != '' and Exists('$(InstallerPayloadZip)')"
+      LogicalName="HomeQuranLearning.ClassroomAgent.Setup.agent-payload.zip" />
+    <EmbeddedResource
+      Include="..\..\Dashboard\academy-dashboard\public\branding\homequranlearning-logo.jpg"
+      LogicalName="HomeQuranLearning.ClassroomAgent.Setup.logo.jpg" />
+  </ItemGroup>
+
+</Project>

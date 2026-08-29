@@ -5,4 +5,5 @@ COPY spikes/SttSpike/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY spikes/SttSpike/qa_worker.py .
+COPY spikes/SttSpike/qa_context_classifier.py .
 CMD ["python", "-u", "qa_worker.py"]

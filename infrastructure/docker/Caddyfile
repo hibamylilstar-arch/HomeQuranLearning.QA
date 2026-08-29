@@ -1,11 +1,77 @@
-﻿qa.homequranlearning.com {
-    handle /api/* {
-        reverse_proxy api:8080
-    }
+{
+    email {$ACME_EMAIL}
 
-    handle {
+    # Browsers and Windows clients commonly omit SNI for an IPv4 literal.
+    # Select this site's certificate explicitly for those no-SNI handshakes.
+    default_sni {$ACADEMY_HOST}
+
+    servers {
+        0rtt off
+    }
+}
+
+{$ACADEMY_HOST} {
+    tls {
+        issuer acme {
+            profile shortlived
+            disable_tlsalpn_challenge
+        }
+    }
+    # Dashboard auth and its JWT-bearing proxy are safe to expose publicly;
+    # the Next.js handlers enforce the session before forwarding data access.
+    handle /api/auth/* {
         reverse_proxy dashboard:3000
     }
 
+    handle /api/proxy/* {
+        reverse_proxy dashboard:3000
+    }
+
+    # LiveKit browser signalling remains authenticated by its short-lived JWT.
+    handle /rtc* {
+        reverse_proxy livekit:7880
+    }
+
+    # FFmpeg publishes encrypted WHIP signalling through the existing HTTPS
+    # endpoint. WebRTC media continues on the dedicated encrypted UDP path.
+    handle /whip/* {
+        reverse_proxy host.docker.internal:8088
+    }
+
+    # Classroom Agents may operate from any Internet connection. Agent routes
+    # are Internet-reachable only over HTTPS and remain application-authenticated.
+    handle /api/agent/* {
+        reverse_proxy api:8080
+    }
+
+    # Public readiness endpoint used by the production installer and operators.
+    handle /health {
+        reverse_proxy api:8080
+    }
+# All non-API paths are dashboard pages/assets and may be reached from
+    # any network; data calls still require an authenticated JWT proxy.
+    @publicDashboard {
+        not path /api/* /health /rtc* /whip/*
+    }
+
+    handle @publicDashboard {
+        reverse_proxy dashboard:3000
+    }
+
+    respond "Access denied" 403
+
+    header {
+        -Server
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "camera=(), geolocation=(), microphone=()"
+    }
+
     encode gzip
+
+    log {
+        output stdout
+        format json
+    }
 }

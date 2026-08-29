@@ -21,7 +21,7 @@ This is not a public multi-tenant SaaS platform.
 6. Current publishing path is FFmpeg RTMP into LiveKit Ingress.
 7. Reliability, retries, historical safety and idempotency are first-class requirements.
 8. QA detection uses speech timing/context rather than processing-time assumptions.
-9. Production/VPS deployment is deferred until local product completeness and stabilization.
+9. Local and VPS environments use the same production-capable architecture; verified releases move through normal test, commit, deploy and runtime verification.
 
 ## Current component map
 
@@ -43,6 +43,12 @@ Responsibilities include class/session context, screen capture, system audio, li
 Current screen/live implementation uses FFmpeg `ddagrab`.
 
 Current system-audio path uses NAudio/WASAPI loopback and local UDP transport into FFmpeg.
+
+The loopback path alone is not teacher-microphone provenance. The approved
+The released 7A-5A slice adds an additive two-track recording layout with a discrete
+teacher microphone track and a primary mixed playback track. The worker only
+attributes speech when the declared teacher track and provenance are proven;
+legacy loopback-only recordings remain non-attributable.
 
 ## Backend
 
@@ -74,7 +80,9 @@ Current worker:
 
 Current completed QA work aligns alerts to recording-relative transcript timestamps and exact QA rule IDs.
 
-Durable transcript-segment persistence is the next planned QA slice.
+Durable transcript-segment persistence is complete. 7A-5A teacher-audio
+provenance is released at `a67ff8a`. Candidate persistence and context-aware
+multilingual analysis remain later independently approved tracks.
 
 ## Deployment
 

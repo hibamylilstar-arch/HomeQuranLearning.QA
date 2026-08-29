@@ -72,6 +72,7 @@ COPY spikes/SttSpike/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY spikes/SttSpike/qa_worker.py .
+COPY spikes/SttSpike/qa_context_classifier.py .
 CMD ["python", "-u", "qa_worker.py"]
 '@
 
@@ -84,8 +85,6 @@ services:
     image: postgres:16-alpine
     container_name: academy-postgres
     restart: unless-stopped
-    env_file:
-      - .env.production
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -99,6 +98,11 @@ services:
       retries: 5
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   redis:
     image: redis:7-alpine
@@ -106,6 +110,8 @@ services:
     restart: unless-stopped
     volumes:
       - redis_data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -113,14 +119,17 @@ services:
       retries: 5
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   minio:
     image: minio/minio:latest
     container_name: academy-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
-    env_file:
-      - .env.production
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -133,6 +142,11 @@ services:
       retries: 5
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   api:
     build:
@@ -142,6 +156,9 @@ services:
     restart: unless-stopped
     environment:
       ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HttpsRedirection__Enabled: "false"
+      RecordingRetention__Enabled: "false"
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       AgentApiKey: ${AGENT_API_KEY}
       WorkerApiKey: ${WORKER_API_KEY}
@@ -152,6 +169,9 @@ services:
       Jwt__Issuer: HomeQuranLearning
       Jwt__Audience: HomeQuranLearning.Dashboard
       Jwt__SigningKey: ${JWT_SIGNING_KEY}
+      LiveKit__Host: wss://${ACADEMY_HOST}
+      LiveKit__ApiKey: ${LIVEKIT_API_KEY}
+      LiveKit__ApiSecret: ${LIVEKIT_API_SECRET}
       SeedOwner__FullName: Owner
       SeedOwner__Email: ${SEED_OWNER_EMAIL}
       SeedOwner__Password: ${SEED_OWNER_PASSWORD}
@@ -160,10 +180,13 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    ports:
-      - "8080:8080"
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   dashboard:
     build:
@@ -176,10 +199,13 @@ services:
       NODE_ENV: production
     depends_on:
       - api
-    ports:
-      - "3000:3000"
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   worker:
     build:
@@ -197,12 +223,142 @@ services:
       - api
     networks:
       - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  livekit:
+    image: livekit/livekit-server:v1.13.5
+    container_name: academy-livekit
+    restart: unless-stopped
+    environment:
+      LIVEKIT_CONFIG: |
+        port: 7880
+        rtc:
+          tcp_port: 7881
+          port_range_start: 51000
+          port_range_end: 51100
+          use_external_ip: false
+          node_ip: ${ACADEMY_HOST}
+        redis:
+          address: redis:6379
+        keys:
+          ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
+        ingress:
+          whip_base_url: https://${ACADEMY_HOST}/whip
+        logging:
+          level: info
+    ports:
+      - "127.0.0.1:7880:7880"
+      - "7881:7881"
+      - "51000-51100:51000-51100/udp"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  livekit-ingress:
+    image: livekit/ingress:v1.5.0
+    container_name: academy-livekit-ingress
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      INGRESS_CONFIG_BODY: |
+        api_key: ${LIVEKIT_API_KEY}
+        api_secret: ${LIVEKIT_API_SECRET}
+        ws_url: ws://127.0.0.1:7880
+        redis:
+          address: 127.0.0.1:6379
+        whip_port: 8088
+        http_relay_port: 9090
+        health_port: 7888
+        rtc_config:
+          udp_port: 7885
+          use_external_ip: false
+          node_ip: ${ACADEMY_HOST}
+        logging:
+          level: info
+    depends_on:
+      redis:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  ingress-manager:
+    build:
+      context: ../..
+      dockerfile: src/LiveKitIngressManager/Dockerfile
+    container_name: academy-ingress-manager
+    restart: unless-stopped
+    environment:
+      BACKEND_BASE_URL: http://api:8080
+      WORKER_API_KEY: ${WORKER_API_KEY}
+      LIVEKIT_URL: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+    depends_on:
+      api:
+        condition: service_started
+      livekit:
+        condition: service_started
+    networks:
+      - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  caddy:
+    image: caddy:2.11.3-alpine
+    container_name: academy-caddy
+    restart: unless-stopped
+    environment:
+      ACADEMY_HOST: ${ACADEMY_HOST}
+      ACME_EMAIL: ${ACME_EMAIL}
+      PILOT_ALLOWED_CIDRS: ${PILOT_ALLOWED_CIDRS}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - dashboard
+      - livekit
+      - livekit-ingress
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
 volumes:
   postgres_data:
   redis_data:
   minio_data:
   worker_hf_cache:
+  caddy_data:
+  caddy_config:
 
 networks:
   academy:
@@ -213,16 +369,87 @@ networks:
 # Caddyfile
 # ---------------------------------------------------------------
 $caddyfile = @'
-qa.homequranlearning.com {
-    handle /api/* {
-        reverse_proxy api:8080
+{
+    email {$ACME_EMAIL}
+
+    # Browsers and Windows clients commonly omit SNI for an IPv4 literal.
+    # Select this site's certificate explicitly for those no-SNI handshakes.
+    default_sni {$ACADEMY_HOST}
+
+    servers {
+        0rtt off
+    }
+}
+
+{$ACADEMY_HOST} {
+    tls {
+        issuer acme {
+            profile shortlived
+            disable_tlsalpn_challenge
+        }
     }
 
-    handle {
+    @pilotAllowed remote_ip {$PILOT_ALLOWED_CIDRS}
+
+    # Dashboard auth and its JWT-bearing proxy are safe to expose publicly;
+    # the Next.js handlers enforce the session before forwarding data access.
+    handle /api/auth/* {
         reverse_proxy dashboard:3000
     }
 
+    handle /api/proxy/* {
+        reverse_proxy dashboard:3000
+    }
+
+    # LiveKit browser signalling remains authenticated by its short-lived JWT.
+    handle /rtc* {
+        reverse_proxy livekit:7880
+    }
+
+    # FFmpeg publishes encrypted WHIP signalling through the existing HTTPS
+    # endpoint. WebRTC media continues on the dedicated encrypted UDP path.
+    handle /whip/* {
+        reverse_proxy host.docker.internal:8088
+    }
+
+    # Keep device, worker, health and direct backend APIs on the exact pilot
+    # source allowlist. Agent credentials never become internet-facing.
+    handle @pilotAllowed {
+        handle /api/* {
+            reverse_proxy api:8080
+        }
+
+        handle /health {
+            reverse_proxy api:8080
+        }
+    }
+
+    # All non-API paths are dashboard pages/assets and may be reached from
+    # any network; data calls still require an authenticated JWT proxy.
+    @publicDashboard {
+        not path /api/* /health /rtc* /whip/*
+    }
+
+    handle @publicDashboard {
+        reverse_proxy dashboard:3000
+    }
+
+    respond "Access denied" 403
+
+    header {
+        -Server
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "camera=(), geolocation=(), microphone=()"
+    }
+
     encode gzip
+
+    log {
+        output stdout
+        format json
+    }
 }
 '@
 
@@ -238,12 +465,26 @@ POSTGRES_USER=academy
 POSTGRES_PASSWORD=CHANGE_ME_STRONG_DB_PASSWORD
 POSTGRES_DB=homequranlearning_qa
 
+# Public VPS IPv4 used for the HTTPS real-academy pilot. Replace with the real IP.
+ACADEMY_HOST=203.0.113.10
+
+# Let's Encrypt account contact. Use an actively monitored address.
+ACME_EMAIL=operations@example.com
+
+# Exact public /32 addresses allowed to reach the pilot. Separate entries with spaces.
+# Include the Owner/Admin review location and every approved teacher-laptop network.
+PILOT_ALLOWED_CIDRS=203.0.113.20/32 203.0.113.21/32
+
 MINIO_ROOT_USER=academy_minio
 MINIO_ROOT_PASSWORD=CHANGE_ME_STRONG_MINIO_PASSWORD
 MINIO_BUCKET=academy-recordings
 
 AGENT_API_KEY=CHANGE_ME_AGENT_API_KEY
 WORKER_API_KEY=CHANGE_ME_WORKER_API_KEY
+
+# Dedicated LiveKit credentials. Keep all values distinct.
+LIVEKIT_API_KEY=CHANGE_ME_LIVEKIT_API_KEY
+LIVEKIT_API_SECRET=CHANGE_ME_LIVEKIT_API_SECRET
 
 JWT_SIGNING_KEY=CHANGE_ME_LONG_RANDOM_SECRET_KEY
 
@@ -256,6 +497,7 @@ SEED_OWNER_PASSWORD=CHANGE_ME_STRONG_OWNER_PASSWORD
 # ---------------------------------------------------------------
 $requirements = @'
 faster-whisper==1.2.1
+av==18.1.0
 '@
 
 # Write all files

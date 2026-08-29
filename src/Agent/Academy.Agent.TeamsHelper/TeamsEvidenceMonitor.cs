@@ -16,11 +16,29 @@ internal sealed class TeamsEvidenceMonitor
     private readonly TeamsEvidenceStateMachine _stateMachine =
         new();
 
+    private readonly TeamsHelperFileLog _log;
+    private readonly TeamsHelperHealthReporter _health;
+
+    public TeamsEvidenceMonitor(
+        TeamsHelperFileLog log,
+        TeamsHelperHealthReporter health)
+    {
+        _log =
+            log;
+
+        _health =
+            health;
+    }
+
     public async Task RunAsync(
         CancellationToken cancellationToken)
     {
-        Console.WriteLine(
+        _log.Information(
             "TEAMS_EVIDENCE_MONITOR_STARTED");
+
+        _health.TryUpdate(
+            "Starting",
+            force: true);
 
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -34,12 +52,18 @@ internal sealed class TeamsEvidenceMonitor
                 {
                     _stateMachine.Reset();
 
+                    _health.TryUpdate(
+                        "Idle");
+
                     await Task.Delay(
                         PollInterval,
                         cancellationToken);
 
                     continue;
                 }
+
+                _health.TryUpdate(
+                    "Monitoring");
 
                 TeamsUiSnapshot snapshot =
                     TeamsUiAutomationDetector.Scan(
@@ -58,7 +82,7 @@ internal sealed class TeamsEvidenceMonitor
                         item,
                         cancellationToken);
 
-                    Console.WriteLine(
+                    _log.Information(
                         $"EVIDENCE_PUBLISHED={item.Type}|{item.IdempotencyKey}");
                 }
 
@@ -71,10 +95,46 @@ internal sealed class TeamsEvidenceMonitor
             {
                 break;
             }
+            catch (TimeoutException ex)
+            {
+                if (_health.TryUpdate(
+                        "WaitingForAgent",
+                        ex.Message))
+                {
+                    _log.Warning(
+                        "Teams evidence IPC is waiting for Academy Agent.",
+                        ex);
+                }
+
+                await Task.Delay(
+                    ErrorBackoff,
+                    cancellationToken);
+            }
+            catch (IOException ex)
+            {
+                if (_health.TryUpdate(
+                        "WaitingForAgent",
+                        ex.Message))
+                {
+                    _log.Warning(
+                        "Teams evidence IPC is waiting for Academy Agent.",
+                        ex);
+                }
+
+                await Task.Delay(
+                    ErrorBackoff,
+                    cancellationToken);
+            }
             catch (Exception ex)
             {
-                Console.Error.WriteLine(
-                    $"MONITOR_ERROR={ex.GetType().Name}:{ex.Message}");
+                _health.TryUpdate(
+                    "Degraded",
+                    $"{ex.GetType().Name}: {ex.Message}",
+                    force: true);
+
+                _log.Error(
+                    "Teams evidence monitor iteration failed.",
+                    ex);
 
                 await Task.Delay(
                     ErrorBackoff,
@@ -82,7 +142,11 @@ internal sealed class TeamsEvidenceMonitor
             }
         }
 
-        Console.WriteLine(
+        _health.TryUpdate(
+            "Stopped",
+            force: true);
+
+        _log.Information(
             "TEAMS_EVIDENCE_MONITOR_STOPPED");
     }
 }

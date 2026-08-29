@@ -47,4 +47,9 @@ public sealed class UserRepository : IUserRepository
     {
         _dbContext.Users.Update(user);
     }
+
+    public void Remove(User user)
+    {
+        _dbContext.Users.Remove(user);
+    }
 }

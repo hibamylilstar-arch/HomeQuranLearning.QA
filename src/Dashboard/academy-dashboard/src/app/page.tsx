@@ -1,10 +1,14 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
-import { getDevices, getRecordings, getQaRules } from "@/lib/api";
+import { getDevices, getQaAlerts, getRecordings, getQaRules } from "@/lib/api";
 import Link from "next/link";
+import type { DeviceListItem } from "@/types";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function OverviewPage() {
+  const { user } = useAuth();
+  const canManageQaRules = user?.role === "Owner" || user?.role === "Admin";
   const [deviceCount, setDeviceCount] = useState(0);
   const [onlineCount, setOnlineCount] = useState(0);
   const [recordingCount, setRecordingCount] = useState(0);
@@ -14,16 +18,20 @@ export default function OverviewPage() {
   useEffect(() => {
     async function loadStats() {
       try {
-        const [devices, recordings, rules] = await Promise.all([
+        const [devices, recordings, qaItems] = await Promise.all([
           getDevices().catch(() => []),
           getRecordings().catch(() => []),
-          getQaRules().catch(() => []),
+          (canManageQaRules ? getQaRules() : getQaAlerts()).catch(() => []),
         ]);
 
         setDeviceCount(devices.length);
-        setOnlineCount(devices.filter((d: any) => d.isOnline || d.status === "Online").length);
+        setOnlineCount(
+          devices.filter(
+            (device: DeviceListItem) => device.status === "Online"
+          ).length
+        );
         setRecordingCount(recordings.length);
-        setRuleCount(rules.length);
+        setRuleCount(qaItems.length);
       } catch (err) {
         console.error(err);
       } finally {
@@ -31,7 +39,7 @@ export default function OverviewPage() {
       }
     }
     loadStats();
-  }, []);
+  }, [canManageQaRules]);
 
   return (
     <div className="space-y-6">
@@ -68,10 +76,12 @@ export default function OverviewPage() {
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">QA Rules Configured</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            {canManageQaRules ? "QA Rules Configured" : "QA Alerts Visible"}
+          </p>
           <p className="text-2xl font-bold text-slate-900 mt-1">{loading ? "..." : ruleCount}</p>
           <div className="mt-2 text-xs text-amber-600 font-medium">
-            Restricted keywords active
+            {canManageQaRules ? "Restricted keywords active" : "Scoped to assigned teachers"}
           </div>
         </div>
       </div>

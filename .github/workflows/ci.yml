@@ -25,6 +25,9 @@ jobs:
       - name: Build
         run: dotnet build HomeQuranLearning.QA.slnx --no-restore
 
+      - name: Run Agent Tests
+        run: dotnet test tests/Academy.Agent.Tests/Academy.Agent.Tests.csproj --no-build
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest

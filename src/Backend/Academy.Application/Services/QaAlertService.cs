@@ -37,7 +37,7 @@ public sealed class QaAlertService
             .ToList();
     }
 
-    public async Task CreateAlertAsync(
+    public async Task<Guid> CreateAlertAsync(
         Guid recordingId,
         Guid? qaRuleId,
         string matchedPhrase,
@@ -60,7 +60,14 @@ public sealed class QaAlertService
 
         if (duplicate)
         {
-            return;
+            return existingAlerts.First(x =>
+                x.RecordingId == recordingId &&
+                x.QaRuleId == qaRuleId &&
+                string.Equals(
+                    x.MatchedPhrase,
+                    matchedPhrase,
+                    StringComparison.OrdinalIgnoreCase) &&
+                x.TimestampUtc == timestampUtc).Id;
         }
 
         var alert = new QaAlert
@@ -81,6 +88,8 @@ public sealed class QaAlertService
 
         await _unitOfWork.SaveChangesAsync(
             cancellationToken);
+
+        return alert.Id;
     }
     public async Task UpdateStatusAsync(
         Guid alertId,

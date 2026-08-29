@@ -51,7 +51,7 @@ async def create_ingress(room_name, identity, name):
     )
 
     create = ing.CreateIngressRequest(
-        input_type=ing.IngressInput.RTMP_INPUT,
+        input_type=ing.IngressInput.WHIP_INPUT,
         name=name,
         room_name=room_name,
         participant_identity=identity,
@@ -77,7 +77,7 @@ def process_session(session):
         create_ingress(room_name, identity, name)
     )
 
-    print(f"Created ingress_id={ingress_id} stream_key={stream_key}")
+    print(f"Created WHIP ingress_id={ingress_id}")
 
     http_post_json(
         f"/api/worker/sessions/{session_id}/livekit-ingress",

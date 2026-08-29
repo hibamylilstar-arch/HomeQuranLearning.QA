@@ -271,9 +271,11 @@ public class RecordingServiceIntegrationTests : IntegrationTestBase
         var dashboard = new DashboardQueryService(
             new RecordingRepository(DbContext),
             new QaAlertRepository(DbContext),
+            new QaCandidateRepository(DbContext),
             new DeviceRepository(DbContext),
             new ManagerTeacherAssignmentRepository(DbContext),
-            new SessionRepository(DbContext));
+            new SessionRepository(DbContext),
+            new SessionEventRepository(DbContext));
 
         // Act
         var visible = await dashboard.GetVisibleRecordingsAsync(manager.Id, UserRole.Manager.ToString());

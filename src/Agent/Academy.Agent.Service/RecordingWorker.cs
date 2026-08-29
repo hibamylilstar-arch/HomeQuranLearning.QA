@@ -123,10 +123,39 @@ public sealed class RecordingWorker : BackgroundService
                 completedRecording = e;
 
                 _logger.LogInformation(
-                    "Recording segment completed: {OutputPath}, Duration: {Duration}, SizeBytes: {SizeBytes}",
+                    "Recording segment completed: {OutputPath}, Duration: {Duration}, SizeBytes: {SizeBytes}, TeacherAudioStatus: {TeacherAudioStatus}, TeacherMicrophone: {TeacherMicrophone}",
                     e.OutputPath,
                     e.Duration,
-                    e.SizeBytes);
+                    e.SizeBytes,
+                    e.TeacherAudioProvenanceStatus,
+                    e.TeacherAudioEndpointName ?? "Unavailable");
+            };
+
+            service.TeacherAudioCoverageChanged += (_, e) =>
+            {
+                if (e.IsAvailable)
+                {
+                    _logger.LogInformation(
+                        "Teacher microphone capture available. Endpoint={Endpoint}",
+                        e.EndpointName ?? "Unknown");
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Teacher microphone QA coverage unavailable. Reason={Reason}, Endpoint={Endpoint}",
+                        e.Reason ?? "Unknown",
+                        e.EndpointName ?? "Unavailable");
+
+                    _activityState.Publish(
+                        new AgentActivitySignal
+                        {
+                            Type = AgentActivitySignalType.TechnicalIssue,
+                            OccurredAtUtc = e.OccurredAtUtc,
+                            Source = "RecordingTeacherAudio",
+                            Details =
+                                $"TeacherAudioCoverageUnavailable:{e.Reason ?? "Unknown"}"
+                        });
+                }
             };
 
             service.RecordingFailed += (_, e) =>
@@ -260,7 +289,26 @@ public sealed class RecordingWorker : BackgroundService
             OutputPath = e.OutputPath,
             StartedAtUtc = e.StartedAtUtc,
             EndedAtUtc = e.EndedAtUtc,
-            SizeBytes = e.SizeBytes
+            SizeBytes = e.SizeBytes,
+            AudioLayoutVersion = e.AudioLayoutVersion,
+            TeacherAudioTrackIndex = e.TeacherAudioTrackIndex,
+            TeacherAudioSourceKind = e.TeacherAudioSourceKind,
+            TeacherAudioEndpointId = e.TeacherAudioEndpointId,
+            TeacherAudioEndpointName = e.TeacherAudioEndpointName,
+            TeacherAudioCoverageStartedAtUtc =
+                e.TeacherAudioCoverageStartedAtUtc,
+            TeacherAudioCoverageGaps =
+                e.TeacherAudioCoverageGaps
+                    .Select(gap =>
+                        new RecordingAudioCoverageGapRequest
+                        {
+                            StartedAtUtc = gap.StartedAtUtc,
+                            EndedAtUtc = gap.EndedAtUtc,
+                            Reason = gap.Reason
+                        })
+                    .ToList(),
+            TeacherAudioProvenanceStatus =
+                e.TeacherAudioProvenanceStatus
         };
 
         // Persist metadata BEFORE contacting the backend.
@@ -540,7 +588,18 @@ public sealed class RecordingWorker : BackgroundService
             FileName = pending.FileName,
             StartedAtUtc = pending.StartedAtUtc,
             EndedAtUtc = pending.EndedAtUtc,
-            SizeBytes = pending.SizeBytes
+            SizeBytes = pending.SizeBytes,
+            AudioLayoutVersion = pending.AudioLayoutVersion,
+            TeacherAudioTrackIndex = pending.TeacherAudioTrackIndex,
+            TeacherAudioSourceKind = pending.TeacherAudioSourceKind,
+            TeacherAudioEndpointId = pending.TeacherAudioEndpointId,
+            TeacherAudioEndpointName = pending.TeacherAudioEndpointName,
+            TeacherAudioCoverageStartedAtUtc =
+                pending.TeacherAudioCoverageStartedAtUtc,
+            TeacherAudioCoverageGaps =
+                pending.TeacherAudioCoverageGaps,
+            TeacherAudioProvenanceStatus =
+                pending.TeacherAudioProvenanceStatus
         };
     }
 
@@ -597,6 +656,14 @@ public sealed class RecordingWorker : BackgroundService
         public DateTimeOffset StartedAtUtc { get; set; }
         public DateTimeOffset EndedAtUtc { get; set; }
         public long SizeBytes { get; set; }
+        public int AudioLayoutVersion { get; set; }
+        public int? TeacherAudioTrackIndex { get; set; }
+        public string TeacherAudioSourceKind { get; set; } = string.Empty;
+        public string? TeacherAudioEndpointId { get; set; }
+        public string? TeacherAudioEndpointName { get; set; }
+        public DateTimeOffset? TeacherAudioCoverageStartedAtUtc { get; set; }
+        public IReadOnlyList<RecordingAudioCoverageGapRequest> TeacherAudioCoverageGaps { get; set; } = [];
+        public string TeacherAudioProvenanceStatus { get; set; } = "LegacyUnknown";
     }
 }
 

@@ -18,8 +18,12 @@ export async function loginUser(email: string, password: string): Promise<AuthUs
     throw new Error("Invalid credentials");
   }
 
-  const data = await res.json();
-  return data.user;
+  await res.json();
+
+  // The dashboard route sets the HttpOnly cookie. Read the canonical user
+  // profile after that cookie has been stored instead of treating the login
+  // response's token envelope as an AuthUser.
+  return fetchCurrentUser();
 }
 
 export async function fetchCurrentUser(): Promise<AuthUser> {

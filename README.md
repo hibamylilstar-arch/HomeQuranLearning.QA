@@ -15,11 +15,13 @@ Private internal QA, attendance and monitoring platform for the HomeQuranLearnin
 
 ## Current checkpoint
 
-`415bbec feat(qa): align alerts with transcript timestamps`
+`f4426c1 fix(dashboard): refine login role copy`
 
-Latest closed phase: `S1 - access and attendance stabilization`
+Latest closed phase: `7A-5C — multilingual QA classifier and evaluation`
 
-Next planned QA phase: `7A-2`; next engineering phase requires post-S1 reassessment.
+Latest released phase: `VPS direct-IP staging preparation and commercial branding` (`20f2fdb`, closure at `f4426c1`).
+
+Latest closed phase: secured real-data VPS pilot preparation (`b61c1d2`). It adds public-IP HTTPS, exact source allowlisting, hardened package/config validation and responsive login proof. No remote deployment or old-VPS-folder deletion has occurred; the next phase starts with read-only VPS inventory as defined in `docs/operations/vps-staging-runbook.md`.
 
 ## Important documentation
 
@@ -30,12 +32,16 @@ Next planned QA phase: `7A-2`; next engineering phase requires post-S1 reassessm
 - `docs/architecture/current-state.md`
 - `docs/architecture/overview.md`
 - `docs/architecture/qa-worker-service.md`
+- `docs/architecture/teams-helper-lifecycle.md`
 - `docs/decisions/ADR-001-system-architecture.md`
 - `docs/decisions/coding-conventions.md`
 
 ## Development policy
 
-The project is local-first. Production/VPS deployment remains deferred until the planned local product is substantially implemented, tested and stable.
+Local approved branches remain the engineering source. A bounded real-academy
+VPS pilot is authorized, but release, deployment, retention, expansion and final
+production activation remain evidence-based gates with measured backup, storage,
+accuracy and rollback proof.
 
 Do not push major-phase changes without a completed validation summary and explicit owner approval.
 

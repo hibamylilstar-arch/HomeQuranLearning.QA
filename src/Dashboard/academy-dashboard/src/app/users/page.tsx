@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
-import { getUsers, createUser } from "@/lib/api";
+import { getUsers, createUser, setUserStatus, resetUserPassword, deleteUser } from "@/lib/api";
 import type { UserListItem } from "@/types";
 
 export default function UsersPage() {
@@ -27,7 +27,13 @@ export default function UsersPage() {
   }
 
   useEffect(() => {
-    loadUsers();
+    const timer = window.setTimeout(() => {
+      void loadUsers();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, []);
 
   async function handleCreate(e: React.FormEvent) {
@@ -45,6 +51,12 @@ export default function UsersPage() {
       setError(err instanceof Error ? err.message : "Error creating user");
     }
   }
+
+  async function changeStatus(user: UserListItem) { try { setError(""); await setUserStatus(user.id, !user.isActive); await loadUsers(); } catch (err) { setError(err instanceof Error ? err.message : "Unable to update account"); } }
+
+  async function resetPassword(user: UserListItem) { const password = window.prompt(`New password for ${user.fullName}:`); if (!password) return; try { setError(""); await resetUserPassword(user.id, password); window.alert("Password updated."); } catch (err) { setError(err instanceof Error ? err.message : "Unable to reset password"); } }
+
+  async function removeUser(user: UserListItem) { if (!window.confirm(`Delete ${user.fullName}? If preserved history references this account, deletion will be blocked.`)) return; try { setError(""); await deleteUser(user.id); await loadUsers(); } catch (err) { setError(err instanceof Error ? err.message : "Unable to delete account"); } }
 
   if (loading) {
     return (
@@ -106,7 +118,6 @@ export default function UsersPage() {
             >
               <option value="Manager">Manager</option>
               <option value="Admin">Admin</option>
-              <option value="Owner">Owner</option>
             </select>
           </div>
         </div>
@@ -147,12 +158,13 @@ export default function UsersPage() {
                 <th className="px-6 py-3">Email Address</th>
                 <th className="px-6 py-3">Role</th>
                 <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-slate-400">
+                  <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
                     No users found. Use the form above to add an account.
                   </td>
                 </tr>
@@ -170,7 +182,7 @@ export default function UsersPage() {
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${user.isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>
                         {user.isActive ? "Active" : "Disabled"}
                       </span>
-                    </td>
+                    </td>`r`n                    <td className="px-6 py-4">{user.role === "Owner" ? <span className="text-slate-400">Protected</span> : <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void changeStatus(user)}>{user.isActive ? "Disable" : "Enable"}</button><button type="button" onClick={() => void resetPassword(user)}>Reset Password</button><button type="button" onClick={() => void removeUser(user)}>Delete</button></div>}</td>
                   </tr>
                 ))
               )}

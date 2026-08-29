@@ -64,15 +64,21 @@ export default function RecordingsPage() {
   }
 
   useEffect(() => {
-    refreshRecordings()
-      .catch((err) =>
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Error loading recordings"
+    const timer = window.setTimeout(() => {
+      void refreshRecordings()
+        .catch((err) =>
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Error loading recordings"
+          )
         )
-      )
-      .finally(() => setLoading(false));
+        .finally(() => setLoading(false));
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, []);
 
   const filteredRecordings = useMemo(() => {
@@ -191,7 +197,7 @@ export default function RecordingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-5 sm:space-y-6">
       <div>
         <h2 className="text-xl font-bold tracking-tight text-slate-900">
           Session Recordings
@@ -208,7 +214,7 @@ export default function RecordingsPage() {
         </div>
       )}
 
-      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3">
+      <div className="grid min-w-0 grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             Search
@@ -264,6 +270,23 @@ export default function RecordingsPage() {
       </div>
 
       <div className="space-y-3">
+        {filteredRecordings.length === 0 && (
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <p className="text-sm font-medium text-slate-600">
+              No recordings match the current filters.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setStatusFilter("ALL");
+              }}
+              className="mt-3 text-xs font-semibold text-indigo-700 hover:text-indigo-600"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
         {filteredRecordings.map(
           (recording) => {
             const status =
@@ -286,8 +309,8 @@ export default function RecordingsPage() {
                 key={recording.id}
                 className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
+                <div className="flex min-w-0 flex-col items-start justify-between gap-3 sm:flex-row">
+                  <div className="min-w-0 max-w-full">
                     <div className="text-base font-bold text-indigo-700">
                       {recording.deviceName}
                     </div>
@@ -326,7 +349,7 @@ export default function RecordingsPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+                <div className="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
                   <div>
                     <div className="text-[10px] uppercase text-slate-400">
                       Started

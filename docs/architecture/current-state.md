@@ -4,12 +4,12 @@
 
 Canonical checkpoint:
 
-- Working branch: `main`
-- Base commit: `32202b3`
-- Base subject: `chore(codex): add autonomous project governance`
-- Latest closed product phase: `S1 - access and attendance stabilization`
-- Current product phase: `BETWEEN PHASES - S1 closed`
-- Next planned QA phase: `7A-2`; next engineering phase requires post-S1 reassessment.
+- Working branch: `codex/final-classroom-agent-installer`
+- Current phase base: `f4426c1`
+- Latest closed product phase: `7A-6 — attendance operations/reporting`
+- Current product phase: production rollout and classroom installer completion
+- Phase status: `IN_PROGRESS`; production routing, roaming Agent access, Owner user management, responsive dashboard and classroom installer are being finalized for VPS rollout.
+- Current QA limitation: legacy layout-0 recordings capture system/loopback audio only and remain non-attributable. New layout-1 recordings have proven teacher-microphone provenance. 7A-5C now adds a versioned, fail-closed lexical baseline that classifies timestamped teacher-track windows and posts review candidates only; production accuracy is not yet claimed.
 
 Canonical resumable state: `docs/PROJECT-STATE.md`
 
@@ -24,9 +24,9 @@ Expected scale:
 - roughly 2–3 hour peak windows
 - mostly stable teacher/device mapping with occasional substitutions
 
-## Local-first policy
+## Production engineering and VPS policy
 
-Production/VPS deployment is deferred until core and advanced local functionality is implemented, tested and stabilized, and the owner explicitly approves deployment.
+Git remains the engineering source of truth. Production uses public HTTPS, application authentication, RBAC and outbound-only teacher Agents. Roaming teacher devices are not trusted or restricted by source IP. Releases are verified locally, committed/pushed normally, deployed to the VPS, then health/runtime verified. Destructive database/evidence operations and secret/security mutations remain separately protected.
 
 ## Stack
 
@@ -91,6 +91,10 @@ NAudio / WASAPI loopback
 ```
 
 Live screen + system audio and dashboard audio enable/disable have been proven end-to-end locally.
+
+This system-audio proof is not teacher-microphone provenance. The phase 7A-5
+design preserves it for live/class context while adding a separately
+attributable teacher track for QA.
 
 ## Recording — proven
 
@@ -296,9 +300,13 @@ These counts are historical proof only, not permanent invariants.
 
 ## Next engineering work
 
-Immediate work: a narrow stabilization phase for current authorization gaps and stale runtime/service proof. TeamsHelper startup and manual-session gaps remain later stabilization work.
+The local dashboard evidence/operational vertical slice is implemented, backend/runtime/browser-proven and pushed at `051fe9e`; operational hardening is released at `e127a19`. Direct-IP VPS preparation and the secured real-data pilot configuration are released. Remote execution starts with a read-only VPS inventory and exact old-copy classification before any deployment or deletion.
 
-The next QA feature remains `7A-2 — durable timestamped transcript segments`, but it must not start until stabilization scope is discussed/approved and normal phase gates are followed.
+The dashboard proof includes 0-error/0-warning lint, a successful production build, full backend build/tests, authenticated login and proxy HTTP checks, 401 unauthenticated behavior and 404 missing/inaccessible event behavior. Browser proof verified the unauthenticated redirect, approved Owner login, 20-session rendering, the six-event raw timeline, filter empty-state/recovery and logout back to `/login`.
+
+7A-2 is released on `codex/7a-2-transcript-segments` at `f4617e0`. 7A-3 is released at `a2b8aae`, and controlled local multi-laptop readiness 7A-4 is released at `ee42315`.
+
+The 7A-3 review workflow exposes persisted transcript segments in the recording player, maps QA alert timestamps to recording-relative offsets, and provides click-to-seek controls. QA Alerts links now open the relevant recording review. If playback is unavailable, transcript and QA evidence remain reviewable.
 
 Likely concerns:
 
@@ -321,11 +329,15 @@ download
 -> mark processed only after all success
 ```
 
-Evidence clip extraction remains a later coherent phase.
+Phase 7A-5A implements teacher-audio provenance and intentionally reuses the
+full recording rather than storing duplicate clips. The later 7A-5B/5C slices
+cover the human-reviewed candidate lifecycle, multilingual Arabic-recitation
+exclusion and timestamp offsets for ten seconds of context on each side. See
+`docs/architecture/teacher-audio-context-qa.md`.
 
 ## Production
 
-Production/VPS is not the current next phase.
+Production/VPS remains deferred until local dashboard, transcript QA, stability and controlled multi-laptop readiness gates are green.
 
 ## Owner Control Plane direction
 

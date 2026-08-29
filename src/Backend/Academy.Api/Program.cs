@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 const string OwnerOrAdminPolicy = "OwnerOrAdmin";
+const string OwnerOnlyPolicy = "OwnerOnly";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +26,8 @@ builder.Services.AddScoped<DeviceService>();
 builder.Services.AddScoped<DeviceQueryService>();
 builder.Services.AddScoped<QaRuleService>();
 builder.Services.AddScoped<QaAlertService>();
+builder.Services.AddScoped<QaCandidateService>();
+builder.Services.AddScoped<TranscriptSegmentService>();
 builder.Services.AddScoped<AdminUserService>();
 builder.Services.AddScoped<TeacherService>();
 builder.Services.AddScoped<ManagerAssignmentService>();
@@ -100,6 +103,7 @@ builder.Services.AddAuthorization(options =>
         policy => policy.RequireRole(
             UserRole.Owner.ToString(),
             UserRole.Admin.ToString()));
+    options.AddPolicy(OwnerOnlyPolicy, policy => policy.RequireRole(UserRole.Owner.ToString()));
 });
 
 builder.Services.AddCors(options =>
@@ -119,7 +123,10 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+if (app.Configuration.GetValue("HttpsRedirection:Enabled", true))
+{
+    app.UseHttpsRedirection();
+}
 app.UseCors("DashboardCors");
 app.UseAuthentication();
 app.UseAuthorization();
@@ -302,8 +309,19 @@ app.MapPost("/api/agent/recordings", async (
         return Results.Unauthorized();
     }
 
-    var response = await recordingService.SubmitRecordingAsync(body, cancellationToken);
-    return Results.Ok(response);
+    try
+    {
+        var response = await recordingService.SubmitRecordingAsync(body, cancellationToken);
+        return Results.Ok(response);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
 });
 
 app.MapPost("/api/agent/recordings/{recordingId:guid}/upload", async (
@@ -460,6 +478,31 @@ app.MapGet("/api/admin/recordings/{recordingId:guid}/playback-url", async (
         return Results.BadRequest(
             new { error = "Recording file is not available." });
     }
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/recordings/{recordingId:guid}/transcript-segments", async (
+    ClaimsPrincipal user,
+    Guid recordingId,
+    DashboardQueryService dashboardQueryService,
+    TranscriptSegmentService transcriptSegmentService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) = GetUserInfo(user);
+
+    if (!await dashboardQueryService.CanAccessRecordingAsync(
+            recordingId,
+            userId,
+            role,
+            cancellationToken))
+    {
+        return Results.NotFound();
+    }
+
+    var segments = await transcriptSegmentService.GetByRecordingIdAsync(
+        recordingId,
+        cancellationToken);
+
+    return Results.Ok(segments);
 }).RequireAuthorization();
 
 app.MapGet("/api/admin/recordings/{recordingId:guid}/download-url", async (
@@ -666,7 +709,7 @@ app.MapPost("/api/admin/users", async (
     {
         return Results.BadRequest(new { message = ex.Message });
     }
-}).RequireAuthorization(OwnerOrAdminPolicy);
+}).RequireAuthorization(OwnerOnlyPolicy);
 
 app.MapPatch("/api/admin/users/{userId:guid}/status", async (
     ClaimsPrincipal user,
@@ -685,7 +728,20 @@ app.MapPatch("/api/admin/users/{userId:guid}/status", async (
     {
         return Results.BadRequest(new { message = ex.Message });
     }
-}).RequireAuthorization(OwnerOrAdminPolicy);
+}).RequireAuthorization(OwnerOnlyPolicy);
+
+app.MapPost("/api/admin/users/{userId:guid}/reset-password", async (Guid userId, ResetUserPasswordRequest body, AdminUserService adminUserService, CancellationToken cancellationToken) =>
+{
+    try { await adminUserService.ResetPasswordAsync(userId, body.Password, cancellationToken); return Results.Ok(new { updated = true }); }
+    catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
+}).RequireAuthorization(OwnerOnlyPolicy);
+
+app.MapDelete("/api/admin/users/{userId:guid}", async (Guid userId, AdminUserService adminUserService, CancellationToken cancellationToken) =>
+{
+    try { await adminUserService.DeleteUserAsync(userId, cancellationToken); return Results.Ok(new { deleted = true }); }
+    catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
+    catch (Microsoft.EntityFrameworkCore.DbUpdateException) { return Results.Conflict(new { message = "Account has preserved history. Disable it instead." }); }
+}).RequireAuthorization(OwnerOnlyPolicy);
 
 app.MapGet("/api/admin/teachers", async (
     ClaimsPrincipal user,
@@ -1031,6 +1087,86 @@ app.MapGet("/api/admin/sessions", async (
     return Results.Ok(sessions);
 }).RequireAuthorization();
 
+app.MapGet("/api/admin/qa-candidates", async (
+    ClaimsPrincipal user,
+    DashboardQueryService dashboardQueryService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) = GetUserInfo(user);
+    var candidates = await dashboardQueryService.GetVisibleQaCandidatesAsync(
+        userId,
+        role,
+        cancellationToken);
+
+    return Results.Ok(candidates);
+}).RequireAuthorization();
+
+app.MapPost("/api/admin/qa-candidates/{candidateId:guid}/review", async (
+    ClaimsPrincipal user,
+    Guid candidateId,
+    ReviewQaCandidateRequest body,
+    DashboardQueryService dashboardQueryService,
+    QaCandidateService candidateService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) = GetUserInfo(user);
+
+    if (!await dashboardQueryService.CanAccessCandidateAsync(
+            candidateId,
+            userId,
+            role,
+            cancellationToken))
+    {
+        return Results.NotFound();
+    }
+
+    try
+    {
+        var candidate = await candidateService.ReviewAsync(
+            candidateId,
+            userId,
+            body,
+            cancellationToken);
+
+        return Results.Ok(candidate);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/api/admin/sessions/{sessionId:guid}/events", async (
+    ClaimsPrincipal user,
+    Guid sessionId,
+    DashboardQueryService dashboardQueryService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) =
+        GetUserInfo(user);
+
+    if (userId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    var events =
+        await dashboardQueryService
+            .GetVisibleSessionEventsAsync(
+                sessionId,
+                userId,
+                role,
+                cancellationToken);
+
+    return events is null
+        ? Results.NotFound()
+        : Results.Ok(events);
+}).RequireAuthorization();
+
 app.MapPatch("/api/admin/sessions/{sessionId:guid}/attendance-review", async (
     ClaimsPrincipal user,
     Guid sessionId,
@@ -1316,6 +1452,68 @@ app.MapPost("/api/worker/qa-alerts", async (
     return Results.Ok(new { created = true });
 });
 
+app.MapPost("/api/worker/qa-candidates", async (
+    HttpRequest request,
+    CreateQaCandidateRequest body,
+    QaCandidateService candidateService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        var candidate = await candidateService.CreateAsync(
+            body,
+            cancellationToken);
+
+        return Results.Ok(candidate);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/worker/recordings/{recordingId:guid}/transcript-segments", async (
+    HttpRequest request,
+    Guid recordingId,
+    PersistTranscriptSegmentsRequest body,
+    TranscriptSegmentService transcriptSegmentService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        var result = await transcriptSegmentService.PersistAsync(
+            recordingId,
+            body.Segments,
+            cancellationToken);
+
+        return Results.Ok(result);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(new { error = ex.Message });
+    }
+});
+
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
 
 app.Run();
@@ -1359,8 +1557,14 @@ static async Task SeedOwnerAsync(WebApplication app)
 
     await dbContext.Database.MigrateAsync();
 
-    string seedEmail = app.Configuration["SeedOwner:Email"] ?? "owner@academy.local";
+    string? seedEmail = app.Configuration["SeedOwner:Email"];
+    string? seedPassword = app.Configuration["SeedOwner:Password"];
 
+    if (string.IsNullOrWhiteSpace(seedEmail) && string.IsNullOrWhiteSpace(seedPassword))
+        return;
+
+    if (string.IsNullOrWhiteSpace(seedEmail) || string.IsNullOrWhiteSpace(seedPassword))
+        throw new InvalidOperationException("SeedOwner requires both Email and Password.");
     bool exists = await dbContext.Users.AnyAsync(u => u.Email == seedEmail);
 
     if (!exists)
@@ -1370,8 +1574,7 @@ static async Task SeedOwnerAsync(WebApplication app)
             Id = Guid.NewGuid(),
             FullName = app.Configuration["SeedOwner:FullName"] ?? "Owner",
             Email = seedEmail,
-            PasswordHash = passwordHasher.Hash(
-                app.Configuration["SeedOwner:Password"] ?? "OwnerPass123!"),
+            PasswordHash = passwordHasher.Hash(seedPassword!),
             Role = UserRole.Owner,
             IsActive = true,
             CreatedAtUtc = DateTimeOffset.UtcNow,

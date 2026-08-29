@@ -4,8 +4,8 @@ import { AuthProvider } from "@/components/AuthProvider";
 import AppShell from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
-  title: "QA Monitoring Suite",
-  description: "Enterprise commercial monitoring system",
+  title: "Home Quran Learning Operations Suite",
+  description: "Private academy operations, attendance and quality console — developed by Abdul Wahid.",
 };
 
 export default function RootLayout({

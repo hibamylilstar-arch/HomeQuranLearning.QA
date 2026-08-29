@@ -41,7 +41,13 @@ export default function ManagerAssignmentsPage() {
   }
 
   useEffect(() => {
-    loadData();
+    const timer = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, []);
 
   async function handleAssign(e: React.FormEvent) {

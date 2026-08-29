@@ -44,7 +44,12 @@ public sealed class RecordingRepository : IRecordingRepository
     {
         return await _dbContext.Recordings
             .AsNoTracking()
-            .Where(x => x.Status == RecordingStatus.Uploaded && x.QaProcessedAtUtc == null)
+            .Where(x =>
+                x.Status == RecordingStatus.Uploaded &&
+                x.QaProcessedAtUtc == null &&
+                x.AudioLayoutVersion == 1 &&
+                x.TeacherAudioProvenanceStatus ==
+                    TeacherAudioProvenanceStatus.Proven)
             .OrderByDescending(x => x.StartedAtUtc)
             .ToListAsync(cancellationToken);
     }
@@ -63,6 +68,7 @@ public sealed class RecordingRepository : IRecordingRepository
         CancellationToken cancellationToken = default)
     {
         return await _dbContext.Recordings
+            .Include(x => x.TeacherAudioCoverageGaps)
             .FirstOrDefaultAsync(
                 x => x.DeviceId == deviceId &&
                      x.FileName == fileName,

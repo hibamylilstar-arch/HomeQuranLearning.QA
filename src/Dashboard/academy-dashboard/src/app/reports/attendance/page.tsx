@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
+import Link from "next/link";
 
 import { useAuth } from "@/components/AuthProvider";
 import { getDailyAttendanceReport } from "@/lib/api";
@@ -78,7 +79,7 @@ function ReportTable({
   emptyMessage: string;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 px-5 py-4">
         <h3 className="text-sm font-semibold text-slate-900">
           {title} ({items.length})
@@ -91,14 +92,15 @@ function ReportTable({
           {emptyMessage}
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
+        <div className="responsive-data-cards attendance-report-cards">
+          <table className="min-w-[920px] divide-y divide-slate-200 text-left text-xs">
             <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-5 py-3">Student</th>
-                <th className="px-5 py-3">Teacher</th>
+                <th className="px-5 py-3">Teacher Name</th>
                 <th className="px-5 py-3">Course / Time</th>
                 <th className="px-5 py-3">Attendance</th>
+                <th className="px-5 py-3">Teacher Status</th>
                 <th className="px-5 py-3">Review</th>
                 <th className="px-5 py-3">Evidence</th>
                 <th className="px-5 py-3">Notes</th>
@@ -142,6 +144,17 @@ function ReportTable({
                     <span
                       className={
                         "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold " +
+                        attendanceBadgeClass(item.teacherAttendanceStatus)
+                      }
+                    >
+                      {item.teacherAttendanceStatus}
+                    </span>
+                  </td>
+
+                  <td className="px-5 py-4">
+                    <span
+                      className={
+                        "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold " +
                         reviewBadgeClass(item.attendanceReviewStatus)
                       }
                     >
@@ -160,7 +173,7 @@ function ReportTable({
                   </td>
 
                   <td className="max-w-xs px-5 py-4 text-slate-600">
-                    {item.attendanceNotes || "—"}
+                    {item.attendanceNotes || "-"}
                   </td>
                 </tr>
               ))}
@@ -180,6 +193,9 @@ export default function DailyAttendanceReportPage() {
     useState<DailyAttendanceReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [view, setView] = useState<"student" | "teacher">("student");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [search, setSearch] = useState("");
 
   const loadReport = useCallback(async (date?: string) => {
     setLoading(true);
@@ -224,6 +240,22 @@ export default function DailyAttendanceReportPage() {
 
     await loadReport(selectedDate);
   }
+
+  useEffect(() => {
+    if (!report) return;
+    const timer = window.setInterval(() => void loadReport(report.date), 30000);
+    return () => window.clearInterval(timer);
+  }, [report, loadReport]);
+
+  const visibleSessions = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return (report?.sessions ?? []).filter((item) => {
+      const status = view === "student" ? item.studentAttendanceStatus : item.teacherAttendanceStatus;
+      const matchesStatus = statusFilter === "ALL" || status === statusFilter;
+      const matchesSearch = !query || [item.teacherFullName, item.studentFullName, item.courseName].some((value) => value.toLowerCase().includes(query));
+      return matchesStatus && matchesSearch;
+    });
+  }, [report?.sessions, search, statusFilter, view]);
 
   if (authLoading || (loading && !report)) {
     return (
@@ -308,7 +340,7 @@ export default function DailyAttendanceReportPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-5 sm:space-y-6">
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900">
@@ -332,14 +364,14 @@ export default function DailyAttendanceReportPage() {
               value={selectedDate}
               onChange={(event) => setSelectedDate(event.target.value)}
               required
-              className="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
+              className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-emerald-500 sm:w-auto"
             />
           </label>
 
           <button
             type="submit"
             disabled={loading || !selectedDate}
-            className="rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             {loading ? "Loading..." : "Load Report"}
           </button>
@@ -375,10 +407,12 @@ export default function DailyAttendanceReportPage() {
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => (
-          <div
+          <button
+            type="button"
+            onClick={() => setStatusFilter(card.label === "Present" || card.label === "Late" || card.label === "Needs Review" ? card.label.replace(" ", "") : card.label === "Confirmed Absent" ? "Absent" : "ALL")}
             key={card.label}
             className={
-              "rounded-xl border p-4 shadow-sm " +
+              "rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md " +
               card.className
             }
           >
@@ -389,8 +423,26 @@ export default function DailyAttendanceReportPage() {
             <p className="mt-2 text-3xl font-bold">
               {card.value}
             </p>
-          </div>
+            <span className="mt-1 block text-[10px] font-semibold uppercase tracking-wide opacity-60">View details &rarr;</span>
+          </button>
         ))}
+      </section>
+
+      <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Attendance Operations</h3>
+            <p className="mt-1 text-xs text-slate-500">Live operational view - refreshes every 30 seconds</p>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+            {(["student", "teacher"] as const).map((item) => <button key={item} type="button" onClick={() => setView(item)} className={`rounded-lg px-3 py-2 text-xs font-semibold ${view === item ? "bg-slate-900 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200"}`}>{item === "student" ? "Student Attendance" : "Teacher Attendance"}</button>)}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 border-b border-slate-100 px-4 py-4 sm:grid-cols-2 sm:px-5">
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search teacher, student or course" className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-900" />
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"><option value="ALL">All statuses</option><option value="Present">Present</option><option value="Late">Late</option><option value="NeedsReview">Needs Review</option><option value="Absent">Absent</option><option value="Excused">Excused</option><option value="Unknown">Unknown</option></select>
+        </div>
+        {visibleSessions.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">No sessions match this view or filter.</p> : <div className="responsive-data-cards attendance-operations-cards"><table className="min-w-[760px] divide-y divide-slate-200 text-left text-xs"><thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><tr><th className="px-5 py-3">Time</th><th className="px-5 py-3">Teacher</th><th className="px-5 py-3">Student</th><th className="px-5 py-3">Course</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Evidence</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleSessions.map((item) => { const status = view === "student" ? item.studentAttendanceStatus : item.teacherAttendanceStatus; return <tr key={item.sessionId} className="hover:bg-slate-50"><td className="whitespace-nowrap px-5 py-4 text-slate-600">{formatScheduleTime(item.scheduledStartUtc)}</td><td className="px-5 py-4 font-medium text-slate-900">{item.teacherFullName || "Unknown"}</td><td className="px-5 py-4 text-slate-700">{item.studentFullName || "Unknown"}</td><td className="px-5 py-4 text-slate-700">{item.courseName || "Course"}</td><td className="px-5 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${attendanceBadgeClass(status)}`}>{status}</span></td><td className="px-5 py-4 text-slate-600">{formatDuration(item.activeSeconds)} active {" - "} {item.disconnectCount} disconnects <Link className="ml-2 font-semibold text-indigo-700" href={`/sessions/${item.sessionId}`}>Open</Link></td></tr>; })}</tbody></table></div>}
       </section>
 
       <ReportTable

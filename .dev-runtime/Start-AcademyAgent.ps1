@@ -19,5 +19,4 @@ Write-Host "Started : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColo
 Write-Host ""
 
 dotnet run `
-    --project .\src\Agent\Academy.Agent.Service\Academy.Agent.Service.csproj `
-    --no-build
+    --project .\src\Agent\Academy.Agent.Service\Academy.Agent.Service.csproj

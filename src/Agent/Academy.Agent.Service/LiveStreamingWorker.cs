@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
 using Academy.Agent.Audio;
+using Academy.Agent.Cloud;
 using NAudio.Wave;
 
 namespace Academy.Agent.Service;
@@ -12,6 +13,8 @@ public sealed class LiveStreamingWorker : BackgroundService
     private readonly ILogger<LiveStreamingWorker> _logger;
     private readonly IConfiguration _configuration;
     private readonly AgentActivityState _activityState;
+    private readonly IDeviceIdentityProvider _identityProvider;
+    private readonly CloudOptions _cloudOptions;
 
     private Process? _ffmpegProcess;
     private AudioCaptureService? _audioService;
@@ -30,11 +33,15 @@ public sealed class LiveStreamingWorker : BackgroundService
     public LiveStreamingWorker(
         ILogger<LiveStreamingWorker> logger,
         IConfiguration configuration,
-        AgentActivityState activityState)
+        AgentActivityState activityState,
+        IDeviceIdentityProvider identityProvider,
+        CloudOptions cloudOptions)
     {
         _logger = logger;
         _configuration = configuration;
         _activityState = activityState;
+        _identityProvider = identityProvider;
+        _cloudOptions = cloudOptions;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -45,16 +52,32 @@ public sealed class LiveStreamingWorker : BackgroundService
             return;
         }
 
-        string deviceId = _configuration["LiveStreaming:DeviceId"]
-            ?? throw new InvalidOperationException("LiveStreaming:DeviceId is required.");
+        DeviceIdentity identity =
+            await _identityProvider.GetOrCreateIdentityAsync(
+                stoppingToken);
 
-        string agentApiKey = _configuration["Cloud:ApiKey"]
-            ?? throw new InvalidOperationException("Cloud:ApiKey is required.");
+        string deviceId = identity.DeviceId;
 
-        string backendBaseUrl = _configuration["Cloud:BaseUrl"]
-            ?? throw new InvalidOperationException("Cloud:BaseUrl is required.");
+        string agentApiKey = _cloudOptions.ApiKey;
+        string backendBaseUrl = _cloudOptions.BaseUrl;
 
         string ffmpegPath = _configuration["LiveStreaming:FfmpegPath"] ?? "ffmpeg";
+
+        string ingestBaseUrl =
+            _configuration["LiveStreaming:IngestBaseUrl"]
+            ?? "rtmp://localhost:1935/live";
+
+        if (!Uri.TryCreate(
+                ingestBaseUrl,
+                UriKind.Absolute,
+                out Uri? ingestUri) ||
+            (ingestUri.Scheme != "rtmp" &&
+             ingestUri.Scheme != "rtmps" &&
+             ingestUri.Scheme != "https"))
+        {
+            throw new InvalidOperationException(
+                "LiveStreaming:IngestBaseUrl must use rtmp, rtmps, or https.");
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -112,10 +135,12 @@ public sealed class LiveStreamingWorker : BackgroundService
                         }
 
                         _logger.LogInformation(
-                            "Starting screen + audio live stream for key: {StreamKey}",
-                            streamKey);
+                            "Starting screen + audio live stream for the active session.");
 
-                        await StartFfmpegAsync(streamKey, ffmpegPath);
+                        await StartFfmpegAsync(
+                            streamKey,
+                            ffmpegPath,
+                            ingestBaseUrl);
                     }
                 }
             }
@@ -158,7 +183,10 @@ public sealed class LiveStreamingWorker : BackgroundService
             ((IPEndPoint)probe.Client.LocalEndPoint!)
             .Port;
     }
-    private async Task StartFfmpegAsync(string streamKey, string ffmpegPath)
+    private async Task StartFfmpegAsync(
+        string streamKey,
+        string ffmpegPath,
+        string ingestBaseUrl)
     {
         if (_ffmpegProcess is not null && !_ffmpegProcess.HasExited)
         {
@@ -194,7 +222,20 @@ public sealed class LiveStreamingWorker : BackgroundService
                 $"Unsupported live audio format: {captureFormat.Encoding}, {captureFormat.BitsPerSample}-bit")
         };
 
-        string rtmpUrl = $"rtmp://localhost:1935/live/{streamKey}";
+        string ingestUrl =
+            $"{ingestBaseUrl.TrimEnd('/')}/{Uri.EscapeDataString(streamKey)}";
+
+        string outputFormat =
+            ingestUrl.StartsWith(
+                "https://",
+                StringComparison.OrdinalIgnoreCase)
+                ? "whip"
+                : "flv";
+
+        string audioEncoderArguments =
+            outputFormat == "whip"
+                ? "-c:a libopus -b:a 64k -ar 48000 -ac 2"
+                : "-c:a aac -b:a 64k -ar 48000 -ac 2";
 
         var startInfo = new ProcessStartInfo
         {
@@ -206,7 +247,7 @@ public sealed class LiveStreamingWorker : BackgroundService
                 $"-vf \"hwdownload,format=bgra,setpts=N/(10*TB)\" " +
                 $"-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p " +
                 $"-profile:v baseline -level:v 4.0 -g 10 -bf 0 -b:v 800k -flush_packets 1 " +
-                $"-c:a aac -b:a 64k -ar 48000 -ac 2 -f flv \"{rtmpUrl}\"",
+                $"{audioEncoderArguments} -f {outputFormat} \"{ingestUrl}\"",
             RedirectStandardOutput = false,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -234,7 +275,8 @@ public sealed class LiveStreamingWorker : BackgroundService
 
         PublishLiveStreamStartedIfInactive();
 
-        _logger.LogInformation("FFmpeg live stream started for stream key: {StreamKey}", streamKey);
+        _logger.LogInformation(
+            "FFmpeg live stream process started for the active session.");
 
         await Task.CompletedTask;
     }

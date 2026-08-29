@@ -42,7 +42,13 @@ export default function DevicesPage() {
   }
 
   useEffect(() => {
-    loadDevices();
+    const timer = window.setTimeout(() => {
+      void loadDevices();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, []);
 
   async function saveRecordingName(device: DeviceListItem) {

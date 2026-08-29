@@ -155,6 +155,7 @@ public class DashboardQueryServiceTests
             .ReturnsAsync(recordings);
 
         var qaRepo = new Mock<IQaAlertRepository>();
+        var candidateRepo = new Mock<IQaCandidateRepository>();
         var deviceRepo = new Mock<IDeviceRepository>();
         var assignRepo = new Mock<IManagerTeacherAssignmentRepository>();
         var sessionRepo = new Mock<ISessionRepository>();
@@ -168,9 +169,11 @@ public class DashboardQueryServiceTests
         var service = new DashboardQueryService(
             recordingRepo.Object,
             qaRepo.Object,
+            candidateRepo.Object,
             deviceRepo.Object,
             assignRepo.Object,
-            sessionRepo.Object);
+            sessionRepo.Object,
+            Mock.Of<ISessionEventRepository>());
 
         // Act
         var result = await service.GetVisibleRecordingsAsync(managerUserId, UserRole.Manager.ToString());
@@ -204,6 +207,7 @@ public class DashboardQueryServiceTests
 
         var recordingRepo = new Mock<IRecordingRepository>();
         var qaRepo = new Mock<IQaAlertRepository>();
+        var candidateRepo = new Mock<IQaCandidateRepository>();
         var deviceRepo = new Mock<IDeviceRepository>();
         var assignRepo = new Mock<IManagerTeacherAssignmentRepository>();
         var sessionRepo = new Mock<ISessionRepository>();
@@ -223,9 +227,11 @@ public class DashboardQueryServiceTests
         var service = new DashboardQueryService(
             recordingRepo.Object,
             qaRepo.Object,
+            candidateRepo.Object,
             deviceRepo.Object,
             assignRepo.Object,
-            sessionRepo.Object);
+            sessionRepo.Object,
+            Mock.Of<ISessionEventRepository>());
 
         // Act
         var result = await service.GetVisibleDevicesAsync(managerUserId, UserRole.Manager.ToString());

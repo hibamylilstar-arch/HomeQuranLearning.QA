@@ -121,6 +121,62 @@ export interface SessionListItem {
   disconnectSeconds: number;
 }
 
+export interface QaCandidateListItem {
+  id: string;
+  recordingId: string;
+  recordingFileName: string;
+  sessionId: string | null;
+  teacherId: string | null;
+  teacherName: string;
+  qaRuleId: string | null;
+  rulePhrase: string | null;
+  confirmedQaAlertId: string | null;
+  policyVersion: string;
+  analysisVersion: string;
+  sourceTrackIndex: number;
+  audioLayoutVersion: number;
+  triggerStartSeconds: number;
+  triggerEndSeconds: number;
+  contextStartSeconds: number;
+  contextEndSeconds: number;
+  transcript: string;
+  languageFamily: string;
+  intentCategory: string;
+  triggerConfidence: number | null;
+  asrConfidence: number | null;
+  intentConfidence: number | null;
+  analysisIdempotencyKey: string;
+  status: string;
+  reviewedByUserId: string | null;
+  reviewedAtUtc: string | null;
+  reviewReason: string | null;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+}
+
+export interface TranscriptSegmentListItem {
+  id: string;
+  recordingId: string;
+  segmentIndex: number;
+  startSeconds: number;
+  endSeconds: number;
+  text: string;
+  language: string | null;
+  avgLogProbability: number | null;
+  noSpeechProbability: number | null;
+  compressionRatio: number | null;
+  createdAtUtc: string;
+}
+
+export interface SessionEventListItem {
+  id: string;
+  eventType: string;
+  occurredAtUtc: string;
+  source: string | null;
+  details: string | null;
+  createdAtUtc: string;
+}
+
 export interface DailyAttendanceReportItem {
   sessionId: string;
   teacherId: string;
@@ -132,6 +188,7 @@ export interface DailyAttendanceReportItem {
   scheduledStartUtc: string;
   scheduledEndUtc: string;
   studentAttendanceStatus: string;
+  teacherAttendanceStatus: string;
   attendanceReviewStatus: string;
   attendanceNotes?: string | null;
   activeSeconds: number;
@@ -152,4 +209,5 @@ export interface DailyAttendanceReport {
   pendingReviewSessions: number;
   confirmedAbsences: DailyAttendanceReportItem[];
   unresolvedSessions: DailyAttendanceReportItem[];
+  sessions: DailyAttendanceReportItem[];
 }

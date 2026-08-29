@@ -70,6 +70,15 @@ Retention must be configurable rather than permanently hard-coded. Support globa
 
 Add per-teacher/course/severity/category overrides only when they solve a demonstrated need. A policy change must not silently delete recordings immediately.
 
+The Owner policy screen must show usable storage, recent recording volume,
+projected retained GB and safety headroom before a retention change is applied.
+Normal, pending-candidate and confirmed-QA retention must be distinguishable.
+Storage warning/critical thresholds are Owner-configurable within backend safety
+validation. Increasing VPS/object-storage capacity must permit the Owner to
+increase retention without a code release. Every policy or threshold change is
+backend-authorized, versioned and audited, with a deferred dry-run/impact preview
+for any change that could make existing media newly eligible for deletion.
+
 ## Owner modules
 
 Plan coherent modules for:

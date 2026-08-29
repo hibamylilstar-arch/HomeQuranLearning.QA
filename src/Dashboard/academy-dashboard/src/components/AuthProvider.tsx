@@ -7,23 +7,25 @@ import {
   useState,
   ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import { AuthUser, fetchCurrentUser, logoutUser } from "@/lib/auth";
 
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   setUser: (user: AuthUser | null) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
   setUser: () => {},
-  logout: () => {},
+  logout: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -35,9 +37,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function logout() {
-    await logoutUser();
-    setUser(null);
-    window.location.href = "/login";
+    try {
+      await logoutUser();
+    } finally {
+      setUser(null);
+      router.replace("/login");
+    }
   }
 
   return (

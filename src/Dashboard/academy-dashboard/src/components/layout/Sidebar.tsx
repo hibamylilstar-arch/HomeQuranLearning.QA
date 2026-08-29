@@ -1,46 +1,56 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { logoutUser } from "@/lib/auth";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen: boolean, setMobileOpen: (val: boolean) => void }) {
   const pathname = usePathname();
-  const router = useRouter();
+  const { logout, user } = useAuth();
 
   const handleLogout = async () => {
-    try { await logoutUser(); } catch { }
-    router.push("/login");
+    await logout();
   };
 
+  const ownerOrAdminRoles = ["Owner", "Admin"];
   const navItems = [
     { name: "Live Monitoring", href: "/live" },
     { name: "Overview", href: "/" },
     { name: "Devices", href: "/devices" },
     { name: "Recordings", href: "/recordings" },
-    { name: "QA Rules", href: "/qa-rules" },
+    { name: "QA Rules", href: "/qa-rules", roles: ownerOrAdminRoles },
     { name: "QA Alerts", href: "/qa-alerts" },
-    { name: "Teachers", href: "/teachers" },
-    { name: "Students", href: "/students" },
-    { name: "Courses", href: "/courses" },
+    { name: "QA Candidates", href: "/qa-candidates" },
+    { name: "Teachers", href: "/teachers", roles: ownerOrAdminRoles },
+    { name: "Students", href: "/students", roles: ownerOrAdminRoles },
+    { name: "Courses", href: "/courses", roles: ownerOrAdminRoles },
     { name: "Schedules", href: "/schedules" },
     { name: "Sessions", href: "/sessions" },
     { name: "Attendance Report", href: "/reports/attendance" },
-    { name: "Users", href: "/users" },
-    { name: "Assignments", href: "/assignments" },
-  ];
+    { name: "Users", href: "/users", roles: ownerOrAdminRoles },
+    { name: "Assignments", href: "/assignments", roles: ownerOrAdminRoles },
+  ].filter((item) => !item.roles || (user && item.roles.includes(user.role)));
 
   return (
     <>
       {mobileOpen && <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />}
 
-      <aside className={"fixed inset-y-0 left-0 z-50 w-64 transform bg-slate-950 border-r border-slate-800 text-slate-300 transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 " + (mobileOpen ? "translate-x-0" : "-translate-x-full") + " flex flex-col"}>
-        <div className="flex h-16 shrink-0 flex-col justify-center border-b border-slate-800 px-6 bg-slate-950">
-          <span className="text-sm font-bold text-white tracking-wide uppercase">QA Monitoring</span>
-          <span className="text-[10px] uppercase tracking-wider text-emerald-500 font-bold">Enterprise Suite</span>
+      <aside className={"fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-64 max-w-[85vw] transform flex-col border-r border-slate-800 bg-slate-950 text-slate-300 transition-transform duration-200 ease-in-out lg:static lg:h-auto lg:max-w-none lg:translate-x-0 " + (mobileOpen ? "translate-x-0" : "-translate-x-full")}>
+        <div className="flex h-16 shrink-0 items-center justify-center border-b border-slate-800 bg-slate-950">
+          <div className="h-12 w-12 overflow-hidden rounded-full" aria-label="Home Quran Learning Operations Suite">
+            <Image
+              src="/branding/homequranlearning-logo.jpg"
+              alt="Home Quran Learning â€” Learn with Faith"
+              width={64}
+              height={64}
+              priority
+              className="h-full w-full scale-[1.12] object-cover"
+            />
+          </div>
         </div>
 
-        <div className="flex flex-1 flex-col overflow-y-auto px-3 py-4 custom-scrollbar bg-slate-950">
+        <div className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-slate-950 px-3 py-4">
           <nav className="flex-1 space-y-1">
             {navItems.map((item) => {
               const isActive = item.href === "/" 

@@ -3,6 +3,7 @@ import type {
   RecordingListItem,
   QaRuleListItem,
   QaAlertListItem,
+  QaCandidateListItem,
   UserListItem,
   TeacherListItem,
   ManagerAssignmentListItem,
@@ -10,6 +11,8 @@ import type {
   CourseListItem,
   ScheduleListItem,
   SessionListItem,
+  SessionEventListItem,
+  TranscriptSegmentListItem,
   DailyAttendanceReport,
 } from "@/types";
 
@@ -31,11 +34,45 @@ async function proxyFetch<T>(
     },
   });
 
+  const responseText = await res.text();
+  let responseBody: unknown = null;
+
+  if (responseText) {
+    try {
+      responseBody = JSON.parse(responseText);
+    } catch {
+      responseBody = responseText;
+    }
+  }
+
   if (!res.ok) {
+    const apiMessage =
+      typeof responseBody === "string"
+        ? responseBody
+        : responseBody && typeof responseBody === "object"
+          ? ["error", "message", "title"]
+              .map((key) => (responseBody as Record<string, unknown>)[key])
+              .find((value): value is string =>
+                typeof value === "string" && value.trim().length > 0
+              )
+          : undefined;
+
+    if (apiMessage) {
+      throw new Error(apiMessage);
+    }
+
+    if (res.status === 401) {
+      throw new Error("Your dashboard session has expired. Please sign in again.");
+    }
+
+    if (res.status === 403) {
+      throw new Error("You do not have access to this resource.");
+    }
+
     throw new Error(`Request failed: ${res.status}`);
   }
 
-  return res.json();
+  return responseBody as T;
 }
 
 export async function getDevices(): Promise<DeviceListItem[]> {
@@ -52,6 +89,21 @@ export async function getQaRules(): Promise<QaRuleListItem[]> {
 
 export async function getQaAlerts(): Promise<QaAlertListItem[]> {
   return proxyFetch<QaAlertListItem[]>(["qa-alerts"]);
+}
+
+export async function getQaCandidates(): Promise<QaCandidateListItem[]> {
+  return proxyFetch<QaCandidateListItem[]>(["qa-candidates"]);
+}
+
+export async function reviewQaCandidate(
+  candidateId: string,
+  decision: "Confirmed" | "Dismissed",
+  reason: string
+): Promise<QaCandidateListItem> {
+  return proxyFetch<QaCandidateListItem>(["qa-candidates", candidateId, "review"], {
+    method: "POST",
+    body: JSON.stringify({ decision, reason }),
+  });
 }
 
 export async function getPlaybackUrl(recordingId: string): Promise<string> {
@@ -79,6 +131,12 @@ export async function createUser(
     body: JSON.stringify({ fullName, email, password, role, isActive }),
   });
 }
+
+export async function setUserStatus(userId: string, isActive: boolean): Promise<void> { await proxyFetch(["users", userId, "status"], { method: "PATCH" }, new URLSearchParams({ isActive: String(isActive) })); }
+
+export async function resetUserPassword(userId: string, password: string): Promise<void> { await proxyFetch(["users", userId, "reset-password"], { method: "POST", body: JSON.stringify({ password }) }); }
+
+export async function deleteUser(userId: string): Promise<void> { await proxyFetch(["users", userId], { method: "DELETE" }); }
 
 export async function getTeachers(): Promise<TeacherListItem[]> {
   return proxyFetch<TeacherListItem[]>(["teachers"]);
@@ -160,6 +218,26 @@ export async function createSchedule(
 
 export async function getSessions(): Promise<SessionListItem[]> {
   return proxyFetch<SessionListItem[]>(["sessions"]);
+}
+
+export async function getTranscriptSegments(
+  recordingId: string
+): Promise<TranscriptSegmentListItem[]> {
+  return proxyFetch<TranscriptSegmentListItem[]>([
+    "recordings",
+    recordingId,
+    "transcript-segments",
+  ]);
+}
+
+export async function getSessionEvents(
+  sessionId: string
+): Promise<SessionEventListItem[]> {
+  return proxyFetch<SessionEventListItem[]>([
+    "sessions",
+    sessionId,
+    "events",
+  ]);
 }
 
 export async function getDailyAttendanceReport(

@@ -24,7 +24,13 @@ export default function CoursesPage() {
   }
 
   useEffect(() => {
-    loadCourses();
+    const timer = window.setTimeout(() => {
+      void loadCourses();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, []);
 
   async function handleCreate(e: React.FormEvent) {

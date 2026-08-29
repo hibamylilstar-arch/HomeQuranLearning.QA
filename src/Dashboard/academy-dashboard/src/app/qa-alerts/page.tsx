@@ -1,8 +1,16 @@
 ﻿"use client";
 
 import { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
 import { getQaAlerts } from "@/lib/api";
 import type { QaAlertListItem } from "@/types";
+
+const utcDateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+  dateStyle: "medium",
+  timeStyle: "medium",
+  hour12: false,
+  timeZone: "UTC",
+});
 
 export default function QaAlertsPage() {
   const [alerts, setAlerts] = useState<QaAlertListItem[]>([]);
@@ -99,12 +107,13 @@ export default function QaAlertsPage() {
                 <th className="px-6 py-3">Rule Phrase</th>
                 <th className="px-6 py-3">Timestamp (UTC)</th>
                 <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3">Evidence</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
               {filteredAlerts.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-slate-400">
+                  <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
                     No QA alerts match your search criteria.
                   </td>
                 </tr>
@@ -122,11 +131,21 @@ export default function QaAlertsPage() {
                     <tr key={alert.id} className="hover:bg-slate-50/65 transition-colors">
                       <td className="px-6 py-4 font-medium text-slate-900 font-mono">{alert.matchedPhrase}</td>
                       <td className="px-6 py-4 text-slate-600 font-mono">{alert.rulePhrase ?? "—"}</td>
-                      <td className="px-6 py-4 text-slate-500">{new Date(alert.timestampUtc).toLocaleString()}</td>
+                      <td className="px-6 py-4 text-slate-500">
+                        {utcDateTimeFormatter.format(new Date(alert.timestampUtc))} UTC
+                      </td>
                       <td className="px-6 py-4">
                         <span className={"inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase " + badgeClass}>
                           {alert.status}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <Link
+                          href={`/recordings/${alert.recordingId}/player`}
+                          className="font-semibold text-indigo-700 hover:text-indigo-500"
+                        >
+                          Review recording
+                        </Link>
                       </td>
                     </tr>
                   );

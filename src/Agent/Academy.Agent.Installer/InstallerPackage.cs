@@ -227,10 +227,12 @@ internal sealed class InstallerPackage : IDisposable
                 deployment.LiveIngestBaseUrl,
                 UriKind.Absolute,
                 out Uri? liveUri) ||
-            liveUri.Scheme != Uri.UriSchemeHttps)
+            (liveUri.Scheme != "rtmp" &&
+             liveUri.Scheme != "rtmps" &&
+             liveUri.Scheme != Uri.UriSchemeHttps))
         {
             throw new InvalidDataException(
-                "The live ingest endpoint must use HTTPS WHIP.");
+                "The live ingest endpoint must use RTMP, RTMPS, or HTTPS.");
         }
     }
 }

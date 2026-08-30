@@ -42,7 +42,10 @@ internal static class AgentConfigurationWriter
                 VideoMaxBitrateKbps = 700,
                 VideoBufferSizeKbps = 1400,
                 FfmpegPath = ffmpegPath,
-                SegmentMinutes = 1
+                SegmentMinutes = 15,
+                LocalRetentionHours = 24,
+                LocalRetentionMaxGB = 50,
+                MinimumFreeDiskGB = 5
             },
             Cloud = new
             {

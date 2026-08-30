@@ -68,9 +68,12 @@ public sealed class SessionService
         var device =
             await _deviceRepository.GetByDeviceIdAsync(
                 deviceId,
-                cancellationToken)
-            ?? throw new InvalidOperationException(
-                "Unknown device.");
+                cancellationToken);
+
+        if (device is null)
+        {
+            return null;
+        }
 
         var session =
             await _sessionRepository.GetActiveSessionForDeviceAsync(

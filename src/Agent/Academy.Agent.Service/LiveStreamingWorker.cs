@@ -135,7 +135,7 @@ public sealed class LiveStreamingWorker : BackgroundService
                         }
 
                         _logger.LogInformation(
-                            "Starting screen + audio live stream for the active session.");
+                            "Starting always-on screen + audio live stream for this device.");
 
                         await StartFfmpegAsync(
                             streamKey,
@@ -273,10 +273,9 @@ public sealed class LiveStreamingWorker : BackgroundService
 
         _currentStreamKey = streamKey;
 
-        PublishLiveStreamStartedIfInactive();
-
+        // Always-on device monitoring is infrastructure state, not classroom-session evidence.
         _logger.LogInformation(
-            "FFmpeg live stream process started for the active session.");
+            "FFmpeg always-on device live stream process started.");
 
         await Task.CompletedTask;
     }

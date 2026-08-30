@@ -13,6 +13,10 @@ public sealed class RecordingWorker : BackgroundService
     private readonly CloudOptions _cloudOptions;
     private readonly AgentActivityState _activityState;
 
+    private int _localRetentionHours = 24;
+    private long _localRetentionMaxBytes = 50L * 1024L * 1024L * 1024L;
+    private long _minimumFreeDiskBytes = 5L * 1024L * 1024L * 1024L;
+
     private static readonly JsonSerializerOptions PendingJsonOptions =
         new()
         {
@@ -50,6 +54,21 @@ public sealed class RecordingWorker : BackgroundService
         int segmentMinutes =
             Math.Max(1, options.SegmentMinutes);
 
+        _localRetentionHours =
+            Math.Max(1, section.GetValue<int>("LocalRetentionHours", 24));
+
+        int localRetentionMaxGb =
+            Math.Max(1, section.GetValue<int>("LocalRetentionMaxGB", 50));
+
+        int minimumFreeDiskGb =
+            Math.Max(1, section.GetValue<int>("MinimumFreeDiskGB", 5));
+
+        _localRetentionMaxBytes =
+            localRetentionMaxGb * 1024L * 1024L * 1024L;
+
+        _minimumFreeDiskBytes =
+            minimumFreeDiskGb * 1024L * 1024L * 1024L;
+
         bool recordingEnabled =
             section.GetValue<bool>("Enabled", false);
 
@@ -67,6 +86,8 @@ public sealed class RecordingWorker : BackgroundService
                 deviceIdentity,
                 stoppingToken);
         }
+
+        EnforceLocalRetention(outputDirectory);
 
         if (!recordingEnabled)
         {
@@ -100,6 +121,8 @@ public sealed class RecordingWorker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            EnforceLocalRetention(outputDirectory);
+
             // Retry older failed uploads before starting another segment.
             if (_cloudOptions.Enabled &&
                 deviceIdentity is not null)
@@ -516,9 +539,17 @@ public sealed class RecordingWorker : BackgroundService
                     "Recording uploaded successfully: {FileName}",
                     pending.FileName);
 
-                DeleteUploadedLocalFiles(
+                MarkUploadedLocalFile(
                     pending.OutputPath,
                     pendingPath);
+
+                string? outputDirectory =
+                    Path.GetDirectoryName(pending.OutputPath);
+
+                if (!string.IsNullOrWhiteSpace(outputDirectory))
+                {
+                    EnforceLocalRetention(outputDirectory);
+                }
 
                 return;
             }
@@ -550,32 +581,192 @@ public sealed class RecordingWorker : BackgroundService
             lastUploadException);
     }
 
-    private void DeleteUploadedLocalFiles(
+    private void MarkUploadedLocalFile(
         string outputPath,
         string pendingPath)
     {
         try
         {
-            if (File.Exists(outputPath))
-            {
-                File.Delete(outputPath);
-            }
-
             if (File.Exists(pendingPath))
             {
                 File.Delete(pendingPath);
             }
 
+            if (File.Exists(outputPath))
+            {
+                File.SetLastWriteTimeUtc(outputPath, DateTime.UtcNow);
+            }
+
             _logger.LogInformation(
-                "Local recording and pending recovery state deleted after confirmed upload: {OutputPath}",
+                "Upload confirmed. Local recording retained for rolling cache: {OutputPath}",
                 outputPath);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(
                 ex,
-                "Upload succeeded, but local cleanup was incomplete for {OutputPath}.",
+                "Upload succeeded, but local retention bookkeeping was incomplete for {OutputPath}.",
                 outputPath);
+        }
+    }
+
+    private void EnforceLocalRetention(string outputDirectory)
+    {
+        try
+        {
+            if (!Directory.Exists(outputDirectory))
+            {
+                return;
+            }
+
+            var allRecordings =
+                Directory.GetFiles(
+                        outputDirectory,
+                        "*.mp4",
+                        SearchOption.TopDirectoryOnly)
+                    .Select(path => new FileInfo(path))
+                    .Where(file => file.Exists)
+                    .OrderBy(file => file.LastWriteTimeUtc)
+                    .ToList();
+
+            if (allRecordings.Count == 0)
+            {
+                return;
+            }
+
+            bool IsPending(FileInfo file) =>
+                File.Exists(GetPendingPath(file.FullName));
+
+            var uploaded =
+                allRecordings
+                    .Where(file => !IsPending(file))
+                    .ToList();
+
+            DateTime cutoffUtc =
+                DateTime.UtcNow.AddHours(-_localRetentionHours);
+
+            foreach (FileInfo file in uploaded.ToList())
+            {
+                if (file.LastWriteTimeUtc >= cutoffUtc)
+                {
+                    continue;
+                }
+
+                if (TryDeleteRetainedRecording(
+                        file,
+                        "retention age expired"))
+                {
+                    uploaded.Remove(file);
+                    allRecordings.Remove(file);
+                }
+            }
+
+            long totalBytes =
+                allRecordings.Sum(
+                    file => file.Exists ? file.Length : 0L);
+
+            long freeBytes =
+                GetAvailableFreeSpace(outputDirectory);
+
+            while (uploaded.Count > 0 &&
+                   (totalBytes > _localRetentionMaxBytes ||
+                    (freeBytes >= 0 &&
+                     freeBytes < _minimumFreeDiskBytes)))
+            {
+                FileInfo oldest = uploaded[0];
+                uploaded.RemoveAt(0);
+
+                long length =
+                    oldest.Exists ? oldest.Length : 0L;
+
+                string reason =
+                    totalBytes > _localRetentionMaxBytes
+                        ? "50 GB local cache cap reached"
+                        : "minimum free disk reserve reached";
+
+                if (!TryDeleteRetainedRecording(
+                        oldest,
+                        reason))
+                {
+                    continue;
+                }
+
+                totalBytes =
+                    Math.Max(0L, totalBytes - length);
+
+                freeBytes =
+                    GetAvailableFreeSpace(outputDirectory);
+            }
+
+            if (totalBytes > _localRetentionMaxBytes)
+            {
+                _logger.LogWarning(
+                    "Local recording cache remains above its configured limit because pending/unuploaded recordings are protected. TotalBytes={TotalBytes}, LimitBytes={LimitBytes}",
+                    totalBytes,
+                    _localRetentionMaxBytes);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Local recording retention cleanup failed for {OutputDirectory}.",
+                outputDirectory);
+        }
+    }
+
+    private bool TryDeleteRetainedRecording(
+        FileInfo file,
+        string reason)
+    {
+        try
+        {
+            if (!file.Exists ||
+                File.Exists(GetPendingPath(file.FullName)))
+            {
+                return false;
+            }
+
+            string path = file.FullName;
+            file.Delete();
+
+            _logger.LogInformation(
+                "Deleted oldest uploaded local recording. Reason={Reason}, OutputPath={OutputPath}",
+                reason,
+                path);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Could not delete retained uploaded recording {OutputPath}.",
+                file.FullName);
+
+            return false;
+        }
+    }
+
+    private static long GetAvailableFreeSpace(
+        string outputDirectory)
+    {
+        try
+        {
+            string? root =
+                Path.GetPathRoot(
+                    Path.GetFullPath(outputDirectory));
+
+            if (string.IsNullOrWhiteSpace(root))
+            {
+                return -1;
+            }
+
+            return new DriveInfo(root).AvailableFreeSpace;
+        }
+        catch
+        {
+            return -1;
         }
     }
 

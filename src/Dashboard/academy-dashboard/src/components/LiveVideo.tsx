@@ -100,7 +100,10 @@ export default function LiveVideo({ url, token }: LiveVideoProps) {
       {connected && (
         <button
           type="button"
-          onClick={toggleAudio}
+          onClick={(event) => {
+            event.stopPropagation();
+            void toggleAudio();
+          }}
           className="rounded bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
         >
           {audioEnabled ? "Disable Audio" : "Enable Audio"}

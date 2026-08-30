@@ -51,11 +51,12 @@ async def create_ingress(room_name, identity, name):
     )
 
     create = ing.CreateIngressRequest(
-        input_type=ing.IngressInput.WHIP_INPUT,
+        input_type=ing.IngressInput.RTMP_INPUT,
         name=name,
         room_name=room_name,
         participant_identity=identity,
         participant_name="Agent",
+        enable_transcoding=True,
     )
 
     try:
@@ -63,6 +64,32 @@ async def create_ingress(room_name, identity, name):
         return info.ingress_id, info.stream_key
     finally:
         await lkapi.aclose()
+
+
+def process_device(device):
+    device_id = device["deviceId"]
+    room_name = device["roomName"]
+    identity = f"agent-device-{device_id}"
+    name = f"device-ingress-{device_id}"
+
+    print(f"Creating ingress for device {device_id} room {room_name}")
+
+    ingress_id, stream_key = asyncio.run(
+        create_ingress(room_name, identity, name)
+    )
+
+    print(f"Created device RTMP ingress_id={ingress_id}")
+
+    http_post_json(
+        f"/api/worker/devices/{device_id}/livekit-ingress",
+        {
+            "ingressId": ingress_id,
+            "streamKey": stream_key,
+        },
+        WORKER_API_KEY,
+    )
+
+    print(f"Updated device {device_id}")
 
 
 def process_session(session):
@@ -77,7 +104,7 @@ def process_session(session):
         create_ingress(room_name, identity, name)
     )
 
-    print(f"Created WHIP ingress_id={ingress_id}")
+    print(f"Created RTMP ingress_id={ingress_id}")
 
     http_post_json(
         f"/api/worker/sessions/{session_id}/livekit-ingress",
@@ -94,14 +121,27 @@ def process_session(session):
 def main(once):
     while True:
         try:
-            pending = http_get_json(
+            pending_devices = http_get_json(
+                "/api/worker/devices/pending-livekit-ingress",
+                WORKER_API_KEY,
+            )
+
+            print(f"Pending devices: {len(pending_devices)}")
+
+            for device in pending_devices:
+                try:
+                    process_device(device)
+                except Exception as ex:
+                    print(f"Error processing device: {ex}")
+
+            pending_sessions = http_get_json(
                 "/api/worker/sessions/pending-livekit-ingress",
                 WORKER_API_KEY,
             )
 
-            print(f"Pending sessions: {len(pending)}")
+            print(f"Pending sessions: {len(pending_sessions)}")
 
-            for session in pending:
+            for session in pending_sessions:
                 try:
                     process_session(session)
                 except Exception as ex:

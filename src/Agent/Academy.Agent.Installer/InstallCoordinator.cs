@@ -57,16 +57,24 @@ internal sealed class InstallCoordinator
             ValidatePayload(temporaryRoot);
 
             progress.Report("Stopping the previous managed Agent version...");
+            _log.Write("CLEANUP_AGENT_TASK_STARTED");
             await StopAndRemoveTaskAsync(
                 InstallerPaths.AgentTaskName,
                 cancellationToken);
+            _log.Write("CLEANUP_AGENT_TASK_COMPLETED");
+            _log.Write("CLEANUP_TEAMS_TASK_STARTED");
             await StopAndRemoveTaskAsync(
                 InstallerPaths.TeamsHelperTaskName,
                 cancellationToken);
+            _log.Write("CLEANUP_TEAMS_TASK_COMPLETED");
+            _log.Write("CLEANUP_PROCESSES_STARTED");
             StopManagedProcesses();
+            _log.Write("CLEANUP_PROCESSES_COMPLETED");
 
+            _log.Write("CREATE_INSTALL_ROOT_STARTED");
             Directory.CreateDirectory(
                 InstallerPaths.InstallRoot);
+            _log.Write("CREATE_INSTALL_ROOT_COMPLETED");
             Directory.CreateDirectory(
                 InstallerPaths.DataRoot);
 
@@ -77,7 +85,9 @@ internal sealed class InstallCoordinator
             if (Directory.Exists(versionRoot))
             {
                 AssertManagedInstallPath(versionRoot);
+                _log.Write("DELETE_VERSION_ROOT_STARTED");
                 Directory.Delete(versionRoot, recursive: true);
+                _log.Write("DELETE_VERSION_ROOT_COMPLETED");
             }
 
             progress.Report("Installing Classroom Agent files...");
@@ -592,13 +602,7 @@ internal sealed class InstallCoordinator
                                 taskNamespace + "UserId",
                                 userSid)),
                         new XElement(
-                            taskNamespace + "CalendarTrigger",
-                            new XElement(
-                                taskNamespace + "StartBoundary",
-                                startBoundary),
-                            new XElement(
-                                taskNamespace + "Enabled",
-                                "true"),
+                            taskNamespace + "TimeTrigger",
                             new XElement(
                                 taskNamespace + "Repetition",
                                 new XElement(
@@ -609,7 +613,13 @@ internal sealed class InstallCoordinator
                                     "P3650D"),
                                 new XElement(
                                     taskNamespace + "StopAtDurationEnd",
-                                    "false")))),
+                                    "false")),
+                            new XElement(
+                                taskNamespace + "StartBoundary",
+                                startBoundary),
+                            new XElement(
+                                taskNamespace + "Enabled",
+                                "true"))),
                     new XElement(
                         taskNamespace + "Principals",
                         new XElement(

@@ -260,16 +260,16 @@ internal sealed class InstallerForm : Form
         {
             if (_mode == InstallerMode.Uninstall)
             {
-                await _coordinator.UninstallAsync(
+                await Task.Run(() => _coordinator.UninstallAsync(
                     progress,
-                    _cancellation.Token);
+                    _cancellation.Token));
             }
             else
             {
-                await _coordinator.InstallAsync(
+                await Task.Run(() => _coordinator.InstallAsync(
                     _teamsOption.Checked,
                     progress,
-                    _cancellation.Token);
+                    _cancellation.Token));
             }
 
             _progressBar.Style = ProgressBarStyle.Continuous;

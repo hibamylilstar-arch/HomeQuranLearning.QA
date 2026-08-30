@@ -1,4 +1,4 @@
-﻿services:
+services:
   postgres:
     image: postgres:16-alpine
     container_name: academy-postgres
@@ -88,8 +88,8 @@
   ingress-manager:
     image: academy-ingress-manager:latest
     build:
-      context: ../../src/LiveKitIngressManager
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: src/LiveKitIngressManager/Dockerfile
     container_name: academy-ingress-manager
     restart: unless-stopped
     environment:

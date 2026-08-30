@@ -190,7 +190,7 @@ app.MapPost("/api/agent/heartbeat", async (
 
 app.MapGet("/api/agent/sessions/active-stream", async (
     HttpRequest request,
-    SessionService sessionService,
+    IDeviceRepository deviceRepository,
     CancellationToken cancellationToken) =>
 {
     if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
@@ -205,28 +205,22 @@ app.MapGet("/api/agent/sessions/active-stream", async (
         return Results.BadRequest("deviceId is required.");
     }
 
-    try
-    {
-        var info =
-            await sessionService.GetAgentLiveStreamInfoAsync(
-                deviceIdValue.ToString(),
-                cancellationToken);
+    var device = await deviceRepository.GetByDeviceIdAsync(
+        deviceIdValue.ToString(),
+        cancellationToken);
 
-        return info is null
-            ? Results.Ok(new { hasStream = false })
-            : Results.Ok(new
-            {
-                hasStream = true,
-                sessionId = info.SessionId,
-                roomName = info.RoomName,
-                streamKey = info.StreamKey
-            });
-    }
-    catch (InvalidOperationException ex)
+    if (device is null || string.IsNullOrWhiteSpace(device.LiveKitStreamKey))
     {
-        return Results.NotFound(
-            new { error = ex.Message });
+        return Results.Ok(new { hasStream = false });
     }
+
+    return Results.Ok(new
+    {
+        hasStream = true,
+        deviceId = device.Id,
+        roomName = $"device-{device.Id}",
+        streamKey = device.LiveKitStreamKey
+    });
 });
 
 app.MapPost("/api/agent/session-events", async (
@@ -1279,17 +1273,11 @@ app.MapPost("/api/admin/livekit/token", async (
         jsonOptions,
         cancellationToken);
 
-    if (body is null || string.IsNullOrWhiteSpace(body.RoomName) || string.IsNullOrWhiteSpace(body.Identity))
+    if (body is null ||
+        string.IsNullOrWhiteSpace(body.RoomName) ||
+        string.IsNullOrWhiteSpace(body.Identity))
     {
         return Results.BadRequest("RoomName and Identity are required.");
-    }
-
-    if (!TryGetSessionIdFromRoomName(
-            body.RoomName,
-            out Guid sessionId))
-    {
-        return Results.BadRequest(
-            "RoomName must use the session-{guid} format.");
     }
 
     var (userId, role) = GetUserInfo(user);
@@ -1299,18 +1287,39 @@ app.MapPost("/api/admin/livekit/token", async (
         return Results.Unauthorized();
     }
 
-    if (role == UserRole.Manager.ToString() &&
-        body.CanPublish)
+    if (role == UserRole.Manager.ToString() && body.CanPublish)
     {
         return Results.Forbid();
     }
 
-    var canAccess =
-        await dashboardQueryService.CanAccessLiveSessionAsync(
-            sessionId,
-            userId,
-            role,
-            cancellationToken);
+    bool canAccess;
+
+    if (body.RoomName.StartsWith("device-", StringComparison.Ordinal) &&
+        Guid.TryParse(body.RoomName["device-".Length..], out Guid deviceId))
+    {
+        var visibleDevices =
+            await dashboardQueryService.GetVisibleDevicesAsync(
+                userId,
+                role,
+                cancellationToken);
+
+        canAccess = visibleDevices.Any(x => x.Id == deviceId);
+    }
+    else if (body.RoomName.StartsWith("session-", StringComparison.Ordinal) &&
+             Guid.TryParse(body.RoomName["session-".Length..], out Guid sessionId))
+    {
+        canAccess =
+            await dashboardQueryService.CanAccessLiveSessionAsync(
+                sessionId,
+                userId,
+                role,
+                cancellationToken);
+    }
+    else
+    {
+        return Results.BadRequest(
+            "RoomName must use the device-{guid} or session-{guid} format.");
+    }
 
     if (!canAccess)
     {
@@ -1326,7 +1335,7 @@ app.MapPost("/api/admin/livekit/token", async (
     return Results.Ok(new
     {
         url = liveKitTokenService.Host,
-        token = token
+        token
     });
 }).RequireAuthorization();
 
@@ -1338,6 +1347,72 @@ app.MapGet("/api/admin/livekit/server-token", async (
     var token = liveKitTokenService.GenerateServerApiToken();
     return Results.Ok(new { token });
 }).RequireAuthorization(OwnerOrAdminPolicy);
+
+app.MapGet("/api/worker/devices/pending-livekit-ingress", async (
+    HttpRequest request,
+    IDeviceRepository deviceRepository,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var devices = await deviceRepository.GetAllAsync(cancellationToken);
+
+    var pending = devices
+        .Where(x => string.IsNullOrWhiteSpace(x.LiveKitStreamKey))
+        .Select(x => new
+        {
+            deviceId = x.Id,
+            roomName = $"device-{x.Id}",
+            deviceName = x.DeviceName
+        })
+        .ToList();
+
+    return Results.Ok(pending);
+});
+
+app.MapPost("/api/worker/devices/{deviceId:guid}/livekit-ingress", async (
+    HttpRequest request,
+    Guid deviceId,
+    UpdateSessionLiveKitIngressRequest body,
+    IDeviceRepository deviceRepository,
+    IUnitOfWork unitOfWork,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (body is null ||
+        string.IsNullOrWhiteSpace(body.IngressId) ||
+        string.IsNullOrWhiteSpace(body.StreamKey))
+    {
+        return Results.BadRequest("IngressId and StreamKey are required.");
+    }
+
+    var device = await deviceRepository.GetByIdAsync(
+        deviceId,
+        cancellationToken);
+
+    if (device is null)
+    {
+        return Results.NotFound(new { error = "Device not found." });
+    }
+
+    device.LiveKitIngressId = body.IngressId;
+    device.LiveKitStreamKey = body.StreamKey;
+    device.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+    deviceRepository.Update(device);
+    await unitOfWork.SaveChangesAsync(cancellationToken);
+
+    return Results.Ok(new { updated = true });
+});
 
 app.MapGet("/api/worker/sessions/pending-livekit-ingress", async (
     HttpRequest request,

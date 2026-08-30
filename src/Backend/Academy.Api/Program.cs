@@ -133,6 +133,7 @@ app.UseAuthorization();
 
 string agentApiKey = app.Configuration["AgentApiKey"] ?? string.Empty;
 string workerApiKey = app.Configuration["WorkerApiKey"] ?? string.Empty;
+string archiveRegistrarApiKey = app.Configuration["ArchiveRegistrarApiKey"] ?? string.Empty;
 
 var jsonOptions = new System.Text.Json.JsonSerializerOptions(
     System.Text.Json.JsonSerializerDefaults.Web);
@@ -352,6 +353,43 @@ app.MapPost("/api/agent/recordings/{recordingId:guid}/upload", async (
         cancellationToken);
 
     return Results.Ok(new { uploaded = true });
+});
+
+
+app.MapPost("/api/worker/server-recordings/finalized", async (
+    HttpRequest request,
+    ServerArchiveCompletedRequest body,
+    RecordingService recordingService,
+    CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(archiveRegistrarApiKey) ||
+        !request.Headers.TryGetValue(
+            "X-Api-Key",
+            out var values) ||
+        values.ToString() != archiveRegistrarApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        ServerArchiveRegistrationResponse response =
+            await recordingService.RegisterServerArchiveAsync(
+                body,
+                cancellationToken);
+
+        return Results.Ok(response);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(
+            new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(
+            new { error = ex.Message });
+    }
 });
 
 app.MapGet("/api/admin/devices", async (

@@ -109,17 +109,15 @@ public sealed class RecordingService
                 });
         }
 
-        // Resolve active session for this device at the recording start time.
-        var activeSession = await _sessionRepository.GetActiveSessionForDeviceAsync(
-            device.Id,
-            request.StartedAtUtc,
-            cancellationToken);
+        RecordingOverlapResolution overlap =
+            await ResolveRecordingOverlapAsync(
+                device.Id,
+                request.StartedAtUtc,
+                request.EndedAtUtc,
+                cancellationToken);
 
-        if (activeSession is not null)
-        {
-            recording.SessionId = activeSession.Id;
-            recording.TeacherId = activeSession.TeacherId;
-        }
+        recording.SessionId = overlap.SessionId;
+        recording.TeacherId = overlap.TeacherId;
 
         await _recordingRepository.AddAsync(recording, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -130,6 +128,158 @@ public sealed class RecordingService
             Accepted = true,
             StorageKey = storageKey
         };
+    }
+
+
+    public async Task<ServerArchiveRegistrationResponse> RegisterServerArchiveAsync(
+        ServerArchiveCompletedRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (string.IsNullOrWhiteSpace(request.DeviceId) ||
+            string.IsNullOrWhiteSpace(request.FileName) ||
+            string.IsNullOrWhiteSpace(request.StorageKey))
+        {
+            throw new ArgumentException(
+                "DeviceId, FileName and StorageKey are required.");
+        }
+
+        if (request.FileName.Contains('/') ||
+            request.FileName.Contains('\\') ||
+            !request.FileName.EndsWith(
+                ".mp4",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                "Server archive FileName must be a plain .mp4 file name.");
+        }
+
+        if (request.EndedAtUtc <= request.StartedAtUtc ||
+            request.SizeBytes <= 0)
+        {
+            throw new ArgumentException(
+                "Server archive timestamps and size are invalid.");
+        }
+
+        TimeSpan duration =
+            request.EndedAtUtc - request.StartedAtUtc;
+
+        if (duration > TimeSpan.FromMinutes(30))
+        {
+            throw new ArgumentException(
+                "Server archive duration exceeds the supported pilot limit.");
+        }
+
+        string containerFormat =
+            request.ContainerFormat?.Trim().ToLowerInvariant()
+            ?? string.Empty;
+
+        if (!request.VideoStreamCopyVerified ||
+            !string.Equals(
+                request.VideoCodec?.Trim(),
+                "h264",
+                StringComparison.OrdinalIgnoreCase) ||
+            containerFormat is not ("fmp4" or "mp4"))
+        {
+            throw new ArgumentException(
+                "Server archive must be verified H.264 stream-copy media.");
+        }
+
+        var device =
+            await _deviceRepository.GetByDeviceIdAsync(
+                request.DeviceId.Trim(),
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Unknown device.");
+
+        string storagePrefix =
+            $"server-recordings/{device.DeviceId}/";
+
+        if (!request.StorageKey.StartsWith(
+                storagePrefix,
+                StringComparison.Ordinal) ||
+            request.StorageKey.Contains(
+                "..",
+                StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "Server archive StorageKey is outside the allowed device prefix.");
+        }
+
+        var allRecordings =
+            await _recordingRepository.GetAllAsync(
+                cancellationToken);
+
+        Recording? existing =
+            allRecordings.FirstOrDefault(x =>
+                x.DeviceId == device.Id &&
+                TimestampsEquivalent(
+                    x.StartedAtUtc,
+                    request.StartedAtUtc) &&
+                TimestampsEquivalent(
+                    x.EndedAtUtc,
+                    request.EndedAtUtc));
+
+        RecordingOverlapResolution overlap =
+            await ResolveRecordingOverlapAsync(
+                device.Id,
+                request.StartedAtUtc,
+                request.EndedAtUtc,
+                cancellationToken);
+
+        if (existing is not null)
+        {
+            if (!IsIdenticalServerArchiveRetry(
+                    existing,
+                    request))
+            {
+                throw new InvalidOperationException(
+                    "Server archive conflicts with existing absolute-time recording identity.");
+            }
+
+            return ToServerArchiveResponse(
+                existing,
+                overlap,
+                alreadyRegistered: true);
+        }
+
+        var recording = new Recording
+        {
+            Id = Guid.NewGuid(),
+            DeviceId = device.Id,
+            SessionId = overlap.SessionId,
+            TeacherId = overlap.TeacherId,
+            FileName = request.FileName.Trim(),
+            StorageKey = request.StorageKey.Trim(),
+            StartedAtUtc = request.StartedAtUtc,
+            EndedAtUtc = request.EndedAtUtc,
+            Duration = duration,
+            SizeBytes = request.SizeBytes,
+            AudioLayoutVersion = 0,
+            TeacherAudioTrackIndex = null,
+            TeacherAudioSourceKind =
+                "ServerArchiveMixedOnly",
+            TeacherAudioEndpointId = null,
+            TeacherAudioEndpointName = null,
+            TeacherAudioCoverageStartedAtUtc = null,
+            TeacherAudioProvenanceStatus =
+                TeacherAudioProvenanceStatus.Unavailable,
+            Status = RecordingStatus.Uploaded,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        };
+
+        await _recordingRepository.AddAsync(
+            recording,
+            cancellationToken);
+        await _unitOfWork.SaveChangesAsync(
+            cancellationToken);
+
+        return ToServerArchiveResponse(
+            recording,
+            overlap,
+            alreadyRegistered: false);
     }
 
     public async Task UploadRecordingAsync(
@@ -520,6 +670,143 @@ public sealed class RecordingService
                 "Recording submission conflicts with existing idempotency state.");
         }
     }
+
+
+    private async Task<RecordingOverlapResolution>
+        ResolveRecordingOverlapAsync(
+            Guid deviceId,
+            DateTimeOffset startedAtUtc,
+            DateTimeOffset endedAtUtc,
+            CancellationToken cancellationToken)
+    {
+        var allSessions =
+            await _sessionRepository.GetAllWithDetailsAsync(
+                cancellationToken)
+            ?? Array.Empty<Session>();
+
+        Session[] overlappingSessions =
+            allSessions
+                .Where(session =>
+                    session.DeviceId == deviceId &&
+                    session.Status is
+                        SessionStatus.Live or
+                        SessionStatus.Completed &&
+                    session.StartedAtUtc < endedAtUtc &&
+                    (!session.EndedAtUtc.HasValue ||
+                     session.EndedAtUtc.Value > startedAtUtc))
+                .OrderBy(session => session.StartedAtUtc)
+                .ToArray();
+
+        if (overlappingSessions.Length == 0)
+        {
+            Session? activeAtStart =
+                await _sessionRepository
+                    .GetActiveSessionForDeviceAsync(
+                        deviceId,
+                        startedAtUtc,
+                        cancellationToken);
+
+            if (activeAtStart is not null &&
+                CoversWholeRecording(
+                    activeAtStart,
+                    startedAtUtc,
+                    endedAtUtc))
+            {
+                overlappingSessions =
+                    new[] { activeAtStart };
+            }
+        }
+
+        int distinctTeacherCount =
+            overlappingSessions
+                .Select(x => x.TeacherId)
+                .Distinct()
+                .Count();
+
+        bool managerSafeWholeSegment =
+            overlappingSessions.Length == 1 &&
+            CoversWholeRecording(
+                overlappingSessions[0],
+                startedAtUtc,
+                endedAtUtc);
+
+        return new RecordingOverlapResolution(
+            managerSafeWholeSegment
+                ? overlappingSessions[0].Id
+                : null,
+            managerSafeWholeSegment
+                ? overlappingSessions[0].TeacherId
+                : null,
+            overlappingSessions.Length,
+            distinctTeacherCount,
+            managerSafeWholeSegment);
+    }
+
+    private static bool CoversWholeRecording(
+        Session session,
+        DateTimeOffset startedAtUtc,
+        DateTimeOffset endedAtUtc)
+    {
+        return
+            session.StartedAtUtc <= startedAtUtc &&
+            (!session.EndedAtUtc.HasValue ||
+             session.EndedAtUtc.Value >= endedAtUtc);
+    }
+
+    private static bool IsIdenticalServerArchiveRetry(
+        Recording existing,
+        ServerArchiveCompletedRequest request)
+    {
+        return
+            existing.Status == RecordingStatus.Uploaded &&
+            existing.AudioLayoutVersion == 0 &&
+            existing.TeacherAudioTrackIndex is null &&
+            string.Equals(
+                existing.TeacherAudioSourceKind,
+                "ServerArchiveMixedOnly",
+                StringComparison.Ordinal) &&
+            existing.TeacherAudioProvenanceStatus ==
+                TeacherAudioProvenanceStatus.Unavailable &&
+            string.Equals(
+                existing.FileName,
+                request.FileName.Trim(),
+                StringComparison.Ordinal) &&
+            string.Equals(
+                existing.StorageKey,
+                request.StorageKey.Trim(),
+                StringComparison.Ordinal) &&
+            existing.SizeBytes == request.SizeBytes;
+    }
+
+    private static ServerArchiveRegistrationResponse
+        ToServerArchiveResponse(
+            Recording recording,
+            RecordingOverlapResolution overlap,
+            bool alreadyRegistered)
+    {
+        return new ServerArchiveRegistrationResponse
+        {
+            RecordingId = recording.Id,
+            Accepted = true,
+            AlreadyRegistered = alreadyRegistered,
+            StorageKey = recording.StorageKey,
+            SessionId = overlap.SessionId,
+            TeacherId = overlap.TeacherId,
+            OverlapSessionCount =
+                overlap.OverlapSessionCount,
+            DistinctTeacherCount =
+                overlap.DistinctTeacherCount,
+            ManagerSafeWholeSegment =
+                overlap.ManagerSafeWholeSegment
+        };
+    }
+
+    private sealed record RecordingOverlapResolution(
+        Guid? SessionId,
+        Guid? TeacherId,
+        int OverlapSessionCount,
+        int DistinctTeacherCount,
+        bool ManagerSafeWholeSegment);
 
     private static string? NormalizeOptional(
         string? value)

@@ -244,7 +244,7 @@ public sealed class LiveStreamingWorker : BackgroundService
                 $"-fflags nobuffer -flags low_delay " +
                 $"-f lavfi -i ddagrab=framerate=10:dup_frames=1 " +
                 $"-thread_queue_size 1024 -use_wallclock_as_timestamps 1 -f {audioFormat} -ar {sampleRate} -ac {channels} -i \"udp://127.0.0.1:{audioUdpPort}?fifo_size=500000&overrun_nonfatal=1\" " +
-                $"-vf \"hwdownload,format=bgra,setpts=PTS-STARTPTS\" -af \"aresample=async=1000:first_pts=0\" " +
+                $"-vf \"hwdownload,format=bgra,setpts=(RTCTIME-RTCSTART)/(TB*1000000)\" -af \"aresample=async=1000:first_pts=0\" " +
                 $"-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p " +
                 $"-profile:v baseline -level:v 4.0 -g 10 -bf 0 -b:v 800k -flush_packets 1 " +
                 $"{audioEncoderArguments} -f {outputFormat} \"{ingestUrl}\"",

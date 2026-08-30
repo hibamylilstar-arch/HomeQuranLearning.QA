@@ -1,15 +1,9 @@
 logLevel: warn
 logDestinations: [stdout]
 
-authMethod: internal
-authInternalUsers:
-  - user: any
-    pass:
-    ips: []
-    permissions:
-      - action: publish
-        path: ~^live/.+$
-
+authMethod: http
+authHTTPAddress: http://api:8080/api/worker/relay/publish-auth
+authHTTPExclude: []
 api: false
 metrics: false
 pprof: false

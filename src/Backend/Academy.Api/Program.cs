@@ -392,6 +392,23 @@ app.MapPost("/api/worker/server-recordings/finalized", async (
     }
 });
 
+app.MapPost("/api/worker/relay/publish-auth", async (
+    RelayPublishAuthRequest body,
+    RecordingService recordingService,
+    CancellationToken cancellationToken) =>
+{
+    bool allowed = await recordingService.AuthorizeRelayPublishAsync(
+        body,
+        cancellationToken);
+
+    if (!allowed)
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.NoContent();
+});
+
 app.MapPost("/api/worker/server-recordings/resolve-device", async (
     HttpRequest request,
     ServerArchiveDeviceResolveRequest body,

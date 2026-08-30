@@ -35,3 +35,10 @@ public sealed class ServerArchiveDeviceResolveResponse
 {
     public string DeviceId { get; set; } = string.Empty;
 }
+
+public sealed class RelayPublishAuthRequest
+{
+    public string Action { get; set; } = string.Empty;
+    public string Path { get; set; } = string.Empty;
+    public string Protocol { get; set; } = string.Empty;
+}

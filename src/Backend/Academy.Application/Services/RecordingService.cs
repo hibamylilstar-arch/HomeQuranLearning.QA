@@ -279,6 +279,61 @@ public sealed class RecordingService
             cancellationToken);
     }
 
+    public async Task<bool> DeleteRecordingMediaAsync(
+        Guid recordingId,
+        Guid? deletedByUserId,
+        string deletionReason,
+        CancellationToken cancellationToken = default)
+    {
+        var recording =
+            await _recordingRepository.GetByIdAsync(
+                recordingId,
+                cancellationToken);
+
+        if (recording is null)
+        {
+            return false;
+        }
+
+        if (recording.Status == RecordingStatus.Deleted)
+        {
+            return true;
+        }
+
+        if (recording.Status != RecordingStatus.Deleting)
+        {
+            recording.Status = RecordingStatus.Deleting;
+            recording.DeletedByUserId = deletedByUserId;
+            recording.DeletionReason =
+                string.IsNullOrWhiteSpace(deletionReason)
+                    ? "Unknown"
+                    : deletionReason.Trim();
+            recording.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+            _recordingRepository.Update(recording);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        if (!string.IsNullOrWhiteSpace(recording.StorageKey))
+        {
+            await _storageService.DeleteAsync(
+                _bucketName,
+                recording.StorageKey,
+                cancellationToken);
+        }
+
+        recording.Status = RecordingStatus.Deleted;
+        recording.IsPreserved = false;
+        recording.PreservedAtUtc = null;
+        recording.DeletedAtUtc = DateTimeOffset.UtcNow;
+        recording.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+        _recordingRepository.Update(recording);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return true;
+    }
+
     private static TeacherAudioProvenanceStatus
         ValidateAndResolveProvenanceStatus(
             RecordingSubmittedRequest request)

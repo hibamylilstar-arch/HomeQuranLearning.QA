@@ -600,6 +600,31 @@ app.MapPost("/api/admin/recordings/{recordingId:guid}/unpreserve", async (
     return Results.Ok(new { preserved = false });
 }).RequireAuthorization();
 
+app.MapDelete("/api/admin/recordings/{recordingId:guid}", async (
+    ClaimsPrincipal user,
+    Guid recordingId,
+    RecordingService recordingService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, _) = GetUserInfo(user);
+
+    if (userId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    bool deleted =
+        await recordingService.DeleteRecordingMediaAsync(
+            recordingId,
+            userId,
+            "OwnerManual",
+            cancellationToken);
+
+    return deleted
+        ? Results.Ok(new { deleted = true })
+        : Results.NotFound();
+}).RequireAuthorization(OwnerOnlyPolicy);
+
 app.MapGet("/api/admin/qa-rules", async (
     ClaimsPrincipal user,
     HttpRequest request,

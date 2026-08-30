@@ -58,6 +58,12 @@ public sealed class Recording
 
     public DateTimeOffset UpdatedAtUtc { get; set; }
 
+    public DateTimeOffset? DeletedAtUtc { get; set; }
+
+    public Guid? DeletedByUserId { get; set; }
+
+    public string? DeletionReason { get; set; }
+
     public ICollection<QaAlert> QaAlerts { get; set; } = new List<QaAlert>();
 
     public ICollection<QaCandidate> QaCandidates { get; set; } = new List<QaCandidate>();

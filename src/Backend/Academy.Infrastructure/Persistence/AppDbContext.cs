@@ -66,6 +66,7 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.TeacherAudioEndpointId).HasMaxLength(512);
             entity.Property(x => x.TeacherAudioEndpointName).HasMaxLength(512);
             entity.Property(x => x.TeacherAudioProvenanceStatus).HasConversion<string>().HasMaxLength(32);
+            entity.Property(x => x.DeletionReason).HasMaxLength(64);
 
             entity.HasOne(x => x.Device)
                 .WithMany()

@@ -6,5 +6,6 @@ public enum RecordingStatus
     Uploading = 1,
     Uploaded = 2,
     Failed = 3,
-    Deleted = 4
+    Deleted = 4,
+    Deleting = 5
 }

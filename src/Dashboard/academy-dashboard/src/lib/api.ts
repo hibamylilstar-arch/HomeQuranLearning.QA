@@ -107,12 +107,7 @@ export async function reviewQaCandidate(
 }
 
 export async function getPlaybackUrl(recordingId: string): Promise<string> {
-  const data = await proxyFetch<{ url: string }>([
-    "recordings",
-    recordingId,
-    "playback-url",
-  ]);
-  return data.url;
+  return `/api/proxy/recordings/${encodeURIComponent(recordingId)}/media`;
 }
 
 export async function getUsers(): Promise<UserListItem[]> {
@@ -315,11 +310,10 @@ export async function createQaRule(phrase: string, severity: string, isActive: b
 export async function getRecordingDownloadUrl(
   recordingId: string
 ): Promise<{ url: string; fileName: string }> {
-  return proxyFetch<{ url: string; fileName: string }>([
-    "recordings",
-    recordingId,
-    "download-url",
-  ]);
+  return {
+    url: `/api/proxy/recordings/${encodeURIComponent(recordingId)}/media?download=1`,
+    fileName: "",
+  };
 }
 
 export async function preserveRecording(

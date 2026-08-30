@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Academy.Agent.Cloud;
 using Academy.Agent.Media;
 
@@ -13,9 +13,8 @@ public sealed class RecordingWorker : BackgroundService
     private readonly CloudOptions _cloudOptions;
     private readonly AgentActivityState _activityState;
 
-    private int _localRetentionHours = 24;
-    private long _localRetentionMaxBytes = 50L * 1024L * 1024L * 1024L;
     private long _minimumFreeDiskBytes = 5L * 1024L * 1024L * 1024L;
+    private long _targetFreeDiskBytes = 7L * 1024L * 1024L * 1024L;
 
     private static readonly JsonSerializerOptions PendingJsonOptions =
         new()
@@ -54,20 +53,17 @@ public sealed class RecordingWorker : BackgroundService
         int segmentMinutes =
             Math.Max(1, options.SegmentMinutes);
 
-        _localRetentionHours =
-            Math.Max(1, section.GetValue<int>("LocalRetentionHours", 24));
-
-        int localRetentionMaxGb =
-            Math.Max(1, section.GetValue<int>("LocalRetentionMaxGB", 50));
-
         int minimumFreeDiskGb =
             Math.Max(1, section.GetValue<int>("MinimumFreeDiskGB", 5));
 
-        _localRetentionMaxBytes =
-            localRetentionMaxGb * 1024L * 1024L * 1024L;
+        int targetFreeDiskGb =
+            Math.Max(minimumFreeDiskGb, section.GetValue<int>("TargetFreeDiskGB", 7));
 
         _minimumFreeDiskBytes =
             minimumFreeDiskGb * 1024L * 1024L * 1024L;
+
+        _targetFreeDiskBytes =
+            targetFreeDiskGb * 1024L * 1024L * 1024L;
 
         bool recordingEnabled =
             section.GetValue<bool>("Enabled", false);
@@ -121,7 +117,23 @@ public sealed class RecordingWorker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            EnforceLocalRetention(outputDirectory);
+            if (!EnforceLocalRetention(outputDirectory))
+            {
+                _activityState.Publish(
+                    new AgentActivitySignal
+                    {
+                        Type = AgentActivitySignalType.TechnicalIssue,
+                        OccurredAtUtc = DateTimeOffset.UtcNow,
+                        Source = "RecordingWorker",
+                        Details = "RecordingPausedLowDisk"
+                    });
+
+                await Task.Delay(
+                    TimeSpan.FromSeconds(30),
+                    stoppingToken);
+
+                continue;
+            }
 
             // Retry older failed uploads before starting another segment.
             if (_cloudOptions.Enabled &&
@@ -133,9 +145,12 @@ public sealed class RecordingWorker : BackgroundService
                     stoppingToken);
             }
 
-            string outputPath = Path.Combine(
+            string finalOutputPath = Path.Combine(
                 outputDirectory,
                 $"Academy_Recording_{DateTime.Now:yyyyMMdd_HHmmss}.mp4");
+
+            string outputPath =
+                LocalRecordingRetentionPolicy.GetWorkingPath(finalOutputPath);
 
             var service = new RecordingService(options);
 
@@ -232,15 +247,22 @@ public sealed class RecordingWorker : BackgroundService
                 await service.StopAsync(
                     CancellationToken.None);
 
+                if (completedRecording is null || !File.Exists(outputPath))
+                {
+                    throw new InvalidOperationException("Recording segment did not finalize successfully.");
+                }
+
+                File.Move(outputPath, finalOutputPath, overwrite: false);
+
                 _activityState.Publish(new AgentActivitySignal
                 {
                     Type = AgentActivitySignalType.RecordingStopped,
                     OccurredAtUtc = DateTimeOffset.UtcNow,
                     Source = "RecordingWorker",
-                    Details = Path.GetFileName(outputPath)
+                    Details = Path.GetFileName(finalOutputPath)
                 });
 
-                if (completedRecording is not null &&
+                if (_cloudOptions.Enabled &&
                     _cloudOptions.Enabled &&
                     deviceIdentity is not null)
                 {
@@ -249,6 +271,7 @@ public sealed class RecordingWorker : BackgroundService
                         await SubmitRecordingAndUploadAsync(
                             deviceIdentity,
                             completedRecording,
+                            finalOutputPath,
                             CancellationToken.None);
                     }
                     catch (Exception ex)
@@ -300,16 +323,17 @@ public sealed class RecordingWorker : BackgroundService
     private async Task SubmitRecordingAndUploadAsync(
         DeviceIdentity deviceIdentity,
         RecordingCompletedEventArgs e,
+        string finalizedOutputPath,
         CancellationToken cancellationToken)
     {
         string pendingPath =
-            GetPendingPath(e.OutputPath);
+            GetPendingPath(finalizedOutputPath);
 
         var pending = new PendingRecordingUpload
         {
             DeviceId = deviceIdentity.DeviceId,
-            FileName = e.FileName,
-            OutputPath = e.OutputPath,
+            FileName = Path.GetFileName(finalizedOutputPath),
+            OutputPath = finalizedOutputPath,
             StartedAtUtc = e.StartedAtUtc,
             EndedAtUtc = e.EndedAtUtc,
             SizeBytes = e.SizeBytes,
@@ -360,7 +384,7 @@ public sealed class RecordingWorker : BackgroundService
         {
             _logger.LogWarning(
                 "Recording metadata was not accepted. Local file and pending state preserved: {OutputPath}",
-                e.OutputPath);
+                finalizedOutputPath);
 
             return;
         }
@@ -592,11 +616,6 @@ public sealed class RecordingWorker : BackgroundService
                 File.Delete(pendingPath);
             }
 
-            if (File.Exists(outputPath))
-            {
-                File.SetLastWriteTimeUtc(outputPath, DateTime.UtcNow);
-            }
-
             _logger.LogInformation(
                 "Upload confirmed. Local recording retained for rolling cache: {OutputPath}",
                 outputPath);
@@ -610,101 +629,70 @@ public sealed class RecordingWorker : BackgroundService
         }
     }
 
-    private void EnforceLocalRetention(string outputDirectory)
+    private bool EnforceLocalRetention(string outputDirectory)
     {
         try
         {
             if (!Directory.Exists(outputDirectory))
             {
-                return;
+                return true;
             }
 
-            var allRecordings =
+            long freeBytes = GetAvailableFreeSpace(outputDirectory);
+
+            if (!LocalRecordingRetentionPolicy.ShouldStartCleanup(
+                    freeBytes,
+                    _minimumFreeDiskBytes))
+            {
+                return true;
+            }
+
+            var deletable =
                 Directory.GetFiles(
                         outputDirectory,
                         "*.mp4",
                         SearchOption.TopDirectoryOnly)
+                    .Where(LocalRecordingRetentionPolicy.IsFinalizedRecordingPath)
                     .Select(path => new FileInfo(path))
-                    .Where(file => file.Exists)
+                    .Where(file =>
+                        file.Exists &&
+                        !File.Exists(GetPendingPath(file.FullName)))
                     .OrderBy(file => file.LastWriteTimeUtc)
                     .ToList();
 
-            if (allRecordings.Count == 0)
+            foreach (FileInfo file in deletable)
             {
-                return;
-            }
-
-            bool IsPending(FileInfo file) =>
-                File.Exists(GetPendingPath(file.FullName));
-
-            var uploaded =
-                allRecordings
-                    .Where(file => !IsPending(file))
-                    .ToList();
-
-            DateTime cutoffUtc =
-                DateTime.UtcNow.AddHours(-_localRetentionHours);
-
-            foreach (FileInfo file in uploaded.ToList())
-            {
-                if (file.LastWriteTimeUtc >= cutoffUtc)
+                if (!LocalRecordingRetentionPolicy.ShouldContinueCleanup(
+                        freeBytes,
+                        _targetFreeDiskBytes))
                 {
-                    continue;
+                    break;
                 }
-
-                if (TryDeleteRetainedRecording(
-                        file,
-                        "retention age expired"))
-                {
-                    uploaded.Remove(file);
-                    allRecordings.Remove(file);
-                }
-            }
-
-            long totalBytes =
-                allRecordings.Sum(
-                    file => file.Exists ? file.Length : 0L);
-
-            long freeBytes =
-                GetAvailableFreeSpace(outputDirectory);
-
-            while (uploaded.Count > 0 &&
-                   (totalBytes > _localRetentionMaxBytes ||
-                    (freeBytes >= 0 &&
-                     freeBytes < _minimumFreeDiskBytes)))
-            {
-                FileInfo oldest = uploaded[0];
-                uploaded.RemoveAt(0);
-
-                long length =
-                    oldest.Exists ? oldest.Length : 0L;
-
-                string reason =
-                    totalBytes > _localRetentionMaxBytes
-                        ? "50 GB local cache cap reached"
-                        : "minimum free disk reserve reached";
 
                 if (!TryDeleteRetainedRecording(
-                        oldest,
-                        reason))
+                        file,
+                        "minimum free disk reserve reached"))
                 {
                     continue;
                 }
 
-                totalBytes =
-                    Math.Max(0L, totalBytes - length);
-
-                freeBytes =
-                    GetAvailableFreeSpace(outputDirectory);
+                freeBytes = GetAvailableFreeSpace(outputDirectory);
             }
 
-            if (totalBytes > _localRetentionMaxBytes)
+            bool safe =
+                freeBytes < 0 ||
+                freeBytes >= _minimumFreeDiskBytes;
+
+            if (!safe)
             {
                 _logger.LogWarning(
-                    "Local recording cache remains above its configured limit because pending/unuploaded recordings are protected. TotalBytes={TotalBytes}, LimitBytes={LimitBytes}",
-                    totalBytes,
-                    _localRetentionMaxBytes);
+                    "Local recording paused because free disk remains below safety reserve after cleanup. FreeBytes={FreeBytes}, MinimumBytes={MinimumBytes}, TargetBytes={TargetBytes}",
+                    freeBytes,
+                    _minimumFreeDiskBytes,
+                    _targetFreeDiskBytes);
             }
+
+            return safe;
         }
         catch (Exception ex)
         {
@@ -712,6 +700,8 @@ public sealed class RecordingWorker : BackgroundService
                 ex,
                 "Local recording retention cleanup failed for {OutputDirectory}.",
                 outputDirectory);
+
+            return false;
         }
     }
 
@@ -722,6 +712,7 @@ public sealed class RecordingWorker : BackgroundService
         try
         {
             if (!file.Exists ||
+                !LocalRecordingRetentionPolicy.IsFinalizedRecordingPath(file.FullName) ||
                 File.Exists(GetPendingPath(file.FullName)))
             {
                 return false;
@@ -731,7 +722,7 @@ public sealed class RecordingWorker : BackgroundService
             file.Delete();
 
             _logger.LogInformation(
-                "Deleted oldest uploaded local recording. Reason={Reason}, OutputPath={OutputPath}",
+                "Deleted oldest finalized local recording. Reason={Reason}, OutputPath={OutputPath}",
                 reason,
                 path);
 
@@ -741,7 +732,7 @@ public sealed class RecordingWorker : BackgroundService
         {
             _logger.LogWarning(
                 ex,
-                "Could not delete retained uploaded recording {OutputPath}.",
+                "Could not delete retained local recording {OutputPath}.",
                 file.FullName);
 
             return false;

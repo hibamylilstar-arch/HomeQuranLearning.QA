@@ -75,12 +75,6 @@ public sealed class RecordingWorker : BackgroundService
             deviceIdentity =
                 await _identityProvider.GetOrCreateIdentityAsync(
                     stoppingToken);
-
-            // Recover anything left behind by a previous Agent/network failure.
-            await RecoverPendingUploadsAsync(
-                outputDirectory,
-                deviceIdentity,
-                stoppingToken);
         }
 
         EnforceLocalRetention(outputDirectory);
@@ -110,6 +104,17 @@ public sealed class RecordingWorker : BackgroundService
             return;
         }
 
+        Task? pendingRecoveryTask = null;
+
+        if (_cloudOptions.Enabled &&
+            deviceIdentity is not null)
+        {
+            pendingRecoveryTask = RunPendingRecoveryLoopAsync(
+                outputDirectory,
+                deviceIdentity,
+                stoppingToken);
+        }
+
         _logger.LogInformation(
             "Segmented recording enabled. SegmentMinutes={SegmentMinutes}, OutputDirectory={OutputDirectory}",
             segmentMinutes,
@@ -133,16 +138,6 @@ public sealed class RecordingWorker : BackgroundService
                     stoppingToken);
 
                 continue;
-            }
-
-            // Retry older failed uploads before starting another segment.
-            if (_cloudOptions.Enabled &&
-                deviceIdentity is not null)
-            {
-                await RecoverPendingUploadsAsync(
-                    outputDirectory,
-                    deviceIdentity,
-                    stoppingToken);
             }
 
             string finalOutputPath = Path.Combine(
@@ -315,9 +310,62 @@ public sealed class RecordingWorker : BackgroundService
                 break;
             }
         }
+        if (pendingRecoveryTask is not null)
+        {
+            try
+            {
+                await pendingRecoveryTask;
+            }
+            catch (OperationCanceledException)
+                when (stoppingToken.IsCancellationRequested)
+            {
+            }
+        }
 
+        _logger.LogInformation("Recording worker stopped.");
+    }
+
+    private async Task RunPendingRecoveryLoopAsync(
+        string outputDirectory,
+        DeviceIdentity deviceIdentity,
+        CancellationToken stoppingToken)
+    {
         _logger.LogInformation(
-            "Recording worker stopped.");
+            "Pending recording upload recovery running in background.");
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await RecoverPendingUploadsAsync(
+                    outputDirectory,
+                    deviceIdentity,
+                    stoppingToken);
+            }
+            catch (OperationCanceledException)
+                when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Background pending recording recovery cycle failed. Preserved pending state will be retried.");
+            }
+
+            try
+            {
+                await Task.Delay(
+                    TimeSpan.FromSeconds(30),
+                    stoppingToken);
+            }
+            catch (OperationCanceledException)
+                when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+        }
     }
 
     private async Task SubmitRecordingAndUploadAsync(

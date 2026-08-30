@@ -1,0 +1,41 @@
+services:
+  livekit-ingress:
+    environment:
+      INGRESS_CONFIG_BODY: |
+        api_key: ${LIVEKIT_API_KEY}
+        api_secret: ${LIVEKIT_API_SECRET}
+        ws_url: ws://127.0.0.1:7880
+        redis:
+          address: 127.0.0.1:6379
+        rtmp_port: 1936
+        whip_port: 8088
+        http_relay_port: 9090
+        health_port: 7888
+        rtc_config:
+          udp_port: 7885
+          use_external_ip: false
+          node_ip: ${ACADEMY_HOST}
+        logging:
+          level: info
+
+  mediamtx-relay:
+    image: bluenviron/mediamtx:1.20.1
+    container_name: academy-mediamtx-relay
+    restart: unless-stopped
+    ports:
+      - "${RELAY_PUBLIC_RTMP_BIND:-127.0.0.1}:${RELAY_PUBLIC_RTMP_PORT:-1937}:1935"
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+      - relay_recordings:/recordings
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  relay_recordings:

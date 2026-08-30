@@ -1,0 +1,45 @@
+logLevel: warn
+logDestinations: [stdout]
+
+authMethod: internal
+authInternalUsers:
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: publish
+        path: ~^live/.+$
+
+api: false
+metrics: false
+pprof: false
+playback: false
+
+rtsp: false
+hls: false
+webrtc: false
+srt: false
+moq: false
+
+rtmp: true
+rtmpAddress: :1935
+rtmpEncryption: "no"
+
+pathDefaults:
+  source: publisher
+  overridePublisher: false
+  record: false
+
+paths:
+  "~^live/(.+)$":
+    source: publisher
+    overridePublisher: false
+    forward:
+      - dest: rtmp://host.docker.internal:1936/live#$G1
+    record: true
+    recordPath: /recordings/%path/%Y%m%d/%H%M%S-%f
+    recordFormat: fmp4
+    recordPartDuration: 1s
+    recordMaxPartSize: 50M
+    recordSegmentDuration: 15m
+    recordDeleteAfter: 0s

@@ -80,7 +80,9 @@ function Assert-ManagedBuildPath {
 }
 
 $null = Assert-HttpsUri -Value $ApiBaseUrl -Name "ApiBaseUrl"
-$null = Assert-HttpsUri -Value $LiveIngestBaseUrl -Name "LiveIngestBaseUrl"
+$liveIngestUri = $null
+try { $liveIngestUri = [Uri]$LiveIngestBaseUrl } catch { throw "LiveIngestBaseUrl must be an absolute RTMP, RTMPS, or HTTPS URL." }
+if (-not $liveIngestUri.IsAbsoluteUri -or @("rtmp", "rtmps", "https") -notcontains $liveIngestUri.Scheme) { throw "LiveIngestBaseUrl must use rtmp, rtmps, or https." }
 
 if ($null -eq $AgentApiKey) {
     $AgentApiKey =

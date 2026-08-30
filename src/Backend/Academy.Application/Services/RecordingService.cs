@@ -282,6 +282,45 @@ public sealed class RecordingService
             alreadyRegistered: false);
     }
 
+    public async Task<ServerArchiveDeviceResolveResponse>
+        ResolveServerArchiveDeviceAsync(
+            ServerArchiveDeviceResolveRequest request,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        string streamKey = request.StreamKey?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(streamKey))
+        {
+            throw new ArgumentException("StreamKey is required.");
+        }
+
+        var devices = await _deviceRepository.GetAllAsync(cancellationToken);
+
+        Device[] matches = devices
+            .Where(device =>
+                !string.IsNullOrWhiteSpace(device.LiveKitStreamKey) &&
+                string.Equals(device.LiveKitStreamKey, streamKey, StringComparison.Ordinal))
+            .Take(2)
+            .ToArray();
+
+        if (matches.Length == 0)
+        {
+            throw new InvalidOperationException("No device is mapped to the supplied stream key.");
+        }
+
+        if (matches.Length > 1)
+        {
+            throw new InvalidOperationException("Multiple devices are mapped to the supplied stream key.");
+        }
+
+        return new ServerArchiveDeviceResolveResponse
+        {
+            DeviceId = matches[0].DeviceId
+        };
+    }
+
     public async Task UploadRecordingAsync(
         Guid recordingId,
         Stream fileStream,

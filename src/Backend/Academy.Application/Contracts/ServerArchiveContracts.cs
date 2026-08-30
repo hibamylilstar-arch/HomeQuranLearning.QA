@@ -25,3 +25,13 @@ public sealed class ServerArchiveRegistrationResponse
     public int DistinctTeacherCount { get; set; }
     public bool ManagerSafeWholeSegment { get; set; }
 }
+
+public sealed class ServerArchiveDeviceResolveRequest
+{
+    public string StreamKey { get; set; } = string.Empty;
+}
+
+public sealed class ServerArchiveDeviceResolveResponse
+{
+    public string DeviceId { get; set; } = string.Empty;
+}

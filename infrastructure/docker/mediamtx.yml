@@ -37,9 +37,10 @@ paths:
     forward:
       - dest: rtmp://host.docker.internal:1936/live#$G1
     record: true
-    recordPath: /recordings/%path/%Y%m%d/%H%M%S-%f
+    recordPath: /recordings/%path/%s
     recordFormat: fmp4
     recordPartDuration: 1s
     recordMaxPartSize: 50M
     recordSegmentDuration: 15m
     recordDeleteAfter: 0s
+    runOnRecordSegmentComplete: /recording-archive-hook

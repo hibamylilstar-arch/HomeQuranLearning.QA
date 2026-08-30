@@ -1,4 +1,8 @@
 services:
+  api:
+    environment:
+      ArchiveRegistrarApiKey: ${ARCHIVE_REGISTRAR_API_KEY}
+
   livekit-ingress:
     environment:
       INGRESS_CONFIG_BODY: |
@@ -19,7 +23,10 @@ services:
           level: info
 
   mediamtx-relay:
-    image: bluenviron/mediamtx:1.20.1
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.mediamtx-relay
+    image: academy-mediamtx-relay:1.20.1-hook1
     container_name: academy-mediamtx-relay
     restart: unless-stopped
     ports:
@@ -29,6 +36,37 @@ services:
       - relay_recordings:/recordings
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  recording-archive-registrar:
+    build:
+      context: ../..
+      dockerfile: src/RecordingArchiveRegistrar/Dockerfile
+    container_name: academy-recording-archive-registrar
+    restart: unless-stopped
+    environment:
+      BACKEND_BASE_URL: http://api:8080
+      ARCHIVE_REGISTRAR_API_KEY: ${ARCHIVE_REGISTRAR_API_KEY}
+      RECORDINGS_ROOT: /recordings
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      POLL_SECONDS: "2"
+      VIDEO_STREAM_COPY_VERIFIED: ${RELAY_VIDEO_STREAM_COPY_VERIFIED:-false}
+    volumes:
+      - relay_recordings:/recordings
+    depends_on:
+      api:
+        condition: service_started
+      minio:
+        condition: service_healthy
     networks:
       - academy
     logging:

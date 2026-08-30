@@ -1,0 +1,7 @@
+FROM golang:1.27.0-alpine3.24 AS hook-build
+WORKDIR /src
+COPY src/RecordingArchiveHook/main.go /src/main.go
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/recording-archive-hook /src/main.go
+
+FROM bluenviron/mediamtx:1.20.1
+COPY --from=hook-build /out/recording-archive-hook /recording-archive-hook

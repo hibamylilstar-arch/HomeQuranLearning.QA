@@ -392,6 +392,34 @@ app.MapPost("/api/worker/server-recordings/finalized", async (
     }
 });
 
+app.MapPost("/api/worker/server-recordings/resolve-device", async (
+    HttpRequest request,
+    ServerArchiveDeviceResolveRequest body,
+    RecordingService recordingService,
+    CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(archiveRegistrarApiKey) ||
+        !request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != archiveRegistrarApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        var response = await recordingService.ResolveServerArchiveDeviceAsync(body, cancellationToken);
+        return Results.Ok(response);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
 app.MapGet("/api/admin/devices", async (
     ClaimsPrincipal user,
     HttpRequest request,

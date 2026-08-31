@@ -1,5 +1,44 @@
 # HomeQuranLearning.QA — Project State
 
+<!-- VERIFIED-LIVE-FIX-6782031 START -->
+## Verified live-monitoring recovery baseline — 2026-09-01
+
+Source commit: `6782031` — `fix(live): stabilize publisher recovery and idle audio`
+
+Verified installer:
+- Version: `1.0.0-6782031e873a`
+- Path: `publish\stable-agent-6782031-20260901-040509\Home Quran Learning Setup.exe`
+- Size: `356205198` bytes
+- SHA256: `A79779A27E9F512D95E04B5C472239C88AF9FF423054A6B59BD19E4511110CFF`
+- Signature: unsigned
+
+Automated verification before packaging:
+- Agent tests: 24 / 24 PASS
+- Unit tests: 115 / 115 PASS
+- Integration tests: 6 / 6 PASS
+- Total: 145 / 145 PASS
+- Release solution build: PASS
+
+Physical installation verification on development machine:
+- device identity preserved
+- existing recordings preserved
+- exactly one managed Agent task/process
+- exactly one TeamsHelper task/process
+- installed version confirmed as `1.0.0-6782031e873a`
+
+Laptop 5 (`DESKTOP-71RJV67`) real E2E validation with this exact installer:
+- idle live feed: PASS
+- dashboard enable/disable control: PASS
+- live feed during Teams call: PASS
+- live feed after Teams call ended: PASS
+
+Resolved live-path defects:
+- stream-key changes now force replacement of a still-running FFmpeg publisher
+- idle system-audio periods now receive adaptive silence keepalive without racing real WASAPI audio
+
+This installer supersedes `1ddf417` as the current physically verified Agent baseline for future installs/repairs unless a newer baseline is explicitly verified and recorded.
+<!-- VERIFIED-LIVE-FIX-6782031 END -->
+
 ## Purpose and authority
 
 Canonical resumable project checkpoint. Use it with Git and actual repository state after reboot, new Codex chat, interrupted phase or missing chat history.

@@ -29,6 +29,7 @@ public sealed class StudentRepository : IStudentRepository
         return await _dbContext.Students
             .AsNoTracking()
             .Include(x => x.AssignedTeacher)
+            .Where(x => x.IsActive)
             .ToListAsync(cancellationToken);
     }
 

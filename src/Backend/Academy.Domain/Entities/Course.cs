@@ -8,6 +8,8 @@ public sealed class Course
 
     public string Description { get; set; } = string.Empty;
 
+    public bool IsActive { get; set; } = true;
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public DateTimeOffset UpdatedAtUtc { get; set; }

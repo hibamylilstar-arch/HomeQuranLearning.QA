@@ -14,6 +14,8 @@ public sealed class Student
 
     public Teacher? AssignedTeacher { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public DateTimeOffset UpdatedAtUtc { get; set; }

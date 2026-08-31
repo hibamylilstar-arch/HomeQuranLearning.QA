@@ -20,17 +20,13 @@ public sealed class TeacherService
     public async Task<IReadOnlyList<TeacherDto>> GetTeachersAsync(
         CancellationToken cancellationToken = default)
     {
-        var teachers = await _teacherRepository.GetAllAsync(cancellationToken);
+        var teachers =
+            await _teacherRepository.GetAllAsync(
+                cancellationToken);
 
         return teachers
             .OrderBy(x => x.FullName)
-            .Select(x => new TeacherDto
-            {
-                Id = x.Id,
-                FullName = x.FullName,
-                Email = x.Email,
-                Phone = x.Phone
-            })
+            .Select(ToDto)
             .ToList();
     }
 
@@ -38,19 +34,83 @@ public sealed class TeacherService
         CreateTeacherRequest request,
         CancellationToken cancellationToken = default)
     {
+        var now = DateTimeOffset.UtcNow;
+
         var teacher = new Teacher
         {
             Id = Guid.NewGuid(),
-            FullName = request.FullName,
-            Email = request.Email,
-            Phone = request.Phone,
-            CreatedAtUtc = DateTimeOffset.UtcNow,
-            UpdatedAtUtc = DateTimeOffset.UtcNow
+            FullName = request.FullName.Trim(),
+            Email = request.Email.Trim(),
+            Phone = request.Phone.Trim(),
+            IsActive = true,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
         };
 
-        await _teacherRepository.AddAsync(teacher, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _teacherRepository.AddAsync(
+            teacher,
+            cancellationToken);
 
+        await _unitOfWork.SaveChangesAsync(
+            cancellationToken);
+
+        return ToDto(teacher);
+    }
+
+    public async Task<TeacherDto?> UpdateTeacherAsync(
+        Guid id,
+        UpdateTeacherRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var teacher =
+            await _teacherRepository.GetByIdAsync(
+                id,
+                cancellationToken);
+
+        if (teacher is null || !teacher.IsActive)
+        {
+            return null;
+        }
+
+        teacher.FullName = request.FullName.Trim();
+        teacher.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+        _teacherRepository.Update(teacher);
+
+        await _unitOfWork.SaveChangesAsync(
+            cancellationToken);
+
+        return ToDto(teacher);
+    }
+
+    public async Task<bool> ArchiveTeacherAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var teacher =
+            await _teacherRepository.GetByIdAsync(
+                id,
+                cancellationToken);
+
+        if (teacher is null || !teacher.IsActive)
+        {
+            return false;
+        }
+
+        teacher.IsActive = false;
+        teacher.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+        _teacherRepository.Update(teacher);
+
+        await _unitOfWork.SaveChangesAsync(
+            cancellationToken);
+
+        return true;
+    }
+
+    private static TeacherDto ToDto(
+        Teacher teacher)
+    {
         return new TeacherDto
         {
             Id = teacher.Id,

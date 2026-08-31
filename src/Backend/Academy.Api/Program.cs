@@ -1041,6 +1041,51 @@ app.MapPost("/api/admin/teachers", async (
     return Results.Ok(teacher);
 }).RequireAuthorization(OwnerAdminManagerPolicy);
 
+app.MapPatch("/api/admin/teachers/{id:guid}", async (
+    Guid id,
+    HttpRequest request,
+    TeacherService teacherService,
+    CancellationToken cancellationToken) =>
+{
+    var body =
+        await request.ReadFromJsonAsync<UpdateTeacherRequest>(
+            jsonOptions,
+            cancellationToken);
+
+    if (body is null ||
+        string.IsNullOrWhiteSpace(body.FullName))
+    {
+        return Results.BadRequest(
+            "FullName is required.");
+    }
+
+    var teacher =
+        await teacherService.UpdateTeacherAsync(
+            id,
+            body,
+            cancellationToken);
+
+    return teacher is null
+        ? Results.NotFound(
+            new { message = "Teacher not found." })
+        : Results.Ok(teacher);
+}).RequireAuthorization(OwnerAdminManagerPolicy);
+
+app.MapDelete("/api/admin/teachers/{id:guid}", async (
+    Guid id,
+    TeacherService teacherService,
+    CancellationToken cancellationToken) =>
+{
+    var archived =
+        await teacherService.ArchiveTeacherAsync(
+            id,
+            cancellationToken);
+
+    return archived
+        ? Results.NoContent()
+        : Results.NotFound();
+}).RequireAuthorization(OwnerAdminManagerPolicy);
+
 app.MapGet("/api/admin/manager-assignments", async (
     ClaimsPrincipal user,
     HttpRequest request,
@@ -1110,6 +1155,51 @@ app.MapPost("/api/admin/students", async (
     return Results.Ok(student);
 }).RequireAuthorization(OwnerAdminManagerPolicy);
 
+app.MapPatch("/api/admin/students/{id:guid}", async (
+    Guid id,
+    HttpRequest request,
+    StudentService studentService,
+    CancellationToken cancellationToken) =>
+{
+    var body =
+        await request.ReadFromJsonAsync<UpdateStudentRequest>(
+            jsonOptions,
+            cancellationToken);
+
+    if (body is null ||
+        string.IsNullOrWhiteSpace(body.FullName))
+    {
+        return Results.BadRequest(
+            "FullName is required.");
+    }
+
+    var student =
+        await studentService.UpdateStudentAsync(
+            id,
+            body,
+            cancellationToken);
+
+    return student is null
+        ? Results.NotFound(
+            new { message = "Student not found." })
+        : Results.Ok(student);
+}).RequireAuthorization(OwnerAdminManagerPolicy);
+
+app.MapDelete("/api/admin/students/{id:guid}", async (
+    Guid id,
+    StudentService studentService,
+    CancellationToken cancellationToken) =>
+{
+    var archived =
+        await studentService.ArchiveStudentAsync(
+            id,
+            cancellationToken);
+
+    return archived
+        ? Results.NoContent()
+        : Results.NotFound();
+}).RequireAuthorization(OwnerAdminManagerPolicy);
+
 app.MapGet("/api/admin/courses", async (
     ClaimsPrincipal user,
     HttpRequest request,
@@ -1137,6 +1227,51 @@ app.MapPost("/api/admin/courses", async (
 
     var course = await courseService.CreateCourseAsync(body, cancellationToken);
     return Results.Ok(course);
+}).RequireAuthorization(OwnerAdminManagerPolicy);
+
+app.MapPatch("/api/admin/courses/{id:guid}", async (
+    Guid id,
+    HttpRequest request,
+    CourseService courseService,
+    CancellationToken cancellationToken) =>
+{
+    var body =
+        await request.ReadFromJsonAsync<UpdateCourseRequest>(
+            jsonOptions,
+            cancellationToken);
+
+    if (body is null ||
+        string.IsNullOrWhiteSpace(body.Name))
+    {
+        return Results.BadRequest(
+            "Name is required.");
+    }
+
+    var course =
+        await courseService.UpdateCourseAsync(
+            id,
+            body,
+            cancellationToken);
+
+    return course is null
+        ? Results.NotFound(
+            new { message = "Course not found." })
+        : Results.Ok(course);
+}).RequireAuthorization(OwnerAdminManagerPolicy);
+
+app.MapDelete("/api/admin/courses/{id:guid}", async (
+    Guid id,
+    CourseService courseService,
+    CancellationToken cancellationToken) =>
+{
+    var archived =
+        await courseService.ArchiveCourseAsync(
+            id,
+            cancellationToken);
+
+    return archived
+        ? Results.NoContent()
+        : Results.NotFound();
 }).RequireAuthorization(OwnerAdminManagerPolicy);
 
 app.MapGet("/api/admin/schedules", async (

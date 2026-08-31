@@ -9,15 +9,10 @@ public sealed class DailyAttendanceReportService
 {
     private readonly ISessionRepository _sessionRepository;
 
-    private readonly IManagerTeacherAssignmentRepository
-        _assignmentRepository;
-
     public DailyAttendanceReportService(
-        ISessionRepository sessionRepository,
-        IManagerTeacherAssignmentRepository assignmentRepository)
+        ISessionRepository sessionRepository)
     {
         _sessionRepository = sessionRepository;
-        _assignmentRepository = assignmentRepository;
     }
 
     public async Task<DailyAttendanceReportDto> GetDailyReportAsync(
@@ -53,33 +48,10 @@ public sealed class DailyAttendanceReportService
                     cancellationToken);
 
         IEnumerable<Session> visibleSessions =
-            sessions;
-
-        if (role == UserRole.Manager.ToString())
-        {
-            var assignments =
-                await _assignmentRepository
-                    .GetByManagerUserIdAsync(
-                        userId,
-                        cancellationToken);
-
-            var teacherIds =
-                assignments
-                    .Select(x => x.TeacherId)
-                    .ToHashSet();
-
-            visibleSessions =
-                visibleSessions.Where(
-                    x => teacherIds.Contains(
-                        x.TeacherId));
-        }
-        else if (
-            role != UserRole.Owner.ToString() &&
-            role != UserRole.Admin.ToString())
-        {
-            visibleSessions =
-                Array.Empty<Session>();
-        }
+            userId != Guid.Empty &&
+            IsOperationalRole(role)
+                ? sessions
+                : Array.Empty<Session>();
 
         var dailySessions =
             visibleSessions
@@ -174,6 +146,15 @@ public sealed class DailyAttendanceReportService
             Sessions =
                 dailySessions.Select(MapItem).ToList()
         };
+    }
+
+    private static bool IsOperationalRole(
+        string role)
+    {
+        return
+            role == UserRole.Owner.ToString() ||
+            role == UserRole.Admin.ToString() ||
+            role == UserRole.Manager.ToString();
     }
 
     private static DailyAttendanceReportItemDto MapItem(

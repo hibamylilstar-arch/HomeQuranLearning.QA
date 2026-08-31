@@ -7,42 +7,29 @@ namespace Academy.Application.Services;
 public sealed class ScheduleAccessService
 {
     private readonly IScheduleRepository _scheduleRepository;
-    private readonly IManagerTeacherAssignmentRepository _assignmentRepository;
 
     public ScheduleAccessService(
-        IScheduleRepository scheduleRepository,
-        IManagerTeacherAssignmentRepository assignmentRepository)
+        IScheduleRepository scheduleRepository)
     {
         _scheduleRepository = scheduleRepository;
-        _assignmentRepository = assignmentRepository;
     }
 
-    public async Task<IReadOnlyList<ScheduleDto>> FilterVisibleSchedulesAsync(
+    public Task<IReadOnlyList<ScheduleDto>> FilterVisibleSchedulesAsync(
         IReadOnlyList<ScheduleDto> schedules,
         Guid userId,
         string role,
         CancellationToken cancellationToken = default)
     {
-        if (IsOwnerOrAdmin(role))
-        {
-            return schedules;
-        }
+        _ = cancellationToken;
 
-        if (role != UserRole.Manager.ToString())
-        {
-            return Array.Empty<ScheduleDto>();
-        }
+        IReadOnlyList<ScheduleDto> visible =
+            userId != Guid.Empty &&
+            IsOperationalRole(role)
+                ? schedules
+                : Array.Empty<ScheduleDto>();
 
-        var assignedTeacherIds =
-            await GetAssignedTeacherIdsAsync(
-                userId,
-                cancellationToken);
-
-        return schedules
-            .Where(x =>
-                assignedTeacherIds.Contains(
-                    x.TeacherId))
-            .ToList();
+        return Task.FromResult(
+            visible);
     }
 
     public async Task<bool> CanAccessScheduleAsync(
@@ -51,73 +38,41 @@ public sealed class ScheduleAccessService
         string role,
         CancellationToken cancellationToken = default)
     {
+        if (scheduleId == Guid.Empty ||
+            userId == Guid.Empty ||
+            !IsOperationalRole(role))
+        {
+            return false;
+        }
+
         var schedule =
             await _scheduleRepository.GetByIdAsync(
                 scheduleId,
                 cancellationToken);
 
-        if (schedule is null)
-        {
-            return false;
-        }
-
-        return await CanManageTeacherAsync(
-            userId,
-            role,
-            schedule.TeacherId,
-            cancellationToken);
+        return schedule is not null;
     }
 
-    public async Task<bool> CanManageTeacherAsync(
+    public Task<bool> CanManageTeacherAsync(
         Guid userId,
         string role,
         Guid teacherId,
         CancellationToken cancellationToken = default)
     {
-        if (userId == Guid.Empty ||
-            teacherId == Guid.Empty)
-        {
-            return false;
-        }
+        _ = cancellationToken;
 
-        if (IsOwnerOrAdmin(role))
-        {
-            return true;
-        }
-
-        if (role != UserRole.Manager.ToString())
-        {
-            return false;
-        }
-
-        var assignedTeacherIds =
-            await GetAssignedTeacherIdsAsync(
-                userId,
-                cancellationToken);
-
-        return assignedTeacherIds.Contains(
-            teacherId);
+        return Task.FromResult(
+            userId != Guid.Empty &&
+            teacherId != Guid.Empty &&
+            IsOperationalRole(role));
     }
 
-    private async Task<HashSet<Guid>> GetAssignedTeacherIdsAsync(
-        Guid userId,
-        CancellationToken cancellationToken)
-    {
-        var assignments =
-            await _assignmentRepository.GetByManagerUserIdAsync(
-                userId,
-                cancellationToken);
-
-        return assignments
-            .Select(x => x.TeacherId)
-            .ToHashSet();
-    }
-
-    private static bool IsOwnerOrAdmin(
+    private static bool IsOperationalRole(
         string role)
     {
         return
             role == UserRole.Owner.ToString() ||
-            role == UserRole.Admin.ToString();
+            role == UserRole.Admin.ToString() ||
+            role == UserRole.Manager.ToString();
     }
 }

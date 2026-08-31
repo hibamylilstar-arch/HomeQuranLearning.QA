@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 const string OwnerOrAdminPolicy = "OwnerOrAdmin";
+const string OwnerAdminManagerPolicy = "OwnerAdminManager";
 const string OwnerOnlyPolicy = "OwnerOnly";
 
 var builder = WebApplication.CreateBuilder(args);
@@ -103,6 +104,12 @@ builder.Services.AddAuthorization(options =>
         policy => policy.RequireRole(
             UserRole.Owner.ToString(),
             UserRole.Admin.ToString()));
+    options.AddPolicy(
+        OwnerAdminManagerPolicy,
+        policy => policy.RequireRole(
+            UserRole.Owner.ToString(),
+            UserRole.Admin.ToString(),
+            UserRole.Manager.ToString()));
     options.AddPolicy(OwnerOnlyPolicy, policy => policy.RequireRole(UserRole.Owner.ToString()));
 });
 
@@ -1013,7 +1020,7 @@ app.MapGet("/api/admin/teachers", async (
 {
     var teachers = await teacherService.GetTeachersAsync(cancellationToken);
     return Results.Ok(teachers);
-}).RequireAuthorization(OwnerOrAdminPolicy);
+}).RequireAuthorization(OwnerAdminManagerPolicy);
 
 app.MapPost("/api/admin/teachers", async (
     ClaimsPrincipal user,
@@ -1032,7 +1039,7 @@ app.MapPost("/api/admin/teachers", async (
 
     var teacher = await teacherService.CreateTeacherAsync(body, cancellationToken);
     return Results.Ok(teacher);
-}).RequireAuthorization(OwnerOrAdminPolicy);
+}).RequireAuthorization(OwnerAdminManagerPolicy);
 
 app.MapGet("/api/admin/manager-assignments", async (
     ClaimsPrincipal user,
@@ -1082,7 +1089,7 @@ app.MapGet("/api/admin/students", async (
 {
     var students = await studentService.GetStudentsAsync(cancellationToken);
     return Results.Ok(students);
-}).RequireAuthorization(OwnerOrAdminPolicy);
+}).RequireAuthorization(OwnerAdminManagerPolicy);
 
 app.MapPost("/api/admin/students", async (
     ClaimsPrincipal user,
@@ -1101,7 +1108,7 @@ app.MapPost("/api/admin/students", async (
 
     var student = await studentService.CreateStudentAsync(body, cancellationToken);
     return Results.Ok(student);
-}).RequireAuthorization(OwnerOrAdminPolicy);
+}).RequireAuthorization(OwnerAdminManagerPolicy);
 
 app.MapGet("/api/admin/courses", async (
     ClaimsPrincipal user,
@@ -1111,7 +1118,7 @@ app.MapGet("/api/admin/courses", async (
 {
     var courses = await courseService.GetCoursesAsync(cancellationToken);
     return Results.Ok(courses);
-}).RequireAuthorization(OwnerOrAdminPolicy);
+}).RequireAuthorization(OwnerAdminManagerPolicy);
 
 app.MapPost("/api/admin/courses", async (
     ClaimsPrincipal user,
@@ -1130,7 +1137,7 @@ app.MapPost("/api/admin/courses", async (
 
     var course = await courseService.CreateCourseAsync(body, cancellationToken);
     return Results.Ok(course);
-}).RequireAuthorization(OwnerOrAdminPolicy);
+}).RequireAuthorization(OwnerAdminManagerPolicy);
 
 app.MapGet("/api/admin/schedules", async (
     ClaimsPrincipal user,

@@ -91,15 +91,15 @@ public sealed class DailyAttendanceReportServiceTests
 
     [Fact]
     public async Task
-        DailyReport_ManagerSeesAssignedTeacherOnly()
+        DailyReport_ManagerSeesAllOperationalTeachers()
     {
-        var assignedTeacherId =
+        var teacherA =
             Guid.NewGuid();
 
-        var hiddenTeacherId =
+        var teacherB =
             Guid.NewGuid();
 
-        var visible =
+        var first =
             SessionAt(
                 new DateTimeOffset(
                     2026,
@@ -110,9 +110,9 @@ public sealed class DailyAttendanceReportServiceTests
                     0,
                     TimeSpan.Zero),
                 AttendanceStatus.Absent,
-                assignedTeacherId);
+                teacherA);
 
-        var hidden =
+        var second =
             SessionAt(
                 new DateTimeOffset(
                     2026,
@@ -123,48 +123,15 @@ public sealed class DailyAttendanceReportServiceTests
                     0,
                     TimeSpan.Zero),
                 AttendanceStatus.Absent,
-                hiddenTeacherId);
-
-        var managerId =
-            Guid.NewGuid();
-
-        var assignmentRepository =
-            new Mock<
-                IManagerTeacherAssignmentRepository>();
-
-        assignmentRepository
-            .Setup(
-                x =>
-                    x.GetByManagerUserIdAsync(
-                        managerId,
-                        It.IsAny<CancellationToken>()))
-            .ReturnsAsync(
-                new[]
-                {
-                    new ManagerTeacherAssignment
-                    {
-                        Id =
-                            Guid.NewGuid(),
-
-                        ManagerUserId =
-                            managerId,
-
-                        TeacherId =
-                            assignedTeacherId,
-
-                        AssignedAtUtc =
-                            DateTimeOffset.UtcNow
-                    }
-                });
+                teacherB);
 
         var service =
             CreateService(
                 new[]
                 {
-                    visible,
-                    hidden
-                },
-                assignmentRepository);
+                    first,
+                    second
+                });
 
         var report =
             await service.GetDailyReportAsync(
@@ -172,24 +139,28 @@ public sealed class DailyAttendanceReportServiceTests
                     2026,
                     8,
                     26),
-                managerId,
+                Guid.NewGuid(),
                 UserRole.Manager.ToString());
 
         Assert.Equal(
-            1,
+            2,
             report.CompletedSessions);
 
         Assert.Equal(
-            1,
+            2,
             report.ConfirmedAbsentSessions);
 
-        Assert.Single(
-            report.ConfirmedAbsences);
-
         Assert.Equal(
-            assignedTeacherId,
-            report.ConfirmedAbsences[0]
-                .TeacherId);
+            2,
+            report.ConfirmedAbsences.Count);
+
+        Assert.Contains(
+            report.ConfirmedAbsences,
+            x => x.TeacherId == teacherA);
+
+        Assert.Contains(
+            report.ConfirmedAbsences,
+            x => x.TeacherId == teacherB);
     }
 
     [Fact]
@@ -377,9 +348,7 @@ public sealed class DailyAttendanceReportServiceTests
 
     private static DailyAttendanceReportService
         CreateService(
-            IReadOnlyList<Session> sessions,
-            Mock<IManagerTeacherAssignmentRepository>?
-                assignmentRepository = null)
+            IReadOnlyList<Session> sessions)
     {
         var sessionRepository =
             new Mock<ISessionRepository>();
@@ -392,26 +361,8 @@ public sealed class DailyAttendanceReportServiceTests
             .ReturnsAsync(
                 sessions);
 
-        if (assignmentRepository is null)
-        {
-            assignmentRepository =
-                new Mock<
-                    IManagerTeacherAssignmentRepository>();
-
-            assignmentRepository
-                .Setup(
-                    x =>
-                        x.GetByManagerUserIdAsync(
-                            It.IsAny<Guid>(),
-                            It.IsAny<CancellationToken>()))
-                .ReturnsAsync(
-                    Array.Empty<
-                        ManagerTeacherAssignment>());
-        }
-
         return new DailyAttendanceReportService(
-            sessionRepository.Object,
-            assignmentRepository.Object);
+            sessionRepository.Object);
     }
 
     private static Session SessionAt(

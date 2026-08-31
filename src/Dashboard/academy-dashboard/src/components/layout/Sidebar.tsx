@@ -14,6 +14,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen: boo
   };
 
   const ownerOrAdminRoles = ["Owner", "Admin"];
+  const operationalRoles = ["Owner", "Admin", "Manager"];
   const navItems = [
     { name: "Live Monitoring", href: "/live" },
     { name: "Overview", href: "/" },
@@ -22,14 +23,13 @@ export default function Sidebar({ mobileOpen, setMobileOpen }: { mobileOpen: boo
     { name: "QA Rules", href: "/qa-rules", roles: ownerOrAdminRoles },
     { name: "QA Alerts", href: "/qa-alerts" },
     { name: "QA Candidates", href: "/qa-candidates" },
-    { name: "Teachers", href: "/teachers", roles: ownerOrAdminRoles },
-    { name: "Students", href: "/students", roles: ownerOrAdminRoles },
-    { name: "Courses", href: "/courses", roles: ownerOrAdminRoles },
+    { name: "Teachers", href: "/teachers", roles: operationalRoles },
+    { name: "Students", href: "/students", roles: operationalRoles },
+    { name: "Courses", href: "/courses", roles: operationalRoles },
     { name: "Schedules", href: "/schedules" },
     { name: "Sessions", href: "/sessions" },
     { name: "Attendance Report", href: "/reports/attendance" },
     { name: "Users", href: "/users", roles: ownerOrAdminRoles },
-    { name: "Assignments", href: "/assignments", roles: ownerOrAdminRoles },
   ].filter((item) => !item.roles || (user && item.roles.includes(user.role)));
 
   return (

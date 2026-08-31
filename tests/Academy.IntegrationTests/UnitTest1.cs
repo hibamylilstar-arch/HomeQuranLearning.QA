@@ -181,7 +181,7 @@ public class RecordingServiceIntegrationTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task ManagerFiltering_ReturnsOnlyAssignedTeachersData_RealDatabase()
+    public async Task ManagerVisibility_ReturnsAllOperationalTeacherData_RealDatabase()
     {
         // Arrange
         var teacher1 = new Teacher
@@ -281,8 +281,13 @@ public class RecordingServiceIntegrationTests : IntegrationTestBase
         var visible = await dashboard.GetVisibleRecordingsAsync(manager.Id, UserRole.Manager.ToString());
 
         // Assert
-        Assert.Single(visible);
-        Assert.Equal("a.mp4", visible[0].FileName);
+        Assert.Equal(2, visible.Count);
+        Assert.Contains(
+            visible,
+            x => x.FileName == "a.mp4");
+        Assert.Contains(
+            visible,
+            x => x.FileName == "b.mp4");
     }
 }
 

@@ -9,7 +9,7 @@ namespace Academy.UnitTests;
 public sealed class DashboardAttendanceAccessTests
 {
     [Fact]
-    public async Task GetVisibleSessions_Manager_ReturnsAssignedTeacherOnly()
+    public async Task GetVisibleSessions_Manager_ReturnsAllOperationalSessions()
     {
         var managerId =
             Guid.NewGuid();
@@ -85,8 +85,14 @@ public sealed class DashboardAttendanceAccessTests
                 managerId,
                 UserRole.Manager.ToString());
 
+        Assert.Equal(
+            2,
+            visible.Count);
+
         var item =
-            Assert.Single(visible);
+            Assert.Single(
+                visible.Where(
+                    x => x.Id == assignedSession.Id));
 
         Assert.Equal(
             assignedSession.Id,
@@ -108,9 +114,16 @@ public sealed class DashboardAttendanceAccessTests
             "Pending",
             item.AttendanceReviewStatus);
 
-        Assert.DoesNotContain(
+        Assert.Contains(
             visible,
             x => x.Id == hiddenSession.Id);
+
+        assignmentRepository.Verify(
+            x =>
+                x.GetByManagerUserIdAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -182,7 +195,7 @@ public sealed class DashboardAttendanceAccessTests
     }
 
     [Fact]
-    public async Task CanAccessSession_Manager_AssignedTeacher_ReturnsTrue()
+    public async Task CanAccessSession_Manager_NormalSession_ReturnsTrue()
     {
         var managerId =
             Guid.NewGuid();
@@ -229,7 +242,7 @@ public sealed class DashboardAttendanceAccessTests
     }
 
     [Fact]
-    public async Task CanAccessSession_Manager_UnassignedTeacher_ReturnsFalse()
+    public async Task CanAccessSession_Manager_NormalSession_ReturnsTrueWithoutAssignmentScope()
     {
         var managerId =
             Guid.NewGuid();
@@ -274,8 +287,15 @@ public sealed class DashboardAttendanceAccessTests
                 managerId,
                 UserRole.Manager.ToString());
 
-        Assert.False(
+        Assert.True(
             allowed);
+
+        assignmentRepository.Verify(
+            x =>
+                x.GetByManagerUserIdAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]

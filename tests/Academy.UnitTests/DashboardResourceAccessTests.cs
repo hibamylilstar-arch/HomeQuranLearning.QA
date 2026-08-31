@@ -9,7 +9,7 @@ namespace Academy.UnitTests;
 public sealed class DashboardResourceAccessTests
 {
     [Fact]
-    public async Task CanAccessRecording_ManagerAssignedTeacher_ReturnsTrue()
+    public async Task CanAccessRecording_ManagerNormalRecording_ReturnsTrue()
     {
         var managerId = Guid.NewGuid();
         var teacherId = Guid.NewGuid();
@@ -29,7 +29,7 @@ public sealed class DashboardResourceAccessTests
     }
 
     [Fact]
-    public async Task CanAccessRecording_ManagerUnassignedTeacher_ReturnsFalse()
+    public async Task CanAccessRecording_ManagerNormalRecordingWithoutAssignment_ReturnsTrue()
     {
         var managerId = Guid.NewGuid();
         var recording = CreateRecording(Guid.NewGuid());
@@ -44,7 +44,7 @@ public sealed class DashboardResourceAccessTests
             managerId,
             UserRole.Manager.ToString());
 
-        Assert.False(allowed);
+        Assert.True(allowed);
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public sealed class DashboardResourceAccessTests
     }
 
     [Fact]
-    public async Task GetVisibleLiveSessions_Manager_ReturnsAssignedLiveOnly()
+    public async Task GetVisibleLiveSessions_Manager_ReturnsAllOperationalLiveSessions()
     {
         var managerId = Guid.NewGuid();
         var assignedTeacherId = Guid.NewGuid();
@@ -100,8 +100,12 @@ public sealed class DashboardResourceAccessTests
             managerId,
             UserRole.Manager.ToString());
 
-        var item = Assert.Single(visible);
-        Assert.Equal(assignedLive.Id, item.Id);
+        Assert.Equal(2, visible.Count);
+        Assert.Contains(visible, x => x.Id == assignedLive.Id);
+        Assert.Contains(visible, x => x.Id == hiddenLive.Id);
+        Assert.DoesNotContain(
+            visible,
+            x => x.Id == assignedCompleted.Id);
     }
 
     [Fact]
@@ -123,7 +127,7 @@ public sealed class DashboardResourceAccessTests
     }
 
     [Fact]
-    public async Task CanAccessLiveSession_ManagerAssignedTeacher_ReturnsTrue()
+    public async Task CanAccessLiveSession_ManagerLiveSession_ReturnsTrue()
     {
         var managerId = Guid.NewGuid();
         var teacherId = Guid.NewGuid();
@@ -143,7 +147,7 @@ public sealed class DashboardResourceAccessTests
     }
 
     [Fact]
-    public async Task CanAccessLiveSession_ManagerUnassignedTeacher_ReturnsFalse()
+    public async Task CanAccessLiveSession_ManagerLiveSessionWithoutAssignment_ReturnsTrue()
     {
         var managerId = Guid.NewGuid();
         var session = CreateSession(Guid.NewGuid(), SessionStatus.Live);
@@ -158,7 +162,7 @@ public sealed class DashboardResourceAccessTests
             managerId,
             UserRole.Manager.ToString());
 
-        Assert.False(allowed);
+        Assert.True(allowed);
     }
 
     [Fact]
@@ -182,7 +186,7 @@ public sealed class DashboardResourceAccessTests
     }
 
     [Fact]
-    public async Task GetVisibleSessionEvents_ManagerAssignedTeacher_ReturnsPurposeLimitedEvents()
+    public async Task GetVisibleSessionEvents_Manager_ReturnsPurposeLimitedEvents()
     {
         var managerId = Guid.NewGuid();
         var teacherId = Guid.NewGuid();
@@ -231,11 +235,20 @@ public sealed class DashboardResourceAccessTests
     }
 
     [Fact]
-    public async Task GetVisibleSessionEvents_ManagerUnassignedTeacher_ReturnsNull()
+    public async Task GetVisibleSessionEvents_ManagerNormalSession_ReturnsEventsWithoutAssignmentScope()
     {
         var managerId = Guid.NewGuid();
         var session = CreateSession(Guid.NewGuid(), SessionStatus.Completed);
-        var eventRepository = new Mock<ISessionEventRepository>();
+        var eventRepository =
+            new Mock<ISessionEventRepository>();
+
+        eventRepository
+            .Setup(x =>
+                x.GetForSessionAsync(
+                    session.Id,
+                    It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                new List<SessionEvent>());
 
         var service = CreateService(
             new Mock<IRecordingRepository>(),
@@ -248,12 +261,14 @@ public sealed class DashboardResourceAccessTests
             managerId,
             UserRole.Manager.ToString());
 
-        Assert.Null(visible);
+        Assert.NotNull(visible);
+        Assert.Empty(visible!);
+
         eventRepository.Verify(
             x => x.GetForSessionAsync(
-                It.IsAny<Guid>(),
+                session.Id,
                 It.IsAny<CancellationToken>()),
-            Times.Never);
+            Times.Once);
     }
 
     private static DashboardQueryService CreateService(

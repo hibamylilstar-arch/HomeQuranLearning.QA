@@ -136,7 +136,7 @@ public class RecordingServiceTests
 public class DashboardQueryServiceTests
 {
     [Fact]
-    public async Task Manager_Recordings_FilteredByAssignedTeachers()
+    public async Task Manager_Recordings_ReturnsAllOperationalRecordings()
     {
         // Arrange
         var teacherId = Guid.NewGuid();
@@ -179,12 +179,20 @@ public class DashboardQueryServiceTests
         var result = await service.GetVisibleRecordingsAsync(managerUserId, UserRole.Manager.ToString());
 
         // Assert
-        Assert.Single(result);
-        Assert.Equal("a.mp4", result[0].FileName);
+        Assert.Equal(3, result.Count);
+        Assert.Contains(result, x => x.FileName == "a.mp4");
+        Assert.Contains(result, x => x.FileName == "b.mp4");
+        Assert.Contains(result, x => x.FileName == "c.mp4");
+
+        assignRepo.Verify(
+            x => x.GetByManagerUserIdAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
-    public async Task Manager_Devices_FilteredByAssignedTeacherSessions()
+    public async Task Manager_Devices_ReturnsAllOperationalDevices()
     {
         // Arrange
         var teacherId = Guid.NewGuid();
@@ -237,7 +245,19 @@ public class DashboardQueryServiceTests
         var result = await service.GetVisibleDevicesAsync(managerUserId, UserRole.Manager.ToString());
 
         // Assert
-        Assert.Single(result);
-        Assert.Equal("Laptop-01", result[0].DeviceName);
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, x => x.DeviceName == "Laptop-01");
+        Assert.Contains(result, x => x.DeviceName == "Laptop-02");
+
+        assignRepo.Verify(
+            x => x.GetByManagerUserIdAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        sessionRepo.Verify(
+            x => x.GetAllWithDetailsAsync(
+                It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }

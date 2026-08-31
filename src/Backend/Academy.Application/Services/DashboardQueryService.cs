@@ -51,7 +51,10 @@ public sealed class DashboardQueryService
         string role,
         CancellationToken cancellationToken = default)
     {
-        var recordings = await _recordingRepository.GetAllWithDeviceAsync(cancellationToken);
+        var recordings =
+            await _recordingRepository
+                .GetAllWithDeviceAsync(
+                    cancellationToken);
 
         if (role != UserRole.Owner.ToString())
         {
@@ -63,14 +66,9 @@ public sealed class DashboardQueryService
                 .ToList();
         }
 
-        if (role == UserRole.Manager.ToString())
-        {
-            var teacherIds = await GetAssignedTeacherIdsAsync(userId, cancellationToken);
-            recordings = recordings
-                .Where(r => r.TeacherId is not null && teacherIds.Contains(r.TeacherId.Value))
-                .ToList();
-        }
-        else if (!IsOwnerOrAdmin(role))
+        if (role != UserRole.Owner.ToString() &&
+            role != UserRole.Admin.ToString() &&
+            role != UserRole.Manager.ToString())
         {
             return Array.Empty<RecordingListItem>();
         }
@@ -81,9 +79,17 @@ public sealed class DashboardQueryService
             {
                 Id = x.Id,
                 DeviceId = x.DeviceId,
-                DeviceName = !string.IsNullOrWhiteSpace(x.Device?.RecordingDisplayName) ? x.Device!.RecordingDisplayName! : x.Device?.DeviceName ?? "Unknown",
-                ActualDeviceName = x.Device?.DeviceName ?? "Unknown",
-                RecordingDisplayName = x.Device?.RecordingDisplayName,
+                DeviceName =
+                    !string.IsNullOrWhiteSpace(
+                        x.Device?.RecordingDisplayName)
+                        ? x.Device!.RecordingDisplayName!
+                        : x.Device?.DeviceName
+                          ?? "Unknown",
+                ActualDeviceName =
+                    x.Device?.DeviceName
+                    ?? "Unknown",
+                RecordingDisplayName =
+                    x.Device?.RecordingDisplayName,
                 FileName = x.FileName,
                 StorageKey = x.StorageKey,
                 StartedAtUtc = x.StartedAtUtc,
@@ -143,7 +149,9 @@ public sealed class DashboardQueryService
         string role,
         CancellationToken cancellationToken = default)
     {
-        var devices = await _deviceRepository.GetAllAsync(cancellationToken);
+        var devices =
+            await _deviceRepository.GetAllAsync(
+                cancellationToken);
 
         if (role != UserRole.Owner.ToString())
         {
@@ -154,20 +162,9 @@ public sealed class DashboardQueryService
                 .ToList();
         }
 
-        if (role == UserRole.Manager.ToString())
-        {
-            var teacherIds = await GetAssignedTeacherIdsAsync(userId, cancellationToken);
-
-            var visibleDeviceIds = (await _sessionRepository.GetAllWithDetailsAsync(cancellationToken))
-                .Where(s => teacherIds.Contains(s.TeacherId))
-                .Select(s => s.DeviceId)
-                .ToHashSet();
-
-            devices = devices
-                .Where(d => visibleDeviceIds.Contains(d.Id))
-                .ToList();
-        }
-        else if (!IsOwnerOrAdmin(role))
+        if (role != UserRole.Owner.ToString() &&
+            role != UserRole.Admin.ToString() &&
+            role != UserRole.Manager.ToString())
         {
             return Array.Empty<DeviceListItem>();
         }
@@ -179,7 +176,8 @@ public sealed class DashboardQueryService
                 Id = x.Id,
                 DeviceId = x.DeviceId,
                 DeviceName = x.DeviceName,
-                RecordingDisplayName = x.RecordingDisplayName,
+                RecordingDisplayName =
+                    x.RecordingDisplayName,
                 AgentVersion = x.AgentVersion,
                 Status = x.Status.ToString(),
                 LastSeenUtc = x.LastSeenUtc
@@ -207,23 +205,9 @@ public sealed class DashboardQueryService
                 .ToList();
         }
 
-        if (role == UserRole.Manager.ToString())
-        {
-            var teacherIds =
-                await GetAssignedTeacherIdsAsync(
-                    userId,
-                    cancellationToken);
-
-            sessions =
-                sessions
-                    .Where(x =>
-                        teacherIds.Contains(
-                            x.TeacherId))
-                    .ToList();
-        }
-        else if (
-            role != UserRole.Owner.ToString() &&
-            role != UserRole.Admin.ToString())
+        if (role != UserRole.Owner.ToString() &&
+            role != UserRole.Admin.ToString() &&
+            role != UserRole.Manager.ToString())
         {
             return Array.Empty<SessionDto>();
         }
@@ -259,11 +243,14 @@ public sealed class DashboardQueryService
                     Status =
                         x.Status.ToString(),
                     TeacherAttendanceStatus =
-                        x.TeacherAttendanceStatus.ToString(),
+                        x.TeacherAttendanceStatus
+                            .ToString(),
                     StudentAttendanceStatus =
-                        x.StudentAttendanceStatus.ToString(),
+                        x.StudentAttendanceStatus
+                            .ToString(),
                     AttendanceReviewStatus =
-                        x.AttendanceReviewStatus.ToString(),
+                        x.AttendanceReviewStatus
+                            .ToString(),
                     AttendanceNotes =
                         x.AttendanceNotes,
                     ActiveSeconds =
@@ -315,18 +302,7 @@ public sealed class DashboardQueryService
             return false;
         }
 
-        if (role == UserRole.Admin.ToString())
-        {
-            return true;
-        }
-
-        var teacherIds =
-            await GetAssignedTeacherIdsAsync(
-                userId,
-                cancellationToken);
-
-        return teacherIds.Contains(
-            session.TeacherId);
+        return true;
     }
 
     public async Task<IReadOnlyList<SessionEventDto>?> GetVisibleSessionEventsAsync(
@@ -458,23 +434,7 @@ public sealed class DashboardQueryService
             return false;
         }
 
-        if (role == UserRole.Admin.ToString())
-        {
-            return true;
-        }
-
-        if (recording.TeacherId is null)
-        {
-            return false;
-        }
-
-        var teacherIds =
-            await GetAssignedTeacherIdsAsync(
-                userId,
-                cancellationToken);
-
-        return teacherIds.Contains(
-            recording.TeacherId.Value);
+        return true;
     }
 
     public async Task<IReadOnlyList<SessionDto>> GetVisibleLiveSessionsAsync(
@@ -535,18 +495,7 @@ public sealed class DashboardQueryService
             return false;
         }
 
-        if (role == UserRole.Admin.ToString())
-        {
-            return true;
-        }
-
-        var teacherIds =
-            await GetAssignedTeacherIdsAsync(
-                userId,
-                cancellationToken);
-
-        return teacherIds.Contains(
-            session.TeacherId);
+        return true;
     }
 
     private async Task<HashSet<Guid>> GetAssignedTeacherIdsAsync(

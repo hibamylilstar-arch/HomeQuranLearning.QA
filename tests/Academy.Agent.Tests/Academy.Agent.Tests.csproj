@@ -24,4 +24,8 @@
     <ProjectReference Include="..\..\src\Agent\Academy.Agent.TeamsHelper\Academy.Agent.TeamsHelper.csproj" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Agent\Academy.Agent.Service\Academy.Agent.Service.csproj" />
+  </ItemGroup>
 </Project>

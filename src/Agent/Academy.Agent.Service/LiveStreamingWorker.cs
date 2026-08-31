@@ -20,6 +20,9 @@ public sealed class LiveStreamingWorker : BackgroundService
     private AudioCaptureService? _audioService;
     private UdpClient? _udpSender;
     private CancellationTokenSource? _audioPumpCts;
+    private Task? _audioPumpTask;
+    private readonly object _audioSendLock = new();
+    private DateTimeOffset _lastRealAudioPacketUtc = DateTimeOffset.MinValue;
     private string? _currentStreamKey;
     private volatile bool _videoCaptureFailed;
     private Task? _stderrMonitorTask;
@@ -119,19 +122,43 @@ public sealed class LiveStreamingWorker : BackgroundService
                         _ffmpegProcess.HasExited;
 
                     bool needsRecovery =
-                        ffmpegNotRunning ||
-                        _videoCaptureFailed;
+                        LiveStreamingPolicy.NeedsPipelineRestart(
+                            _currentStreamKey,
+                            streamKey,
+                            ffmpegNotRunning,
+                            _videoCaptureFailed);
 
-                    if (streamKey != _currentStreamKey || needsRecovery)
+                    if (needsRecovery)
                     {
-                        if (needsRecovery && _currentStreamKey is not null)
-                        {
-                            _logger.LogWarning(
-                                _videoCaptureFailed
-                                    ? "Live video capture failed. Recreating live stream."
-                                    : "Live FFmpeg stopped unexpectedly. Recreating live stream.");
+                        bool streamKeyChanged =
+                            !string.Equals(
+                                streamKey,
+                                _currentStreamKey,
+                                StringComparison.Ordinal);
 
-                            await StopFfmpegAsync(publishStopEvidence: false);
+                        bool hasExistingPipeline =
+                            _ffmpegProcess is not null ||
+                            _audioService is not null ||
+                            _udpSender is not null ||
+                            _currentStreamKey is not null;
+
+                        if (hasExistingPipeline)
+                        {
+                            if (streamKeyChanged)
+                            {
+                                _logger.LogWarning(
+                                    "Live stream key changed. Recreating live stream.");
+                            }
+                            else
+                            {
+                                _logger.LogWarning(
+                                    _videoCaptureFailed
+                                        ? "Live video capture failed. Recreating live stream."
+                                        : "Live FFmpeg stopped unexpectedly. Recreating live stream.");
+                            }
+
+                            await StopFfmpegAsync(
+                                publishStopEvidence: false);
                         }
 
                         _logger.LogInformation(
@@ -222,6 +249,12 @@ public sealed class LiveStreamingWorker : BackgroundService
                 $"Unsupported live audio format: {captureFormat.Encoding}, {captureFormat.BitsPerSample}-bit")
         };
 
+        int silenceChunkBytes =
+            LiveStreamingPolicy.CalculateSilenceChunkBytes(
+                sampleRate,
+                channels,
+                captureFormat.BitsPerSample);
+
         string ingestUrl =
             $"{ingestBaseUrl.TrimEnd('/')}/{Uri.EscapeDataString(streamKey)}";
 
@@ -268,8 +301,11 @@ public sealed class LiveStreamingWorker : BackgroundService
 
         _audioService.DataAvailable += OnAudioDataAvailable;
 
-        // Continuous silence pump disabled.
-        // It must not write simultaneously with real WASAPI audio.
+        _lastRealAudioPacketUtc = DateTimeOffset.MinValue;
+        _audioPumpCts = new CancellationTokenSource();
+        _audioPumpTask = StartSilencePumpAsync(
+            silenceChunkBytes,
+            _audioPumpCts.Token);
 
         _currentStreamKey = streamKey;
 
@@ -396,42 +432,96 @@ public sealed class LiveStreamingWorker : BackgroundService
             }
         }
     }
-    private void OnAudioDataAvailable(object? sender, AudioDataAvailableEventArgs e)
+    private void OnAudioDataAvailable(
+        object? sender,
+        AudioDataAvailableEventArgs e)
     {
+        if (e.BytesRecorded <= 0)
+        {
+            return;
+        }
+
         try
         {
-            if (_udpSender is not null && e.BytesRecorded > 0)
+            lock (_audioSendLock)
             {
-                _udpSender.Send(e.Buffer, e.BytesRecorded);
+                if (_udpSender is null)
+                {
+                    return;
+                }
+
+                _lastRealAudioPacketUtc =
+                    DateTimeOffset.UtcNow;
+
+                _udpSender.Send(
+                    e.Buffer,
+                    e.BytesRecorded);
             }
         }
-        catch
+        catch (ObjectDisposedException)
         {
-            // ignore network/socket transmission exceptions during shutdown
+            // Expected during shutdown/recovery.
+        }
+        catch (SocketException ex)
+        {
+            _logger.LogDebug(
+                ex,
+                "Live real-audio UDP send failed.");
         }
     }
 
-    private async Task StartSilencePumpAsync(CancellationToken token)
+    private async Task StartSilencePumpAsync(
+        int silenceChunkBytes,
+        CancellationToken token)
     {
-        // 48000 Hz * 2 channels * 2 bytes per sample = 192,000 bytes/sec -> 9,600 bytes per 50ms chunk
-        byte[] silenceChunk = new byte[9600];
+        byte[] silenceChunk =
+            new byte[silenceChunkBytes];
+
         try
         {
             while (!token.IsCancellationRequested)
             {
-                if (_udpSender is not null)
+                try
                 {
-                    _udpSender.Send(silenceChunk, silenceChunk.Length);
+                    lock (_audioSendLock)
+                    {
+                        DateTimeOffset nowUtc =
+                            DateTimeOffset.UtcNow;
+
+                        if (_udpSender is not null &&
+                            LiveStreamingPolicy.ShouldSendSilence(
+                                _lastRealAudioPacketUtc,
+                                nowUtc))
+                        {
+                            _udpSender.Send(
+                                silenceChunk,
+                                silenceChunk.Length);
+                        }
+                    }
                 }
-                await Task.Delay(50, token);
+                catch (ObjectDisposedException)
+                    when (token.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (SocketException ex)
+                {
+                    _logger.LogDebug(
+                        ex,
+                        "Live silence UDP keepalive send failed.");
+                }
+
+                await Task.Delay(
+                    TimeSpan.FromMilliseconds(50),
+                    token);
             }
         }
-        catch
+        catch (OperationCanceledException)
+            when (token.IsCancellationRequested)
         {
-            // Task canceled or disposed
+            // Expected during shutdown/recovery.
         }
     }
-
     private void PublishLiveStreamStartedIfInactive()
     {
         var snapshot =
@@ -491,9 +581,24 @@ public sealed class LiveStreamingWorker : BackgroundService
         if (_audioPumpCts is not null)
         {
             _audioPumpCts.Cancel();
-            _audioPumpCts.Dispose();
-            _audioPumpCts = null;
         }
+
+        if (_audioPumpTask is not null)
+        {
+            try
+            {
+                await _audioPumpTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected during shutdown/recovery.
+            }
+
+            _audioPumpTask = null;
+        }
+
+        _audioPumpCts?.Dispose();
+        _audioPumpCts = null;
 
         if (_audioService is not null)
         {
@@ -502,10 +607,12 @@ public sealed class LiveStreamingWorker : BackgroundService
             _audioService = null;
         }
 
-        if (_udpSender is not null)
+        lock (_audioSendLock)
         {
-            _udpSender.Dispose();
+            _udpSender?.Dispose();
             _udpSender = null;
+            _lastRealAudioPacketUtc =
+                DateTimeOffset.MinValue;
         }
 
         if (_ffmpegProcess is null ||

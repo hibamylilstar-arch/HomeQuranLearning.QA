@@ -9,11 +9,13 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>HomeQuranLearning.ClassroomAgent.Setup</AssemblyName>
     <RootNamespace>HomeQuranLearning.ClassroomAgent.Setup</RootNamespace>
-    <Product>Home Quran Learning Classroom Agent</Product>
+    <AssemblyTitle>Home Quran Learning Setup</AssemblyTitle>
+    <Product>Home Quran Learning</Product>
     <Company>Abdul Wahid</Company>
     <Authors>Abdul Wahid</Authors>
-    <Copyright>Copyright © 2026 Abdul Wahid. All rights reserved.</Copyright>
-    <Description>Installer for the Home Quran Learning Classroom Agent</Description>
+    <Copyright>Copyright Â© 2026 Abdul Wahid. All rights reserved.</Copyright>
+    <Description>Installer for Home Quran Learning</Description>
+    <ApplicationIcon>..\Branding\HomeQuranLearning.ico</ApplicationIcon>
     <Version>1.0.0</Version>
   </PropertyGroup>
 

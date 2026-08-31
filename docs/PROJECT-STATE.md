@@ -8,52 +8,27 @@ Chat history is not authoritative. Repository state + this file are the durable 
 
 ## Canonical checkpoint
 
-- Branch: `codex/final-classroom-agent-installer`
-- HEAD: `9ff6abf9633b4231ddab3eb73ea0cdde2f11145f`
-- Status: `READY_FOR_PRODUCTION_DEPLOYMENT`
-- Development mode: production-targeted local development; current branch changes are not deployed.
-- Latest committed checkpoint: production classroom installer / WHIP live-path foundation at `9ff6abf`.
-- Current verified but uncommitted work:
-  - development Runtime now keeps TeamsHelper manual on the admin/development laptop and supports `StartTeams` / `StopTeams`; normal `StartAll` leaves TeamsHelper OFF;
-  - stale Agent `--no-build` launcher behavior was removed so current source is used;
-  - dashboard authentication cookie handling works on local HTTP LAN while preserving Secure cookies behind HTTPS;
-  - dashboard layout is responsive on mobile; Sessions and Attendance use stacked mobile cards; known mojibake in these operational views and the Sessions review separator were repaired;
-  - installer/dashboard branding uses Home Quran Learning product identity and developer/owner credit;
-  - root `AGENTS.md` has been revised to a production-first, low-bureaucracy engineering model.
-- Verification already completed for the current uncommitted dashboard slice:
-  - dashboard lint GREEN;
-  - Next.js production build GREEN;
-  - mobile Sessions and Attendance human visual test GREEN;
-  - Sessions review text renders cleanly as `Active <duration> - Drops <count>`.
-- Runtime/TeamsHelper verification already completed for the current uncommitted runtime slice:
-  - Runtime parser GREEN;
-  - Agent build GREEN;
-  - `StartAll` => API ON / Agent ON / Teams OFF;
-  - `StartTeams` => Teams ON;
-  - `StopTeams` => Teams OFF;
-  - development Teams scheduled task disabled intentionally.
-- Intentionally uncommitted/generated backup files currently include:
-  - `.dev-runtime/Runtime.ps1.before-teams-control`
-  - `.dev-runtime/Start-AcademyAgent.ps1.before-teams-control`
-  - dashboard `*.mobile-backup` files.
-- Known local line-ending/index noise remains in:
-  - `infrastructure/docker/Dockerfile.api`
-  - `infrastructure/docker/Dockerfile.dashboard`
-  - `infrastructure/docker/Dockerfile.worker`
-  - `spikes/SttSpike/requirements.txt`
-  These must not be blindly reset or staged; prove real content differences before action.
-- Current release candidate is locally verified and awaiting commit/push plus VPS rollout. Production routing no longer depends on teacher/reviewer source-IP `/32` allowlists; roaming Classroom Agents use HTTPS and application authentication.
-- Owner can manage Admin/Manager accounts through real backend contracts: enable/disable, password reset and safe delete; Owner accounts are protected.
-- Production Owner seeding no longer has a default email/password fallback.
-- Final Classroom Agent installer built successfully as a self-contained Windows EXE (338.98 MB), SHA256 `02E378637A0252445B75A7BE7203ECF5845DB2694FC8312E037546CC52C7E549`; current build is unsigned and may trigger SmartScreen.
-- Verification: unit 87/87 GREEN; integration 5/5 GREEN; dashboard lint GREEN; dashboard production build GREEN; production config self-test GREEN; installer build GREEN.
-- Historical VPS pilot/deployment work documented later in this file is separate history; do not infer that the current branch or current uncommitted changes are deployed.
-- Next production-development checkpoint:
-  1. reconcile `PROJECT-DECISIONS.md`, `OWNER-CONTROL-PLANE.md`, and relevant architecture state with the revised governance;
-  2. review intended diffs, backups/noise, and secret exposure;
-  3. update this file with the final verified checkpoint;
-  4. create an atomic commit and normal push on the current feature branch;
-  5. start Owner Control Center v1 with real backend contracts only.
+- Branch: `codex/agent-windows-branding`
+- Base HEAD: `926fe1c2fcd0`
+- Status: `AGENT_WINDOWS_BRANDING_VERIFIED`
+- Development mode: production-targeted local development; this branding/update-path slice is not deployed or installed on academy laptops yet.
+- Current focused slice:
+  - Windows file metadata and the Windows-service display name identify the process exactly as `Home Quran Learning`, published by Abdul Wahid;
+  - the Agent and setup executables embed the approved Home Quran Learning logo icon generated deterministically from the repository branding asset;
+  - installer updates use one stable managed application path instead of a new commit-named executable path per release;
+  - after the replacement Agent is running, obsolete legacy version directories are removed while ProgramData device identity, recordings and evidence remain untouched.
+- Verification:
+  - Agent Release build GREEN with 0 warnings/errors;
+  - installer Release build GREEN with 0 warnings/errors;
+  - built Agent metadata reports the branded file description/product/company and exposes a valid embedded icon;
+  - built installer metadata reports the branded setup description/product/company and exposes a valid embedded icon;
+  - logo-to-ICO generation is deterministic and contains 16, 24, 32, 48, 64, 128 and 256 pixel assets;
+  - final full solution Release build GREEN with 0 warnings/errors;
+  - unit tests 108/108 GREEN and integration tests 6/6 GREEN;
+  - intended path references were checked repository-wide; no runtime or script consumer still depends on a commit-named `versions` path.
+- Scope protection: dashboard, VPS configuration/deployment, database, recordings, LiveKit, Teams attendance semantics and QA processing were not changed.
+- Existing Windows microphone-history rows may remain visible until Windows expires its history. Installing a newly built approved setup switches the live process to the branded stable path and prevents future per-release identity rows.
+- Next step: commit and push this isolated slice, then build/install the next approved Classroom Agent setup when the Owner chooses to update a laptop.
 
 ## Current runtime snapshot
 

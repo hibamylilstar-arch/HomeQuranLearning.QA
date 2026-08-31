@@ -306,7 +306,7 @@ try {
         Join-Path $outputRoot "HomeQuranLearning.ClassroomAgent.Setup.exe"
 
     $finalExe =
-        Join-Path $outputRoot "Home Quran Learning Classroom Agent Setup.exe"
+        Join-Path $outputRoot "Home Quran Learning Setup.exe"
 
     if (-not (Test-Path -LiteralPath $publishedExe -PathType Leaf)) {
         throw "The expected single-file installer executable was not produced."

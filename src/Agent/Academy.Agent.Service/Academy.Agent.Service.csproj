@@ -6,6 +6,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-Academy.Agent.Service-b5f80c9f-6eff-4250-9b6e-753d25f23214</UserSecretsId>
+    <AssemblyTitle>Home Quran Learning</AssemblyTitle>
+    <Product>Home Quran Learning</Product>
+    <Company>Abdul Wahid</Company>
+    <Authors>Abdul Wahid</Authors>
+    <Description>Home Quran Learning classroom monitoring and quality agent</Description>
+    <Copyright>Copyright © 2026 Abdul Wahid. All rights reserved.</Copyright>
+    <ApplicationIcon>..\Branding\HomeQuranLearning.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

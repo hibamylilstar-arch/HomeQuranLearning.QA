@@ -15,6 +15,16 @@ internal static class InstallerPaths
             "Home Quran Learning",
             "Classroom Agent");
 
+    public static string ApplicationRoot =>
+        Path.Combine(
+            InstallRoot,
+            "app");
+
+    public static string LegacyVersionsRoot =>
+        Path.Combine(
+            InstallRoot,
+            "versions");
+
     public static string DataRoot =>
         Path.Combine(
             Environment.GetFolderPath(

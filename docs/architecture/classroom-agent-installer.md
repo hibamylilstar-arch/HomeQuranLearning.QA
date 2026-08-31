@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`Home Quran Learning Classroom Agent Setup.exe` is the Windows deployment
+`Home Quran Learning Setup.exe` is the Windows deployment
 surface for academy laptops. A teacher double-clicks one executable, approves
 the Windows elevation prompt, leaves the default Microsoft Teams platform
 selected, and chooses Install. No PowerShell command or visible Agent console
@@ -37,6 +37,17 @@ Downloads/shared storage after installation.
   Windows DPAPI under `C:\ProgramData\AcademyAgent\Secrets`.
 - Agent logs are written to
   `C:\ProgramData\AcademyAgent\Logs\ClassroomAgent.log` with bounded rotation.
+- Windows identifies the executable as `Home Quran Learning`,
+  published by Abdul Wahid, with the approved Home Quran Learning logo. The
+  internal executable filename remains stable for runtime compatibility.
+- Agent and TeamsHelper binaries run from the stable
+  `C:\Program Files\Home Quran Learning\Classroom Agent\app` path. Repair/update
+  replaces that managed payload only after stopping its tasks and processes, so
+  Windows does not create a new microphone-privacy application identity for
+  every release commit.
+- After the replacement Agent starts successfully, the installer removes the
+  obsolete legacy `versions` application directory. Durable device identity,
+  recordings and evidence under ProgramData are never part of that cleanup.
 - Repair/update is performed by running a newer approved setup EXE. The durable
   device identity and evidence directories are preserved.
 - Windows Apps & Features can remove the binaries and startup tasks. Identity,

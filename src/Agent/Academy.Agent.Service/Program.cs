@@ -21,7 +21,7 @@ builder.Logging.AddProvider(
 
 builder.Services.AddWindowsService(options =>
 {
-    options.ServiceName = "Academy Agent Service";
+    options.ServiceName = "Home Quran Learning";
 });
 
 var cloudOptions = builder.Configuration

@@ -78,35 +78,34 @@ internal sealed class InstallCoordinator
             Directory.CreateDirectory(
                 InstallerPaths.DataRoot);
 
-            string versionRoot =
-                GetVersionRoot(
-                    deployment.Version);
+            string applicationRoot =
+                GetApplicationRoot();
 
-            if (Directory.Exists(versionRoot))
+            if (Directory.Exists(applicationRoot))
             {
-                AssertManagedInstallPath(versionRoot);
-                _log.Write("DELETE_VERSION_ROOT_STARTED");
-                Directory.Delete(versionRoot, recursive: true);
-                _log.Write("DELETE_VERSION_ROOT_COMPLETED");
+                AssertManagedInstallPath(applicationRoot);
+                _log.Write("DELETE_APPLICATION_ROOT_STARTED");
+                Directory.Delete(applicationRoot, recursive: true);
+                _log.Write("DELETE_APPLICATION_ROOT_COMPLETED");
             }
 
             progress.Report("Installing Classroom Agent files...");
-            Directory.CreateDirectory(versionRoot);
+            Directory.CreateDirectory(applicationRoot);
 
             CopyDirectory(
                 Path.Combine(temporaryRoot, "agent"),
-                Path.Combine(versionRoot, "agent"));
+                Path.Combine(applicationRoot, "agent"));
 
             CopyDirectory(
                 Path.Combine(temporaryRoot, "teams-helper"),
-                Path.Combine(versionRoot, "teams-helper"));
+                Path.Combine(applicationRoot, "teams-helper"));
 
             CopyDirectory(
                 Path.Combine(temporaryRoot, "tools"),
                 Path.Combine(InstallerPaths.InstallRoot, "tools"));
 
             string agentDirectory =
-                Path.Combine(versionRoot, "agent");
+                Path.Combine(applicationRoot, "agent");
 
             progress.Report("Protecting the device credential with Windows DPAPI...");
             WindowsProtectedSecretStore.ProtectToFile(
@@ -140,7 +139,7 @@ internal sealed class InstallCoordinator
             {
                 string helperDirectory =
                     Path.Combine(
-                        versionRoot,
+                        applicationRoot,
                         "teams-helper");
 
                 string helperExecutable =
@@ -178,10 +177,13 @@ internal sealed class InstallCoordinator
             {
                 VerifyProcessRunning(
                     Path.Combine(
-                        versionRoot,
+                        applicationRoot,
                         "teams-helper",
                         "Academy.Agent.TeamsHelper.exe"));
             }
+
+            progress.Report("Removing obsolete Agent application versions...");
+            RemoveLegacyVersionDirectories();
 
             _log.Write(
                 $"INSTALL_SUCCESS Version={deployment.Version} Teams={installTeamsHelper}");
@@ -351,17 +353,31 @@ internal sealed class InstallCoordinator
         }
     }
 
-    private static string GetVersionRoot(string version)
+    private static string GetApplicationRoot()
     {
         string root =
             Path.GetFullPath(
-                Path.Combine(
-                    InstallerPaths.InstallRoot,
-                    "versions",
-                    version));
+                InstallerPaths.ApplicationRoot);
 
         AssertManagedInstallPath(root);
         return root;
+    }
+
+    private void RemoveLegacyVersionDirectories()
+    {
+        string legacyRoot =
+            Path.GetFullPath(
+                InstallerPaths.LegacyVersionsRoot);
+
+        if (!Directory.Exists(legacyRoot))
+        {
+            return;
+        }
+
+        AssertManagedInstallPath(legacyRoot);
+        _log.Write("DELETE_LEGACY_VERSIONS_STARTED");
+        Directory.Delete(legacyRoot, recursive: true);
+        _log.Write("DELETE_LEGACY_VERSIONS_COMPLETED");
     }
 
     private static void AssertManagedInstallPath(string path)
@@ -472,7 +488,7 @@ internal sealed class InstallCoordinator
     {
         var state = new
         {
-            product = "Home Quran Learning Classroom Agent",
+            product = "Home Quran Learning",
             developer = "Abdul Wahid",
             version = deployment.Version,
             platform = teamsEnabled ? "Teams" : "Zoom",
@@ -521,7 +537,7 @@ internal sealed class InstallCoordinator
 
         key.SetValue(
             "DisplayName",
-            "Home Quran Learning Classroom Agent");
+            "Home Quran Learning");
         key.SetValue(
             "DisplayVersion",
             version);

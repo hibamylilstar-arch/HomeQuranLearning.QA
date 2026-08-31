@@ -23,8 +23,8 @@ internal sealed class InstallerForm : Form
 
         Text =
             mode == InstallerMode.Uninstall
-                ? "Remove Home Quran Learning Classroom Agent"
-                : "Home Quran Learning Classroom Agent Setup";
+                ? "Remove Home Quran Learning"
+                : "Home Quran Learning Setup";
 
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(760, 560);
@@ -80,7 +80,7 @@ internal sealed class InstallerForm : Form
                 Location = new Point(183, 90),
                 ForeColor = Color.FromArgb(189, 221, 197),
                 Font = new Font("Segoe UI Semibold", 13F),
-                Text = "Classroom Agent"
+                Text = "Monitoring & Quality System"
             };
 
         var developer =
@@ -117,7 +117,7 @@ internal sealed class InstallerForm : Form
                 ForeColor = Color.FromArgb(21, 45, 70),
                 Text =
                     _mode == InstallerMode.Uninstall
-                        ? "Remove Classroom Agent"
+                        ? "Remove Home Quran Learning"
                         : "Ready for academy monitoring"
             };
 
@@ -194,8 +194,8 @@ internal sealed class InstallerForm : Form
         _primaryButton.Font = new Font("Segoe UI Semibold", 10F);
         _primaryButton.Text =
             _mode == InstallerMode.Uninstall
-                ? "Remove Classroom Agent"
-                : "Install Classroom Agent";
+                ? "Remove Home Quran Learning"
+                : "Install Home Quran Learning";
         _primaryButton.Enabled = false;
         _primaryButton.Click += OnPrimaryButtonClick;
 

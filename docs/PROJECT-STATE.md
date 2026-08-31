@@ -6,6 +6,303 @@ Canonical resumable project checkpoint. Use it with Git and actual repository st
 
 Chat history is not authoritative. Repository state + this file are the durable project state.
 
+<!-- CURRENT-VERIFIED-CHECKPOINT:START -->
+
+# CURRENT VERIFIED PROJECT CHECKPOINT — 2026-09-01
+
+> **AUTHORITATIVE RECOVERY SECTION**
+>
+> A new engineering session must read this section before the historical
+> checkpoints below. If an older statement later in this file conflicts with
+> this section, this section wins. Git and fresh runtime evidence still outrank
+> this document when the repository has advanced.
+
+## Exact source and deployment position
+
+- Primary branch: `main`
+- Latest verified product/source commit: `2e4f52e`
+- Product commit: `feat(schedules): add conflict-safe multi-day management`
+- Before this documentation-only checkpoint, local `main` and `origin/main`
+  both resolved to `2e4f52e` and the worktree was clean.
+- The documentation commit containing this section is newer than the product
+  commit; `2e4f52e` remains the product baseline for this checkpoint.
+- Full .NET verification at the product baseline: **121 / 121 PASS**, 0 failed,
+  0 skipped.
+- Dashboard Next.js production build: **PASS**.
+- The latest management/scheduling slices changed no Agent source.
+
+Important recent product checkpoints:
+
+- `008aeef` — professional Teacher/Student/Course management actions
+- `24b9de4` — safe Teacher/Student/Course edit and archive foundation
+- `5c99a70` — simplified people and device dashboard views
+- `fee8692` — Manager global operational scope completed
+- `92096f0` — old Manager assignment operational scope removed
+- `e84563d` — Owner-only private-laptop visibility foundation
+- `59e70d9` — Admin user-management boundaries
+- `8aee968` — stable Windows Agent physical verification documented
+- `1ddf417` — verified Agent/live-publisher source baseline
+
+## Production VPS checkpoint
+
+Owner-supplied VPS deployment output records the following successful
+production deployment. This documentation-only turn did not mutate or re-probe
+the VPS.
+
+- Production project: `/opt/homequranlearning`
+- Production product HEAD: `2e4f52e`
+- Production environment file:
+  `/opt/homequranlearning/infrastructure/docker/.env.production`
+- Base Compose: `infrastructure/docker/docker-compose.prod.yml`
+- Relay overlay:
+  `infrastructure/docker/docker-compose.relay-production.yml`
+- Pre-deployment database backup:
+  `/var/backups/homequranlearning/pre-management-2e4f52e-20260831T203759Z.dump`
+- Management migration:
+  `20260831195915_ManagementEntityActiveFlags`
+
+Recorded deployment proof:
+
+```text
+SOURCE_CHECKOUT=PASS
+COMPOSE_CONFIG=PASS
+DATABASE_BACKUP=PASS
+API_DASHBOARD_BUILD=PASS
+API_HEALTH=PASS
+MANAGEMENT_MIGRATION=PASS
+DASHBOARD_LOGIN=PASS
+API_DASHBOARD_RUNTIME=PASS
+LIVE_SERVICES_UNTOUCHED=PASS
+LIVE_PORTS_1935_1936=PASS
+VPS_MANAGEMENT_DEPLOY=PASS
+PRODUCTION_HEAD=2e4f52e
+DATABASE_MIGRATION=PASS
+API=PASS
+DASHBOARD=PASS
+LIVE_RUNTIME_UNTOUCHED=PASS
+```
+
+API and Dashboard were rebuilt/recreated. The live relay, LiveKit, ingress,
+archive registrar and Caddy services were deliberately preserved. For routine
+updates, do not use blanket `docker compose down`; recreate only affected
+services. The correct Docker-network API readiness target is
+`http://api:8080/health`, not local-development port 5100.
+
+## Protected production live architecture
+
+Current topology:
+
+```text
+Windows Classroom Agent
+    -> RTMP H264/AAC
+    -> VPS MediaMTX relay :1935
+       -> independent VPS archive path
+       -> LiveKit Ingress :1936
+          -> LiveKit
+             -> authenticated Dashboard live view
+```
+
+Do not regress to the older direct-public-ingress architecture or casually
+rewrite the known-good FFmpeg timing, codec, `ddagrab`, relay or browser
+playback behavior. Public TCP 1935 remains required for roaming academy
+laptops while this architecture is active. Protected live behavior includes
+continuous online-device feeds, muted autoplay, independent audio controls,
+no reconnect on enlargement/metadata refresh and `No Active Class` when no
+session metadata applies.
+
+## Verified Windows Agent baseline
+
+- Authoritative physically verified Agent source: `1ddf417`
+- Verification/documentation commit: `8aee968`
+- Verified installer:
+  `C:\Dev\HomeQuranLearning.QA\publish\stable-agent-1ddf417-20260831-160734\Home Quran Learning Setup.exe`
+- Installer size: `362107534 bytes`
+- Installer SHA256:
+  `7E9AD671DDD43DAFD7E78D308067B920F6E34300C6FE93F635204130A518C99D`
+- Windows-visible identity: `Home Quran Learning`
+- Publisher/company: `Abdul Wahid`
+
+Permanent runtime layout:
+
+```text
+C:\Program Files\Home Quran Learning\Classroom Agent\app\agent\Academy.Agent.Service.exe
+C:\Program Files\Home Quran Learning\Classroom Agent\app\teams-helper\Academy.Agent.TeamsHelper.exe
+C:\ProgramData\AcademyAgent
+C:\ProgramData\AcademyAgent\Recordings
+C:\ProgramData\AcademyAgent\Logs\ClassroomAgent.log
+```
+
+Physical proof recorded at `8aee968` includes two consecutive Install/Repair
+cycles, stable Agent and TeamsHelper paths, exactly one managed process/task for
+each, legacy version-directory cleanup, preserved device identity/recordings,
+verified branding/icon, heartbeat PASS, RTMP live publishing PASS and growing
+local recording PASS. Future laptop fixes must be implemented centrally in
+source/installer. Never patch individual teacher laptops or install an older
+package merely because it remains in `publish`.
+
+A future Agent may supersede this baseline only after recording its source
+commit, installer path/size/hash, physical repair proof, heartbeat, live,
+recording and durable-data preservation. Agent updates must preserve
+`C:\ProgramData\AcademyAgent` unless a separately approved migration says
+otherwise.
+
+## Recording and attendance invariants
+
+Local `AudioLayoutVersion1` recordings use:
+
+- Track 0: `Academy Class Mixed Audio`
+- Track 1: `Academy Teacher Microphone QA v1`
+
+Do not represent server RTMP/archive mixed audio as an isolated teacher
+microphone. Normal VPS archive handling should remux/stream-copy incoming H264
+rather than transcode video, and session association uses Device plus absolute
+timestamps/overlap rather than segment-number assumptions.
+
+Preserve Teams evidence semantics:
+
+- `TeacherGreetingSent` and `CallAttempted` are teacher evidence only.
+- `StudentCallConnected` is explicit student presence.
+- `CallEnded` supplies stop/duration evidence.
+- `LessonShared` is strong teacher and student evidence, but its timestamp is
+  not an arrival-time signal.
+- Late threshold: 3 minutes.
+- Pre-class teacher-ready window: 5 minutes.
+
+## Current authorization model
+
+Roles are Owner, Admin and Manager.
+
+- Owner is the highest authority.
+- Manager now has global access to normal academy operations: Teachers,
+  Students, Courses, Schedules, Sessions, Live, Recordings, Attendance and
+  appropriate QA operational views.
+- Do not reintroduce `/assignments`, `/manager-assignments` or assigned-teacher
+  filtering as an operational requirement.
+- Historical assignment tables/services may remain dormant until deliberate
+  cleanup.
+- Global Manager operational scope does not grant Owner/Admin user-management
+  authority.
+- Admin account-management boundaries implemented at `59e70d9` remain in
+  force; Owner records are not ordinary Admin-manageable users.
+
+An older statement in `docs/OWNER-CONTROL-PLANE.md` says Managers are normally
+teacher-scoped. The newer explicit Owner decision and implemented source above
+supersede that statement for normal academy operations; the Owner Control Plane
+document requires later reconciliation rather than reintroducing the old
+restriction.
+
+## Owner-only private laptop
+
+The private/trial laptop must remain visible to Owner and invisible to Admin
+and Manager across current and historical device-linked data. Commit `e84563d`
+is only the foundation. Global server-side coverage is **not yet proven** for
+Schedules, Sessions, Recordings, Attendance/reporting and linked QA evidence.
+Prefer a centralized resource/device visibility service and do not call this
+requirement complete until Owner/Admin/Manager E2E tests prove it.
+
+## Management and scheduling status
+
+Teacher, Student and Course management now provides professional Edit and
+archive/Delete actions with `IsActive` lifecycle fields. Existing records
+default active through migration
+`20260831195915_ManagementEntityActiveFlags`. Historical evidence must not be
+hard-deleted. Teacher/Student screens do not expose phone/email management
+fields, and Student/Teacher class relationships derive from schedules rather
+than a permanent UI assignment.
+
+Remaining archive correctness gap: archiving a Teacher, Student or Course must
+safely expire/deactivate active and future schedules referencing it while
+preserving historical schedule/session/evidence rows.
+
+Schedule management at `2e4f52e` includes multi-day creation, batch validation,
+one persistence transaction, current Teacher-class preview, exact duplicate
+checks, Teacher/Student/device overlap checks, adjacent-class allowance,
+cross-midnight weekly logic, history-safe Edit/archive, friendly laptop names,
+responsive controls and deterministic 12-hour display (`hh:mm AM/PM`, no
+seconds). This source is deployed to the production VPS per the proof above.
+
+Operational UI should prefer `recordingDisplayName`, falling back to
+`deviceName`. Schedule management complies; Sessions, Live metadata and reports
+still require consistency verification.
+
+## Current unresolved work, in priority order
+
+1. Complete server-side Owner-only private-laptop visibility across every
+   device-linked resource and prove it with Owner/Admin/Manager E2E tests.
+2. On Teacher/Student/Course archive, safely deactivate active/future schedules
+   without deleting history.
+3. Complete Sessions Edit, Cancel and history-safe archive/Delete; verify
+   Manager permissions, friendly laptop names and private-device isolation.
+4. Finish mobile Schedule UI/browser polish and real-device verification.
+5. Verify friendly laptop naming across Sessions, Live and reporting.
+6. Fix stale online/offline device status behavior.
+7. Implement strict approved-headset microphone behavior: never silently fall
+   back to the internal mic, surface missing headset state and safely auto-bind
+   when it returns.
+8. Run full Owner/Admin/Manager browser E2E regression.
+9. Resume remaining QA roadmap only after management, privacy, session and
+   device correctness are stable.
+
+QA remains secondary for now. Preserve mixed-audio eligibility, hard-rule
+independence, off-topic detection, Arabic/Quran exclusions, ASR hallucination
+safeguards and evidence windows. Never infer isolated teacher audio from the
+server mixed stream.
+
+## Security, workflow and recovery
+
+Never document or print Agent API keys, RTMP stream keys, LiveKit secrets,
+database passwords, archive credentials, signed storage URLs or production
+environment values. The installer SHA256 above is not a credential.
+
+Normal workflow remains:
+
+```text
+inspect exact source/runtime
+-> implement smallest production-grade slice
+-> targeted and regression verification
+-> update this checkpoint
+-> review diff/secrets
+-> atomic commit and normal push
+-> separately approved production mutation/deployment
+-> runtime/E2E proof
+```
+
+At the start of a new session:
+
+1. Read `AGENTS.md` and this authoritative section.
+2. Run `git status --short` and `git log -5 --oneline --decorate`.
+3. If HEAD is newer, inspect it and update this section; never reset backward.
+4. Do not install an Agent older than the verified baseline above.
+5. Preserve MediaMTX `:1935` -> LiveKit Ingress `:1936` and ProgramData.
+6. Do not reintroduce Manager assigned-teacher operational restrictions.
+7. Do not claim Owner-only isolation complete without E2E evidence.
+8. Continue from the unresolved-work list, not an older roadmap below.
+
+## Checkpoint summary
+
+```text
+LATEST_PRODUCT_SOURCE=2e4f52e
+PRODUCTION_PRODUCT_SOURCE=2e4f52e
+PRODUCTION_DEPLOYMENT=PASS
+DATABASE_MIGRATION=PASS
+API=PASS
+DASHBOARD=PASS
+LIVE_RUNTIME_UNTOUCHED=PASS
+DOTNET_TESTS=121/121 PASS
+DASHBOARD_BUILD=PASS
+VERIFIED_AGENT_BASELINE=1ddf417
+VERIFIED_AGENT_DOC_COMMIT=8aee968
+VERIFIED_INSTALLER_SIZE_BYTES=362107534
+VERIFIED_INSTALLER_SHA256=7E9AD671DDD43DAFD7E78D308067B920F6E34300C6FE93F635204130A518C99D
+```
+
+Update this section whenever product source, production deployment, verified
+Agent, live topology, security/role policy or major roadmap completion changes.
+
+<!-- CURRENT-VERIFIED-CHECKPOINT:END -->
+
+---
+
 ## Canonical checkpoint
 
 - Branch: `codex/agent-windows-branding`

@@ -15,6 +15,19 @@ public sealed class DashboardQueryService
     private readonly ISessionRepository _sessionRepository;
     private readonly ISessionEventRepository _sessionEventRepository;
 
+    // Temporary Owner-only laptop during the live academy trial.
+    private const string OwnerOnlyTrialDeviceId =
+        "82f9b22d-2d5b-46b2-b372-ef864219e383";
+
+    private static bool IsOwnerOnlyTrialDevice(
+        string? deviceId)
+    {
+        return string.Equals(
+            deviceId,
+            OwnerOnlyTrialDeviceId,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     public DashboardQueryService(
         IRecordingRepository recordingRepository,
         IQaAlertRepository qaAlertRepository,
@@ -39,6 +52,16 @@ public sealed class DashboardQueryService
         CancellationToken cancellationToken = default)
     {
         var recordings = await _recordingRepository.GetAllWithDeviceAsync(cancellationToken);
+
+        if (role != UserRole.Owner.ToString())
+        {
+            recordings = recordings
+                .Where(x =>
+                    x.Device is null ||
+                    !IsOwnerOnlyTrialDevice(
+                        x.Device.DeviceId))
+                .ToList();
+        }
 
         if (role == UserRole.Manager.ToString())
         {
@@ -81,18 +104,24 @@ public sealed class DashboardQueryService
     {
         var alerts = await _qaAlertRepository.GetAllAsync(cancellationToken);
 
-        if (role == UserRole.Manager.ToString())
+        if (role != UserRole.Owner.ToString())
         {
-            var visibleRecordings = await GetVisibleRecordingsAsync(userId, role, cancellationToken);
-            var visibleRecordingIds = visibleRecordings.Select(r => r.Id).ToHashSet();
+            var visibleRecordings =
+                await GetVisibleRecordingsAsync(
+                    userId,
+                    role,
+                    cancellationToken);
+
+            var visibleRecordingIds =
+                visibleRecordings
+                    .Select(x => x.Id)
+                    .ToHashSet();
 
             alerts = alerts
-                .Where(a => visibleRecordingIds.Contains(a.RecordingId))
+                .Where(x =>
+                    visibleRecordingIds.Contains(
+                        x.RecordingId))
                 .ToList();
-        }
-        else if (!IsOwnerOrAdmin(role))
-        {
-            return Array.Empty<QaAlertDto>();
         }
 
         return alerts
@@ -115,6 +144,15 @@ public sealed class DashboardQueryService
         CancellationToken cancellationToken = default)
     {
         var devices = await _deviceRepository.GetAllAsync(cancellationToken);
+
+        if (role != UserRole.Owner.ToString())
+        {
+            devices = devices
+                .Where(x =>
+                    !IsOwnerOnlyTrialDevice(
+                        x.DeviceId))
+                .ToList();
+        }
 
         if (role == UserRole.Manager.ToString())
         {
@@ -158,6 +196,16 @@ public sealed class DashboardQueryService
             await _sessionRepository
                 .GetAllWithDetailsAsync(
                     cancellationToken);
+
+        if (role != UserRole.Owner.ToString())
+        {
+            sessions = sessions
+                .Where(x =>
+                    x.Device is null ||
+                    !IsOwnerOnlyTrialDevice(
+                        x.Device.DeviceId))
+                .ToList();
+        }
 
         if (role == UserRole.Manager.ToString())
         {
@@ -244,16 +292,32 @@ public sealed class DashboardQueryService
             return false;
         }
 
-        if (
-            role == UserRole.Owner.ToString() ||
-            role == UserRole.Admin.ToString())
+        if (role == UserRole.Owner.ToString())
         {
             return true;
         }
 
-        if (role != UserRole.Manager.ToString())
+        if (role != UserRole.Admin.ToString() &&
+            role != UserRole.Manager.ToString())
         {
             return false;
+        }
+
+        var device =
+            await _deviceRepository.GetByIdAsync(
+                session.DeviceId,
+                cancellationToken);
+
+        if (device is not null &&
+            IsOwnerOnlyTrialDevice(
+                device.DeviceId))
+        {
+            return false;
+        }
+
+        if (role == UserRole.Admin.ToString())
+        {
+            return true;
         }
 
         var teacherIds =
@@ -304,16 +368,25 @@ public sealed class DashboardQueryService
     {
         var candidates = await _qaCandidateRepository.GetAllAsync(cancellationToken);
 
-        if (role == UserRole.Manager.ToString())
+        if (role != UserRole.Owner.ToString())
         {
-            var teacherIds = await GetAssignedTeacherIdsAsync(userId, cancellationToken);
+            var visibleRecordings =
+                await GetVisibleRecordingsAsync(
+                    userId,
+                    role,
+                    cancellationToken);
+
+            var visibleRecordingIds =
+                visibleRecordings
+                    .Select(x => x.Id)
+                    .ToHashSet();
+
             candidates = candidates
-                .Where(x => x.Recording?.TeacherId is Guid teacherId && teacherIds.Contains(teacherId))
+                .Where(x =>
+                    x.RecordingId is Guid recordingId &&
+                    visibleRecordingIds.Contains(
+                        recordingId))
                 .ToList();
-        }
-        else if (!IsOwnerOrAdmin(role))
-        {
-            return Array.Empty<QaCandidateDto>();
         }
 
         return candidates
@@ -329,7 +402,10 @@ public sealed class DashboardQueryService
         string role,
         CancellationToken cancellationToken = default)
     {
-        var candidate = await _qaCandidateRepository.GetByIdAsync(candidateId, cancellationToken);
+        var candidate =
+            await _qaCandidateRepository.GetByIdAsync(
+                candidateId,
+                cancellationToken);
 
         if (candidate?.RecordingId is not Guid recordingId)
         {
@@ -359,13 +435,35 @@ public sealed class DashboardQueryService
             return false;
         }
 
-        if (IsOwnerOrAdmin(role))
+        if (role == UserRole.Owner.ToString())
         {
             return true;
         }
 
-        if (role != UserRole.Manager.ToString() ||
-            recording.TeacherId is null)
+        if (role != UserRole.Admin.ToString() &&
+            role != UserRole.Manager.ToString())
+        {
+            return false;
+        }
+
+        var device =
+            await _deviceRepository.GetByIdAsync(
+                recording.DeviceId,
+                cancellationToken);
+
+        if (device is not null &&
+            IsOwnerOnlyTrialDevice(
+                device.DeviceId))
+        {
+            return false;
+        }
+
+        if (role == UserRole.Admin.ToString())
+        {
+            return true;
+        }
+
+        if (recording.TeacherId is null)
         {
             return false;
         }
@@ -414,14 +512,32 @@ public sealed class DashboardQueryService
             return false;
         }
 
-        if (IsOwnerOrAdmin(role))
+        if (role == UserRole.Owner.ToString())
         {
             return true;
         }
 
-        if (role != UserRole.Manager.ToString())
+        if (role != UserRole.Admin.ToString() &&
+            role != UserRole.Manager.ToString())
         {
             return false;
+        }
+
+        var device =
+            await _deviceRepository.GetByIdAsync(
+                session.DeviceId,
+                cancellationToken);
+
+        if (device is not null &&
+            IsOwnerOnlyTrialDevice(
+                device.DeviceId))
+        {
+            return false;
+        }
+
+        if (role == UserRole.Admin.ToString())
+        {
+            return true;
         }
 
         var teacherIds =

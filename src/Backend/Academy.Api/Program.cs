@@ -811,8 +811,24 @@ app.MapGet("/api/admin/users", async (
     AdminUserService adminUserService,
     CancellationToken cancellationToken) =>
 {
-    var users = await adminUserService.GetUsersAsync(cancellationToken);
-    return Results.Ok(users);
+    var (_, actorRole) = GetUserInfo(user);
+
+    var users =
+        await adminUserService.GetUsersAsync(
+            cancellationToken);
+
+    var visibleUsers =
+        actorRole == UserRole.Admin.ToString()
+            ? users
+                .Where(x =>
+                    !string.Equals(
+                        Convert.ToString(x.Role),
+                        UserRole.Owner.ToString(),
+                        StringComparison.OrdinalIgnoreCase))
+                .ToArray()
+            : users.ToArray();
+
+    return Results.Ok(visibleUsers);
 }).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPost("/api/admin/users", async (
@@ -821,25 +837,61 @@ app.MapPost("/api/admin/users", async (
     AdminUserService adminUserService,
     CancellationToken cancellationToken) =>
 {
-    var body = await request.ReadFromJsonAsync<CreateUserRequest>(
-        jsonOptions,
-        cancellationToken);
+    var (_, actorRole) = GetUserInfo(user);
 
-    if (body is null || string.IsNullOrWhiteSpace(body.Email) || string.IsNullOrWhiteSpace(body.Password))
+    var body =
+        await request.ReadFromJsonAsync<CreateUserRequest>(
+            jsonOptions,
+            cancellationToken);
+
+    if (body is null ||
+        string.IsNullOrWhiteSpace(body.Email) ||
+        string.IsNullOrWhiteSpace(body.Password))
     {
-        return Results.BadRequest("FullName, Email, and Password are required.");
+        return Results.BadRequest(
+            "FullName, Email, and Password are required.");
+    }
+
+    string requestedRole =
+        Convert.ToString(body.Role) ?? string.Empty;
+
+    if (actorRole == UserRole.Admin.ToString() &&
+        !string.Equals(
+            requestedRole,
+            UserRole.Manager.ToString(),
+            StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.Forbid();
+    }
+
+    if (!string.Equals(
+            requestedRole,
+            UserRole.Manager.ToString(),
+            StringComparison.OrdinalIgnoreCase) &&
+        !string.Equals(
+            requestedRole,
+            UserRole.Admin.ToString(),
+            StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.BadRequest(
+            new { message = "Only Admin or Manager accounts may be created." });
     }
 
     try
     {
-        var createdUser = await adminUserService.CreateUserAsync(body, cancellationToken);
+        var createdUser =
+            await adminUserService.CreateUserAsync(
+                body,
+                cancellationToken);
+
         return Results.Ok(createdUser);
     }
     catch (InvalidOperationException ex)
     {
-        return Results.BadRequest(new { message = ex.Message });
+        return Results.BadRequest(
+            new { message = ex.Message });
     }
-}).RequireAuthorization(OwnerOnlyPolicy);
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPatch("/api/admin/users/{userId:guid}/status", async (
     ClaimsPrincipal user,
@@ -851,26 +903,106 @@ app.MapPatch("/api/admin/users/{userId:guid}/status", async (
 {
     try
     {
-        await adminUserService.UpdateUserStatusAsync(userId, isActive, cancellationToken);
+        await adminUserService.UpdateUserStatusAsync(
+            userId,
+            isActive,
+            cancellationToken);
+
         return Results.Ok(new { updated = true });
     }
     catch (InvalidOperationException ex)
     {
-        return Results.BadRequest(new { message = ex.Message });
+        return Results.BadRequest(
+            new { message = ex.Message });
     }
 }).RequireAuthorization(OwnerOnlyPolicy);
 
-app.MapPost("/api/admin/users/{userId:guid}/reset-password", async (Guid userId, ResetUserPasswordRequest body, AdminUserService adminUserService, CancellationToken cancellationToken) =>
+app.MapPost("/api/admin/users/{userId:guid}/reset-password", async (
+    ClaimsPrincipal user,
+    Guid userId,
+    ResetUserPasswordRequest body,
+    AdminUserService adminUserService,
+    CancellationToken cancellationToken) =>
 {
-    try { await adminUserService.ResetPasswordAsync(userId, body.Password, cancellationToken); return Results.Ok(new { updated = true }); }
-    catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
-}).RequireAuthorization(OwnerOnlyPolicy);
+    var (actorId, actorRole) = GetUserInfo(user);
 
-app.MapDelete("/api/admin/users/{userId:guid}", async (Guid userId, AdminUserService adminUserService, CancellationToken cancellationToken) =>
+    if (actorId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    var users =
+        await adminUserService.GetUsersAsync(
+            cancellationToken);
+
+    var target =
+        users.FirstOrDefault(x => x.Id == userId);
+
+    if (target is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (actorRole == UserRole.Admin.ToString())
+    {
+        bool ownAccount =
+            actorId == userId;
+
+        bool managerAccount =
+            string.Equals(
+                Convert.ToString(target.Role),
+                UserRole.Manager.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+
+        if (!ownAccount && !managerAccount)
+        {
+            return Results.Forbid();
+        }
+    }
+
+    try
+    {
+        await adminUserService.ResetPasswordAsync(
+            userId,
+            body.Password,
+            cancellationToken);
+
+        return Results.Ok(new { updated = true });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(
+            new { message = ex.Message });
+    }
+}).RequireAuthorization(OwnerOrAdminPolicy);
+
+app.MapDelete("/api/admin/users/{userId:guid}", async (
+    Guid userId,
+    AdminUserService adminUserService,
+    CancellationToken cancellationToken) =>
 {
-    try { await adminUserService.DeleteUserAsync(userId, cancellationToken); return Results.Ok(new { deleted = true }); }
-    catch (InvalidOperationException ex) { return Results.BadRequest(new { message = ex.Message }); }
-    catch (Microsoft.EntityFrameworkCore.DbUpdateException) { return Results.Conflict(new { message = "Account has preserved history. Disable it instead." }); }
+    try
+    {
+        await adminUserService.DeleteUserAsync(
+            userId,
+            cancellationToken);
+
+        return Results.Ok(new { deleted = true });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(
+            new { message = ex.Message });
+    }
+    catch (Microsoft.EntityFrameworkCore.DbUpdateException)
+    {
+        return Results.Conflict(
+            new
+            {
+                message =
+                    "Account has preserved history. Disable it instead."
+            });
+    }
 }).RequireAuthorization(OwnerOnlyPolicy);
 
 app.MapGet("/api/admin/teachers", async (

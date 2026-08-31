@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { getUsers, createUser, setUserStatus, resetUserPassword, deleteUser } from "@/lib/api";
 import type { UserListItem } from "@/types";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function UsersPage() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -58,6 +60,14 @@ export default function UsersPage() {
 
   async function removeUser(user: UserListItem) { if (!window.confirm(`Delete ${user.fullName}? If preserved history references this account, deletion will be blocked.`)) return; try { setError(""); await deleteUser(user.id); await loadUsers(); } catch (err) { setError(err instanceof Error ? err.message : "Unable to delete account"); } }
 
+  const visibleUsers =
+    currentUser?.role === "Admin"
+      ? users.filter((item) => item.role !== "Owner")
+      : users;
+
+  const isOwner =
+    currentUser?.role === "Owner";
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -70,7 +80,7 @@ export default function UsersPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold text-slate-900 tracking-tight">Users & Administration</h2>
-        <p className="text-xs text-slate-500 mt-0.5">Manage dashboard user accounts, owners, admins, and managers</p>
+        <p className="text-xs text-slate-500 mt-0.5">Manage Admin and Manager dashboard accounts</p>
       </div>
 
       {/* Create User Form Card */}
@@ -117,7 +127,9 @@ export default function UsersPage() {
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="Manager">Manager</option>
-              <option value="Admin">Admin</option>
+              {currentUser?.role === "Owner" && (
+                <option value="Admin">Admin</option>
+              )}
             </select>
           </div>
         </div>
@@ -148,7 +160,7 @@ export default function UsersPage() {
       {/* Users Table Card */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
-          <h3 className="text-sm font-semibold text-slate-800">Registered Users ({users.length})</h3>
+          <h3 className="text-sm font-semibold text-slate-800">Registered Users ({visibleUsers.length})</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-xs">
@@ -162,14 +174,14 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
-              {users.length === 0 ? (
+              {visibleUsers.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
                     No users found. Use the form above to add an account.
                   </td>
                 </tr>
               ) : (
-                users.map((user) => (
+                visibleUsers.map((user) => (
                   <tr key={user.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="px-6 py-4 font-medium text-slate-900">{user.fullName}</td>
                     <td className="px-6 py-4 text-slate-600">{user.email}</td>
@@ -182,7 +194,51 @@ export default function UsersPage() {
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${user.isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>
                         {user.isActive ? "Active" : "Disabled"}
                       </span>
-                    </td>`r`n                    <td className="px-6 py-4">{user.role === "Owner" ? <span className="text-slate-400">Protected</span> : <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void changeStatus(user)}>{user.isActive ? "Disable" : "Enable"}</button><button type="button" onClick={() => void resetPassword(user)}>Reset Password</button><button type="button" onClick={() => void removeUser(user)}>Delete</button></div>}</td>
+                    </td>`r`n                    <td className="px-6 py-4">
+                      {user.role === "Owner" ? (
+                        <span className="text-slate-400">
+                          Protected
+                        </span>
+                      ) : isOwner ? (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void changeStatus(user)}
+                          >
+                            {user.isActive ? "Disable" : "Enable"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void resetPassword(user)}
+                          >
+                            Reset Password
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void removeUser(user)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ) : currentUser?.role === "Admin" &&
+                        (
+                          user.id === currentUser.id ||
+                          user.role === "Manager"
+                        ) ? (
+                        <button
+                          type="button"
+                          onClick={() => void resetPassword(user)}
+                        >
+                          Reset Password
+                        </button>
+                      ) : (
+                        <span className="text-slate-400">
+                          No actions
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}

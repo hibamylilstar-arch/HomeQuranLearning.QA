@@ -49,6 +49,28 @@ public sealed class ScheduleRepository : IScheduleRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Schedule>> GetActiveSchedulesForTeacherAsync(
+        Guid teacherId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Schedules
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Where(x => x.TeacherId == teacherId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Schedule>> GetActiveSchedulesForStudentAsync(
+        Guid studentId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Schedules
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Where(x => x.StudentId == studentId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Schedule>> GetActiveSchedulesForDeviceAsync(
         Guid deviceId,
         CancellationToken cancellationToken = default)
@@ -64,10 +86,9 @@ public sealed class ScheduleRepository : IScheduleRepository
         Schedule schedule,
         CancellationToken cancellationToken = default)
     {
-        await _dbContext.Schedules
-            .AddAsync(
-                schedule,
-                cancellationToken);
+        await _dbContext.Schedules.AddAsync(
+            schedule,
+            cancellationToken);
     }
 
     public void Update(Schedule schedule)

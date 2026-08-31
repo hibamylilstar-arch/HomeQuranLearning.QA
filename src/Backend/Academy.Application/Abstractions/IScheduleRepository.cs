@@ -16,6 +16,14 @@ public interface IScheduleRepository
         TimeSpan time,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Schedule>> GetActiveSchedulesForTeacherAsync(
+        Guid teacherId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Schedule>> GetActiveSchedulesForStudentAsync(
+        Guid studentId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Schedule>> GetActiveSchedulesForDeviceAsync(
         Guid deviceId,
         CancellationToken cancellationToken = default);

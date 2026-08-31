@@ -270,6 +270,68 @@ export async function createSchedule(
   });
 }
 
+export async function createSchedules(
+  teacherId: string,
+  studentId: string,
+  courseId: string,
+  deviceId: string,
+  days: number[],
+  startTime: string,
+  endTime: string
+): Promise<ScheduleListItem[]> {
+  return proxyFetch<ScheduleListItem[]>(
+    ["schedules", "batch"],
+    {
+      method: "POST",
+      body: JSON.stringify({
+        teacherId,
+        studentId,
+        courseId,
+        deviceId,
+        days,
+        startTime,
+        endTime,
+      }),
+    }
+  );
+}
+
+export async function updateSchedule(
+  scheduleId: string,
+  teacherId: string,
+  studentId: string,
+  courseId: string,
+  deviceId: string,
+  dayOfWeek: number,
+  startTime: string,
+  endTime: string
+): Promise<ScheduleListItem> {
+  return proxyFetch<ScheduleListItem>(
+    ["schedules", scheduleId],
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        teacherId,
+        studentId,
+        courseId,
+        deviceId,
+        dayOfWeek,
+        startTime,
+        endTime,
+      }),
+    }
+  );
+}
+
+export async function deleteSchedule(
+  scheduleId: string
+): Promise<void> {
+  await proxyFetch<void>(
+    ["schedules", scheduleId],
+    { method: "DELETE" }
+  );
+}
+
 export async function getSessions(): Promise<SessionListItem[]> {
   return proxyFetch<SessionListItem[]>(["sessions"]);
 }

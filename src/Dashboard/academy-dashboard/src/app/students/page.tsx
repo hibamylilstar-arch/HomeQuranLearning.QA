@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTime12Hour } from "@/lib/time";
 import { useEffect, useMemo, useState } from "react";
 import {
   createStudent,
@@ -377,9 +378,9 @@ export default function StudentsPage() {
                                   {DAYS[schedule.dayOfWeek] ??
                                     `Day ${schedule.dayOfWeek}`}
                                   {" · "}
-                                  {schedule.startTime}
+                                  {formatTime12Hour(schedule.startTime)}
                                   {" - "}
-                                  {schedule.endTime}
+                                  {formatTime12Hour(schedule.endTime)}
                                 </div>
                               </div>
                             ))}

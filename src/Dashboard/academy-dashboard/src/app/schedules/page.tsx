@@ -1,14 +1,27 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
 import {
-  createSchedule,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  createSchedules,
+  deleteSchedule,
   getCourses,
   getDevices,
   getSchedules,
   getStudents,
   getTeachers,
+  updateSchedule,
 } from "@/lib/api";
+
+import {
+  formatScheduleRange,
+  normalizeTime24,
+} from "@/lib/time";
+
 import type {
   CourseListItem,
   DeviceListItem,
@@ -17,15 +30,32 @@ import type {
   TeacherListItem,
 } from "@/types";
 
+import {
+  ConfirmArchiveDialog,
+  ManagementActionButtons,
+  ManagementModal,
+} from "@/components/ManagementActions";
+
+import {
+  ScheduleTimeField,
+} from "@/components/ScheduleTimeField";
+
 const DAYS = [
-  { value: 0, label: "Sunday" },
-  { value: 1, label: "Monday" },
-  { value: 2, label: "Tuesday" },
-  { value: 3, label: "Wednesday" },
-  { value: 4, label: "Thursday" },
-  { value: 5, label: "Friday" },
-  { value: 6, label: "Saturday" },
+  { value: 0, short: "Sun", label: "Sunday" },
+  { value: 1, short: "Mon", label: "Monday" },
+  { value: 2, short: "Tue", label: "Tuesday" },
+  { value: 3, short: "Wed", label: "Wednesday" },
+  { value: 4, short: "Thu", label: "Thursday" },
+  { value: 5, short: "Fri", label: "Friday" },
+  { value: 6, short: "Sat", label: "Saturday" },
 ];
+
+function dayLabel(day: number) {
+  return (
+    DAYS.find((item) => item.value === day)?.label ??
+    `Day ${day}`
+  );
+}
 
 function deviceLabel(device: DeviceListItem) {
   return (
@@ -37,12 +67,16 @@ function deviceLabel(device: DeviceListItem) {
 export default function SchedulesPage() {
   const [schedules, setSchedules] =
     useState<ScheduleListItem[]>([]);
+
   const [teachers, setTeachers] =
     useState<TeacherListItem[]>([]);
+
   const [students, setStudents] =
     useState<StudentListItem[]>([]);
+
   const [courses, setCourses] =
     useState<CourseListItem[]>([]);
+
   const [devices, setDevices] =
     useState<DeviceListItem[]>([]);
 
@@ -53,9 +87,51 @@ export default function SchedulesPage() {
   const [studentId, setStudentId] = useState("");
   const [courseId, setCourseId] = useState("");
   const [deviceId, setDeviceId] = useState("");
-  const [dayOfWeek, setDayOfWeek] = useState(1);
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("09:30");
+
+  const [selectedDays, setSelectedDays] =
+    useState<number[]>([1]);
+
+  const [startTime, setStartTime] =
+    useState("09:00");
+
+  const [endTime, setEndTime] =
+    useState("09:30");
+
+  const [creating, setCreating] =
+    useState(false);
+
+  const [editingSchedule, setEditingSchedule] =
+    useState<ScheduleListItem | null>(null);
+
+  const [editTeacherId, setEditTeacherId] =
+    useState("");
+
+  const [editStudentId, setEditStudentId] =
+    useState("");
+
+  const [editCourseId, setEditCourseId] =
+    useState("");
+
+  const [editDeviceId, setEditDeviceId] =
+    useState("");
+
+  const [editDay, setEditDay] =
+    useState(1);
+
+  const [editStartTime, setEditStartTime] =
+    useState("09:00");
+
+  const [editEndTime, setEditEndTime] =
+    useState("09:30");
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [deletingSchedule, setDeletingSchedule] =
+    useState<ScheduleListItem | null>(null);
+
+  const [deleting, setDeleting] =
+    useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -92,20 +168,67 @@ export default function SchedulesPage() {
       void loadData();
     }, 0);
 
-    return () => window.clearTimeout(timer);
+    return () =>
+      window.clearTimeout(timer);
   }, []);
 
-  async function handleCreate(e: React.FormEvent) {
+  const selectedTeacherSchedules =
+    useMemo(
+      () =>
+        teacherId
+          ? schedules.filter(
+              (schedule) =>
+                schedule.teacherId === teacherId &&
+                schedule.isActive
+            )
+          : [],
+      [schedules, teacherId]
+    );
+
+  function scheduleDeviceName(
+    schedule: ScheduleListItem
+  ) {
+    const device =
+      devices.find(
+        (item) =>
+          item.id === schedule.deviceId
+      );
+
+    return device
+      ? deviceLabel(device)
+      : schedule.deviceName;
+  }
+
+  function toggleDay(day: number) {
+    setSelectedDays((current) =>
+      current.includes(day)
+        ? current.filter((value) => value !== day)
+        : [...current, day].sort((a, b) => a - b)
+    );
+  }
+
+  async function handleCreate(
+    e: React.FormEvent
+  ) {
     e.preventDefault();
     setError("");
 
+    if (selectedDays.length === 0) {
+      setError(
+        "Select at least one class day."
+      );
+      return;
+    }
+
+    setCreating(true);
+
     try {
-      await createSchedule(
+      await createSchedules(
         teacherId,
         studentId,
         courseId,
         deviceId,
-        dayOfWeek,
+        selectedDays,
         `${startTime}:00`,
         `${endTime}:00`
       );
@@ -114,7 +237,7 @@ export default function SchedulesPage() {
       setStudentId("");
       setCourseId("");
       setDeviceId("");
-      setDayOfWeek(1);
+      setSelectedDays([1]);
       setStartTime("09:00");
       setEndTime("09:30");
 
@@ -125,20 +248,93 @@ export default function SchedulesPage() {
           ? err.message
           : "Error creating schedule"
       );
+    } finally {
+      setCreating(false);
     }
   }
 
-  function scheduleDeviceName(
+  function openEdit(
     schedule: ScheduleListItem
   ) {
-    const device =
-      devices.find(
-        (item) => item.id === schedule.deviceId
+    setEditingSchedule(schedule);
+    setEditTeacherId(schedule.teacherId);
+    setEditStudentId(schedule.studentId);
+    setEditCourseId(schedule.courseId);
+    setEditDeviceId(schedule.deviceId);
+    setEditDay(schedule.dayOfWeek);
+
+    setEditStartTime(
+      normalizeTime24(schedule.startTime)
+    );
+
+    setEditEndTime(
+      normalizeTime24(schedule.endTime)
+    );
+
+    setError("");
+  }
+
+  async function handleUpdate(
+    e: React.FormEvent
+  ) {
+    e.preventDefault();
+
+    if (!editingSchedule) {
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    try {
+      await updateSchedule(
+        editingSchedule.id,
+        editTeacherId,
+        editStudentId,
+        editCourseId,
+        editDeviceId,
+        editDay,
+        `${editStartTime}:00`,
+        `${editEndTime}:00`
       );
 
-    return device
-      ? deviceLabel(device)
-      : schedule.deviceName;
+      setEditingSchedule(null);
+      await loadData();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Error updating schedule"
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deletingSchedule) {
+      return;
+    }
+
+    setDeleting(true);
+    setError("");
+
+    try {
+      await deleteSchedule(
+        deletingSchedule.id
+      );
+
+      setDeletingSchedule(null);
+      await loadData();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Error deleting schedule"
+      );
+    } finally {
+      setDeleting(false);
+    }
   }
 
   if (loading) {
@@ -163,15 +359,27 @@ export default function SchedulesPage() {
         </p>
       </div>
 
+      {error && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700">
+          {error}
+        </div>
+      )}
+
       <form
         onSubmit={handleCreate}
-        className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+        className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
       >
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-700">
-          Create New Class Schedule
-        </h3>
+        <div>
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-700">
+            Create New Class Schedule
+          </h3>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <p className="mt-1 text-xs text-slate-500">
+            Select one or more weekly class days. All selected days are created together.
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600">
               Teacher
@@ -179,11 +387,15 @@ export default function SchedulesPage() {
 
             <select
               value={teacherId}
-              onChange={(e) => setTeacherId(e.target.value)}
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={(e) =>
+                setTeacherId(e.target.value)
+              }
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               required
             >
-              <option value="">-- Choose Teacher --</option>
+              <option value="">
+                -- Choose Teacher --
+              </option>
 
               {teachers.map((teacher) => (
                 <option
@@ -203,11 +415,15 @@ export default function SchedulesPage() {
 
             <select
               value={studentId}
-              onChange={(e) => setStudentId(e.target.value)}
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={(e) =>
+                setStudentId(e.target.value)
+              }
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               required
             >
-              <option value="">-- Choose Student --</option>
+              <option value="">
+                -- Choose Student --
+              </option>
 
               {students.map((student) => (
                 <option
@@ -227,11 +443,15 @@ export default function SchedulesPage() {
 
             <select
               value={courseId}
-              onChange={(e) => setCourseId(e.target.value)}
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={(e) =>
+                setCourseId(e.target.value)
+              }
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               required
             >
-              <option value="">-- Choose Course --</option>
+              <option value="">
+                -- Choose Course --
+              </option>
 
               {courses.map((course) => (
                 <option
@@ -251,11 +471,15 @@ export default function SchedulesPage() {
 
             <select
               value={deviceId}
-              onChange={(e) => setDeviceId(e.target.value)}
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={(e) =>
+                setDeviceId(e.target.value)
+              }
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               required
             >
-              <option value="">-- Choose Laptop --</option>
+              <option value="">
+                -- Choose Laptop --
+              </option>
 
               {devices.map((device) => (
                 <option
@@ -267,77 +491,138 @@ export default function SchedulesPage() {
               ))}
             </select>
           </div>
+        </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">
-              Day of Week
-            </label>
+        {teacherId && (
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-800">
+                Teacher Existing Classes
+              </h4>
 
-            <select
-              value={dayOfWeek}
-              onChange={(e) =>
-                setDayOfWeek(Number(e.target.value))
-              }
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              {DAYS.map((day) => (
-                <option
+              <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-indigo-700 shadow-sm ring-1 ring-indigo-100">
+                {selectedTeacherSchedules.length} active
+              </span>
+            </div>
+
+            {selectedTeacherSchedules.length === 0 ? (
+              <p className="mt-3 text-xs text-slate-500">
+                No active classes for this teacher.
+              </p>
+            ) : (
+              <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {selectedTeacherSchedules.map(
+                  (schedule) => (
+                    <div
+                      key={schedule.id}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm"
+                    >
+                      <div className="text-xs font-semibold text-slate-900">
+                        {schedule.studentFullName}
+                        {" · "}
+                        {schedule.courseName}
+                      </div>
+
+                      <div className="mt-1 text-[11px] leading-5 text-slate-500">
+                        {dayLabel(schedule.dayOfWeek)}
+                        {" · "}
+                        {formatScheduleRange(
+                          schedule.startTime,
+                          schedule.endTime
+                        )}
+                      </div>
+
+                      <div className="text-[11px] text-slate-500">
+                        {scheduleDeviceName(schedule)}
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div>
+          <label className="mb-2 block text-xs font-semibold text-slate-700">
+            Class Days
+          </label>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+            {DAYS.map((day) => {
+              const selected =
+                selectedDays.includes(day.value);
+
+              return (
+                <label
                   key={day.value}
-                  value={day.value}
+                  className={[
+                    "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-semibold shadow-sm transition",
+                    selected
+                      ? "border-indigo-300 bg-indigo-50 text-indigo-800 ring-1 ring-indigo-100"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50",
+                  ].join(" ")}
                 >
-                  {day.label}
-                </option>
-              ))}
-            </select>
-          </div>
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={() =>
+                      toggleDay(day.value)
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">
-              Start Time
-            </label>
+                  <span className="sm:hidden">
+                    {day.short}
+                  </span>
 
-            <input
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">
-              End Time
-            </label>
-
-            <input
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              required
-            />
+                  <span className="hidden sm:inline">
+                    {day.label}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:max-w-2xl">
+          <ScheduleTimeField
+            label="Start Time"
+            value={startTime}
+            onChange={setStartTime}
+          />
+
+          <ScheduleTimeField
+            label="End Time"
+            value={endTime}
+            onChange={setEndTime}
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
           <button
             type="submit"
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white shadow-sm transition-colors hover:bg-indigo-500"
+            disabled={
+              creating ||
+              selectedDays.length === 0
+            }
+            className="inline-flex min-w-36 items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Create Schedule
+            {creating
+              ? "Creating..."
+              : selectedDays.length > 1
+                ? `Create ${selectedDays.length} Schedules`
+                : "Create Schedule"}
           </button>
 
-          {error && (
-            <p className="text-xs font-medium text-rose-600">
-              {error}
-            </p>
-          )}
+          <p className="text-xs text-slate-500">
+            Conflicts are checked for teacher, student and laptop.
+          </p>
         </div>
       </form>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+        <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
           <h3 className="text-sm font-semibold text-slate-800">
             Active Schedules ({schedules.length})
           </h3>
@@ -347,12 +632,13 @@ export default function SchedulesPage() {
           <table className="min-w-full divide-y divide-slate-200 text-xs">
             <thead className="bg-slate-50/75 text-left font-semibold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-6 py-3">Teacher</th>
-                <th className="px-6 py-3">Student</th>
-                <th className="px-6 py-3">Course</th>
-                <th className="px-6 py-3">Laptop</th>
-                <th className="px-6 py-3">Day</th>
-                <th className="px-6 py-3">Time Slot</th>
+                <th className="px-5 py-3 sm:px-6">Teacher</th>
+                <th className="px-5 py-3 sm:px-6">Student</th>
+                <th className="px-5 py-3 sm:px-6">Course</th>
+                <th className="px-5 py-3 sm:px-6">Laptop</th>
+                <th className="px-5 py-3 sm:px-6">Day</th>
+                <th className="px-5 py-3 sm:px-6">Time</th>
+                <th className="px-5 py-3 text-right sm:px-6">Actions</th>
               </tr>
             </thead>
 
@@ -360,10 +646,10 @@ export default function SchedulesPage() {
               {schedules.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-6 py-8 text-center text-slate-400"
                   >
-                    No class schedules found.
+                    No active class schedules found.
                   </td>
                 </tr>
               ) : (
@@ -372,33 +658,45 @@ export default function SchedulesPage() {
                     key={schedule.id}
                     className="transition-colors hover:bg-slate-50/60"
                   >
-                    <td className="px-6 py-4 font-medium text-slate-900">
+                    <td className="whitespace-nowrap px-5 py-4 font-medium text-slate-900 sm:px-6">
                       {schedule.teacherFullName}
                     </td>
 
-                    <td className="px-6 py-4 text-slate-600">
+                    <td className="whitespace-nowrap px-5 py-4 sm:px-6">
                       {schedule.studentFullName}
                     </td>
 
-                    <td className="px-6 py-4 text-slate-600">
+                    <td className="whitespace-nowrap px-5 py-4 sm:px-6">
                       {schedule.courseName}
                     </td>
 
-                    <td className="px-6 py-4 font-medium text-slate-700">
+                    <td className="whitespace-nowrap px-5 py-4 font-medium sm:px-6">
                       {scheduleDeviceName(schedule)}
                     </td>
 
-                    <td className="px-6 py-4 font-semibold text-indigo-700">
-                      {DAYS.find(
-                        (day) =>
-                          day.value === schedule.dayOfWeek
-                      )?.label ?? schedule.dayOfWeek}
+                    <td className="whitespace-nowrap px-5 py-4 font-semibold text-indigo-700 sm:px-6">
+                      {dayLabel(schedule.dayOfWeek)}
                     </td>
 
-                    <td className="px-6 py-4 font-mono text-slate-600">
-                      {schedule.startTime}
-                      {" - "}
-                      {schedule.endTime}
+                    <td className="whitespace-nowrap px-5 py-4 font-medium text-slate-600 sm:px-6">
+                      {formatScheduleRange(
+                        schedule.startTime,
+                        schedule.endTime
+                      )}
+                    </td>
+
+                    <td className="whitespace-nowrap px-5 py-4 sm:px-6">
+                      <ManagementActionButtons
+                        onEdit={() =>
+                          openEdit(schedule)
+                        }
+                        onDelete={() => {
+                          setError("");
+                          setDeletingSchedule(
+                            schedule
+                          );
+                        }}
+                      />
                     </td>
                   </tr>
                 ))
@@ -407,6 +705,206 @@ export default function SchedulesPage() {
           </table>
         </div>
       </div>
+
+      <ManagementModal
+        open={Boolean(editingSchedule)}
+        title="Edit Class Schedule"
+        description="Changing a class creates a new schedule version while preserving historical records."
+        onClose={() => {
+          if (!saving) {
+            setEditingSchedule(null);
+          }
+        }}
+      >
+        <form onSubmit={handleUpdate}>
+          <div className="max-h-[70vh] space-y-4 overflow-y-auto px-5 py-5 sm:px-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">
+                  Teacher
+                </label>
+
+                <select
+                  value={editTeacherId}
+                  onChange={(e) =>
+                    setEditTeacherId(
+                      e.target.value
+                    )
+                  }
+                  required
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {teachers.map((teacher) => (
+                    <option
+                      key={teacher.id}
+                      value={teacher.id}
+                    >
+                      {teacher.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">
+                  Student
+                </label>
+
+                <select
+                  value={editStudentId}
+                  onChange={(e) =>
+                    setEditStudentId(
+                      e.target.value
+                    )
+                  }
+                  required
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {students.map((student) => (
+                    <option
+                      key={student.id}
+                      value={student.id}
+                    >
+                      {student.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">
+                  Course
+                </label>
+
+                <select
+                  value={editCourseId}
+                  onChange={(e) =>
+                    setEditCourseId(
+                      e.target.value
+                    )
+                  }
+                  required
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {courses.map((course) => (
+                    <option
+                      key={course.id}
+                      value={course.id}
+                    >
+                      {course.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">
+                  Laptop
+                </label>
+
+                <select
+                  value={editDeviceId}
+                  onChange={(e) =>
+                    setEditDeviceId(
+                      e.target.value
+                    )
+                  }
+                  required
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {devices.map((device) => (
+                    <option
+                      key={device.id}
+                      value={device.id}
+                    >
+                      {deviceLabel(device)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">
+                Day
+              </label>
+
+              <select
+                value={editDay}
+                onChange={(e) =>
+                  setEditDay(
+                    Number(e.target.value)
+                  )
+                }
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {DAYS.map((day) => (
+                  <option
+                    key={day.value}
+                    value={day.value}
+                  >
+                    {day.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ScheduleTimeField
+                label="Start Time"
+                value={editStartTime}
+                onChange={setEditStartTime}
+              />
+
+              <ScheduleTimeField
+                label="End Time"
+                value={editEndTime}
+                onChange={setEditEndTime}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-6">
+            <button
+              type="button"
+              onClick={() =>
+                setEditingSchedule(null)
+              }
+              disabled={saving}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="min-w-28 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving
+                ? "Saving..."
+                : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </ManagementModal>
+
+      <ConfirmArchiveDialog
+        open={Boolean(deletingSchedule)}
+        entityLabel="Schedule"
+        entityName={
+          deletingSchedule
+            ? `${deletingSchedule.teacherFullName} · ${deletingSchedule.studentFullName} · ${dayLabel(deletingSchedule.dayOfWeek)}`
+            : ""
+        }
+        busy={deleting}
+        onCancel={() =>
+          setDeletingSchedule(null)
+        }
+        onConfirm={() =>
+          void handleDelete()
+        }
+      />
     </div>
   );
 }

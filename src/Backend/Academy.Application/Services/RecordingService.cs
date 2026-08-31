@@ -282,6 +282,33 @@ public sealed class RecordingService
             alreadyRegistered: false);
     }
 
+    public async Task<IReadOnlyList<ServerArchiveTargetResponse>>
+        GetServerArchiveTargetsAsync(
+            CancellationToken cancellationToken = default)
+    {
+        var devices =
+            await _deviceRepository.GetAllAsync(cancellationToken);
+
+        return devices
+            .Where(device =>
+                !string.IsNullOrWhiteSpace(device.LiveKitStreamKey))
+            .Select(device => device.LiveKitStreamKey!.Trim())
+            .Where(streamKey =>
+                !streamKey.Contains('/') &&
+                !streamKey.Contains('\\'))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(
+                streamKey => streamKey,
+                StringComparer.Ordinal)
+            .Select(streamKey =>
+                new ServerArchiveTargetResponse
+                {
+                    StreamKey = streamKey
+                })
+            .ToArray();
+    }
+
+
     public async Task<bool> AuthorizeRelayPublishAsync(
         RelayPublishAuthRequest request,
         CancellationToken cancellationToken = default)
@@ -972,4 +999,3 @@ public sealed class RecordingService
             right.Value);
     }
 }
-

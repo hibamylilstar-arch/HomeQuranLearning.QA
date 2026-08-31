@@ -44,3 +44,8 @@ public sealed class RelayPublishAuthRequest
     public string User { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
 }
+
+public sealed class ServerArchiveTargetResponse
+{
+    public string StreamKey { get; set; } = string.Empty;
+}

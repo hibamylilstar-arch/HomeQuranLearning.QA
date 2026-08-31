@@ -392,6 +392,28 @@ app.MapPost("/api/worker/server-recordings/finalized", async (
     }
 });
 
+app.MapGet("/api/worker/server-recordings/targets", async (
+    HttpRequest request,
+    RecordingService recordingService,
+    CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(archiveRegistrarApiKey) ||
+        !request.Headers.TryGetValue(
+            "X-Api-Key",
+            out var values) ||
+        values.ToString() != archiveRegistrarApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    IReadOnlyList<ServerArchiveTargetResponse> targets =
+        await recordingService.GetServerArchiveTargetsAsync(
+            cancellationToken);
+
+    return Results.Ok(targets);
+});
+
+
 app.MapPost("/api/worker/relay/publish-auth", async (
     RelayPublishAuthRequest body,
     RecordingService recordingService,
@@ -1774,7 +1796,3 @@ static async Task SeedOwnerAsync(WebApplication app)
         await dbContext.SaveChangesAsync();
     }
 }
-
-
-
-

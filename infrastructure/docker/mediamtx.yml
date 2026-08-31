@@ -30,7 +30,7 @@ paths:
     overridePublisher: false
     forward:
       - dest: rtmp://host.docker.internal:1936/live#$G1
-    record: true
+    record: false
     recordPath: /recordings/%path/%s
     recordFormat: fmp4
     recordPartDuration: 1s

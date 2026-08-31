@@ -47,6 +47,35 @@ services:
         max-size: "10m"
         max-file: "5"
 
+  recording-archive-recorder:
+    build:
+      context: ../..
+      dockerfile: src/RecordingArchiveRecorder/Dockerfile
+    container_name: academy-recording-archive-recorder
+    restart: unless-stopped
+    environment:
+      BACKEND_BASE_URL: http://api:8080
+      ARCHIVE_REGISTRAR_API_KEY: ${ARCHIVE_REGISTRAR_API_KEY}
+      RECORDINGS_ROOT: /recordings
+      RTMP_BASE_URL: rtmp://mediamtx-relay:1935
+      SEGMENT_SECONDS: "900"
+      TARGET_POLL_SECONDS: "10"
+      RETRY_SECONDS: "5"
+    volumes:
+      - archive_reader_recordings:/recordings
+    depends_on:
+      api:
+        condition: service_started
+      mediamtx-relay:
+        condition: service_started
+    networks:
+      - academy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
   recording-archive-registrar:
     build:
       context: ../..
@@ -64,7 +93,7 @@ services:
       POLL_SECONDS: "2"
       VIDEO_STREAM_COPY_VERIFIED: "true"
     volumes:
-      - relay_recordings:/recordings
+      - archive_reader_recordings:/recordings
     depends_on:
       api:
         condition: service_started
@@ -80,3 +109,4 @@ services:
 
 volumes:
   relay_recordings:
+  archive_reader_recordings:

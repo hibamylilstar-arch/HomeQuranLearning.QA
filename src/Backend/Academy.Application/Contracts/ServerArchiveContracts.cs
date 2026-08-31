@@ -41,4 +41,6 @@ public sealed class RelayPublishAuthRequest
     public string Action { get; set; } = string.Empty;
     public string Path { get; set; } = string.Empty;
     public string Protocol { get; set; } = string.Empty;
+    public string User { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
 }

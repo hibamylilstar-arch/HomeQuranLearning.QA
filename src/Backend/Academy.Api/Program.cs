@@ -397,9 +397,15 @@ app.MapPost("/api/worker/relay/publish-auth", async (
     RecordingService recordingService,
     CancellationToken cancellationToken) =>
 {
-    bool allowed = await recordingService.AuthorizeRelayPublishAsync(
-        body,
-        cancellationToken);
+    bool allowed =
+        string.Equals(body.Action, "read", StringComparison.OrdinalIgnoreCase)
+            ? await recordingService.AuthorizeArchiveReadAsync(
+                body,
+                archiveRegistrarApiKey,
+                cancellationToken)
+            : await recordingService.AuthorizeRelayPublishAsync(
+                body,
+                cancellationToken);
 
     if (!allowed)
     {

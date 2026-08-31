@@ -324,6 +324,55 @@ public sealed class RecordingService
         return matches == 1;
     }
 
+    public async Task<bool> AuthorizeArchiveReadAsync(
+        RelayPublishAuthRequest request,
+        string archiveReaderSecret,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!string.Equals(request.Action, "read", StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(request.Protocol, "rtmp", StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(request.User, "archive-reader", StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(archiveReaderSecret) ||
+            !string.Equals(request.Password, archiveReaderSecret, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        const string Prefix = "live/";
+        string path = request.Path?.Trim() ?? string.Empty;
+
+        if (!path.StartsWith(Prefix, StringComparison.Ordinal) ||
+            path.Length <= Prefix.Length)
+        {
+            return false;
+        }
+
+        string streamKey = path[Prefix.Length..];
+
+        if (string.IsNullOrWhiteSpace(streamKey) ||
+            streamKey.Contains('/') ||
+            streamKey.Contains('\\'))
+        {
+            return false;
+        }
+
+        var devices = await _deviceRepository.GetAllAsync(cancellationToken);
+
+        int matches = devices
+            .Where(device =>
+                !string.IsNullOrWhiteSpace(device.LiveKitStreamKey) &&
+                string.Equals(
+                    device.LiveKitStreamKey,
+                    streamKey,
+                    StringComparison.Ordinal))
+            .Take(2)
+            .Count();
+
+        return matches == 1;
+    }
+
     public async Task<ServerArchiveDeviceResolveResponse>
         ResolveServerArchiveDeviceAsync(
             ServerArchiveDeviceResolveRequest request,

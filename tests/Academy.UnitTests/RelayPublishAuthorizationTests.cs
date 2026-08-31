@@ -81,6 +81,79 @@ public sealed class RelayPublishAuthorizationTests
         Assert.False(allowed);
     }
 
+    [Fact]
+    public async Task ArchiveReader_WithValidSecretAndKnownStream_AllowsRead()
+    {
+        var devices = DeviceRepository(
+            new Device
+            {
+                Id = Guid.NewGuid(),
+                DeviceId = "device-a",
+                LiveKitStreamKey = "valid-key"
+            });
+
+        bool allowed = await CreateService(devices).AuthorizeArchiveReadAsync(
+            new RelayPublishAuthRequest
+            {
+                Action = "read",
+                Protocol = "rtmp",
+                Path = "live/valid-key",
+                User = "archive-reader",
+                Password = "reader-secret"
+            },
+            "reader-secret");
+
+        Assert.True(allowed);
+    }
+
+    [Fact]
+    public async Task ArchiveReader_WithWrongSecret_IsRejected()
+    {
+        var devices = DeviceRepository(
+            new Device
+            {
+                Id = Guid.NewGuid(),
+                DeviceId = "device-a",
+                LiveKitStreamKey = "valid-key"
+            });
+
+        bool allowed = await CreateService(devices).AuthorizeArchiveReadAsync(
+            new RelayPublishAuthRequest
+            {
+                Action = "read",
+                Protocol = "rtmp",
+                Path = "live/valid-key",
+                User = "archive-reader",
+                Password = "wrong-secret"
+            },
+            "reader-secret");
+
+        Assert.False(allowed);
+    }
+
+    [Fact]
+    public async Task ArchiveReader_AnonymousRead_IsRejected()
+    {
+        var devices = DeviceRepository(
+            new Device
+            {
+                Id = Guid.NewGuid(),
+                DeviceId = "device-a",
+                LiveKitStreamKey = "valid-key"
+            });
+
+        bool allowed = await CreateService(devices).AuthorizeArchiveReadAsync(
+            new RelayPublishAuthRequest
+            {
+                Action = "read",
+                Protocol = "rtmp",
+                Path = "live/valid-key"
+            },
+            "reader-secret");
+
+        Assert.False(allowed);
+    }
+
     private static Mock<IDeviceRepository> DeviceRepository(params Device[] values)
     {
         var repository = new Mock<IDeviceRepository>();

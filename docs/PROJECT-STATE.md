@@ -470,3 +470,20 @@ Before any next VPS mutation, verify the exact remote commit/config/runtime stat
 6. Never discard/reset/clean/stash unexpected human work.
 7. Continue ordinary verified low-risk development without ceremonial release gates.
 8. Stop for explicit approval only when the next action is high-risk under `AGENTS.md`.
+
+### Permanent Windows Agent physical verification — DESKTOP-PUFUU3U
+
+Verified at: 2026-08-31 16:31:19 +05:00
+
+- Release source HEAD: `1ddf417`.
+- Owner-approved physical update laptop: `DESKTOP-PUFUU3U`.
+- Two consecutive Install/Repair cycles completed successfully.
+- Agent remained at `C:\Program Files\Home Quran Learning\Classroom Agent\app\agent\Academy.Agent.Service.exe` after both repairs.
+- TeamsHelper remained under the permanent `app\teams-helper` path.
+- Exactly one managed Agent process/task and one managed TeamsHelper process/task were verified.
+- Legacy version-named runtime directories were removed.
+- Durable `C:\ProgramData\AcademyAgent` device identity and existing recordings were preserved.
+- FileDescription/ProductName verified as `Home Quran Learning` and CompanyName as `Abdul Wahid`.
+- Embedded Home Quran Learning executable icon verified.
+- Successful heartbeat, RTMP live publishing and growing local recording verified after both repairs.
+- Existing Windows microphone privacy-history records were not modified.

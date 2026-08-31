@@ -150,6 +150,24 @@ export async function createTeacher(
   });
 }
 
+export async function updateTeacher(
+  teacherId: string,
+  fullName: string
+): Promise<TeacherListItem> {
+  return proxyFetch<TeacherListItem>(["teachers", teacherId], {
+    method: "PATCH",
+    body: JSON.stringify({ fullName }),
+  });
+}
+
+export async function deleteTeacher(
+  teacherId: string
+): Promise<void> {
+  await proxyFetch<void>(["teachers", teacherId], {
+    method: "DELETE",
+  });
+}
+
 export async function getManagerAssignments(): Promise<ManagerAssignmentListItem[]> {
   return proxyFetch<ManagerAssignmentListItem[]>(["manager-assignments"]);
 }
@@ -182,6 +200,24 @@ export async function createStudent(
   });
 }
 
+export async function updateStudent(
+  studentId: string,
+  fullName: string
+): Promise<StudentListItem> {
+  return proxyFetch<StudentListItem>(["students", studentId], {
+    method: "PATCH",
+    body: JSON.stringify({ fullName }),
+  });
+}
+
+export async function deleteStudent(
+  studentId: string
+): Promise<void> {
+  await proxyFetch<void>(["students", studentId], {
+    method: "DELETE",
+  });
+}
+
 export async function getCourses(): Promise<CourseListItem[]> {
   return proxyFetch<CourseListItem[]>(["courses"]);
 }
@@ -193,6 +229,25 @@ export async function createCourse(
   return proxyFetch<CourseListItem>(["courses"], {
     method: "POST",
     body: JSON.stringify({ name, description }),
+  });
+}
+
+export async function updateCourse(
+  courseId: string,
+  name: string,
+  description: string
+): Promise<CourseListItem> {
+  return proxyFetch<CourseListItem>(["courses", courseId], {
+    method: "PATCH",
+    body: JSON.stringify({ name, description }),
+  });
+}
+
+export async function deleteCourse(
+  courseId: string
+): Promise<void> {
+  await proxyFetch<void>(["courses", courseId], {
+    method: "DELETE",
   });
 }
 

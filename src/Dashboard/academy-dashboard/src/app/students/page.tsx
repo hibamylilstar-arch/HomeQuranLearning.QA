@@ -1,17 +1,24 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import {
   createStudent,
+  deleteStudent,
   getSchedules,
   getStudents,
   getTeachers,
+  updateStudent,
 } from "@/lib/api";
 import type {
   ScheduleListItem,
   StudentListItem,
   TeacherListItem,
 } from "@/types";
+import {
+  ConfirmArchiveDialog,
+  ManagementActionButtons,
+  ManagementModal,
+} from "@/components/ManagementActions";
 
 const DAYS = [
   "Sunday",
@@ -33,6 +40,15 @@ export default function StudentsPage() {
   const [fullName, setFullName] = useState("");
   const [teacherFilter, setTeacherFilter] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
+
+  const [editingStudent, setEditingStudent] =
+    useState<StudentListItem | null>(null);
+  const [editName, setEditName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const [deletingStudent, setDeletingStudent] =
+    useState<StudentListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -82,6 +98,67 @@ export default function StudentsPage() {
           ? err.message
           : "Error creating student"
       );
+    }
+  }
+
+  function openEdit(student: StudentListItem) {
+    setEditingStudent(student);
+    setEditName(student.fullName);
+    setError("");
+  }
+
+  async function handleUpdate(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!editingStudent) {
+      return;
+    }
+
+    const value = editName.trim();
+
+    if (!value) {
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    try {
+      await updateStudent(editingStudent.id, value);
+      setEditingStudent(null);
+      setEditName("");
+      await loadData();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Error updating student"
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deletingStudent) {
+      return;
+    }
+
+    setDeleting(true);
+    setError("");
+
+    try {
+      await deleteStudent(deletingStudent.id);
+      setDeletingStudent(null);
+      await loadData();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Error deleting student"
+      );
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -149,6 +226,12 @@ export default function StudentsPage() {
         </p>
       </div>
 
+      {error && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700">
+          {error}
+        </div>
+      )}
+
       <form
         onSubmit={handleCreate}
         className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
@@ -171,19 +254,13 @@ export default function StudentsPage() {
           />
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+        <div className="border-t border-slate-100 pt-2">
           <button
             type="submit"
             className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white shadow-sm transition-colors hover:bg-indigo-500"
           >
             Add Student
           </button>
-
-          {error && (
-            <p className="text-xs font-medium text-rose-600">
-              {error}
-            </p>
-          )}
         </div>
       </form>
 
@@ -248,12 +325,9 @@ export default function StudentsPage() {
           <table className="min-w-full divide-y divide-slate-200 text-xs">
             <thead className="bg-slate-50/75 text-left font-semibold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-6 py-3">
-                  Student Name
-                </th>
-                <th className="px-6 py-3">
-                  Active Classes
-                </th>
+                <th className="px-6 py-3">Student Name</th>
+                <th className="px-6 py-3">Active Classes</th>
+                <th className="px-6 py-3 text-right">Actions</th>
               </tr>
             </thead>
 
@@ -261,7 +335,7 @@ export default function StudentsPage() {
               {filteredStudents.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={2}
+                    colSpan={3}
                     className="px-6 py-8 text-center text-slate-400"
                   >
                     No matching students found.
@@ -312,6 +386,16 @@ export default function StudentsPage() {
                           </div>
                         )}
                       </td>
+
+                      <td className="px-6 py-4">
+                        <ManagementActionButtons
+                          onEdit={() => openEdit(student)}
+                          onDelete={() => {
+                            setError("");
+                            setDeletingStudent(student);
+                          }}
+                        />
+                      </td>
                     </tr>
                   );
                 })
@@ -320,6 +404,61 @@ export default function StudentsPage() {
           </table>
         </div>
       </div>
+
+      <ManagementModal
+        open={Boolean(editingStudent)}
+        title="Edit Student"
+        description="Update the student name used throughout academy management."
+        onClose={() => {
+          if (!saving) {
+            setEditingStudent(null);
+          }
+        }}
+      >
+        <form onSubmit={handleUpdate}>
+          <div className="px-5 py-5 sm:px-6">
+            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+              Student Name
+            </label>
+
+            <input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              autoFocus
+              required
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-6">
+            <button
+              type="button"
+              onClick={() => setEditingStudent(null)}
+              disabled={saving}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={saving || !editName.trim()}
+              className="min-w-28 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </ManagementModal>
+
+      <ConfirmArchiveDialog
+        open={Boolean(deletingStudent)}
+        entityLabel="Student"
+        entityName={deletingStudent?.fullName ?? ""}
+        busy={deleting}
+        onCancel={() => setDeletingStudent(null)}
+        onConfirm={() => void handleDelete()}
+      />
     </div>
   );
 }

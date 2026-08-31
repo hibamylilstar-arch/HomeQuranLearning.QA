@@ -138,13 +138,15 @@ export async function getTeachers(): Promise<TeacherListItem[]> {
 }
 
 export async function createTeacher(
-  fullName: string,
-  email: string,
-  phone: string
+  fullName: string
 ): Promise<TeacherListItem> {
   return proxyFetch<TeacherListItem>(["teachers"], {
     method: "POST",
-    body: JSON.stringify({ fullName, email, phone }),
+    body: JSON.stringify({
+      fullName,
+      email: "",
+      phone: "",
+    }),
   });
 }
 
@@ -167,14 +169,16 @@ export async function getStudents(): Promise<StudentListItem[]> {
 }
 
 export async function createStudent(
-  fullName: string,
-  email: string,
-  phone: string,
-  assignedTeacherId: string | null
+  fullName: string
 ): Promise<StudentListItem> {
   return proxyFetch<StudentListItem>(["students"], {
     method: "POST",
-    body: JSON.stringify({ fullName, email, phone, assignedTeacherId }),
+    body: JSON.stringify({
+      fullName,
+      email: "",
+      phone: "",
+      assignedTeacherId: null,
+    }),
   });
 }
 

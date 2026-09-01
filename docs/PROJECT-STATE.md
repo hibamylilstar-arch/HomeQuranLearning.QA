@@ -1,39 +1,93 @@
 # HomeQuranLearning.QA — Project State
 
 <!-- AGENT-AUTO-UPDATE-FOUNDATION-20260902 START -->
-## Secure Agent automatic update foundation — 2026-09-02
+## Owner-controlled Agent automatic update — CLOSED / PRODUCTION PROVEN — 2026-09-02
 
-Feature branch: codex/agent-auto-update
+Status: **CLOSED**.
 
-Implemented and locally verified:
-- Windows Agent writes a fresh update-readiness state.
-- Active recording blocks update installation.
-- Active recording or verified communication microphone use blocks update installation; idle Teams/Zoom process presence and always-on live monitoring do not.
-- Dedicated updater Scheduled Task runs as LocalSystem every 15 minutes.
-- Updater authenticates to the existing Agent API over HTTPS.
-- Existing DPAPI LocalMachine Agent API credential is reused without storing plaintext configuration.
-- Installer download requires SHA256 verification before execution.
-- Optional Authenticode signer verification is supported.
-- Installer now supports unattended --silent install/repair.
-- Session-0 SYSTEM updates resolve the active classroom Windows user before recreating interactive Agent/Teams tasks and ACLs.
-- Backend exposes authenticated update manifest and package endpoints.
-- Release manifests support TargetDeviceIds for staged per-device rollout.
-- Production compose source mounts Agent release storage read-only into the API container.
-- Release manifest builder script produces package metadata and SHA256.
+Feature branch: `codex/agent-auto-update`
 
-Current deployment state:
-- Auto-update feature has NOT been deployed to the VPS.
-- No teacher laptop currently depends on this updater.
-- Existing production runtime remains unchanged.
-- First rollout will use the Owner machine as the bootstrap and automatic-update test device.
+Latest updater/Agent source commit:
+`b98a416dbc51a617a9673d741dc1c9f739a65575`
+`fix(agent): report installed version in heartbeats`
 
-Rollout plan:
-1. Build updater-enabled bootstrap installer.
-2. Install bootstrap once on Owner machine.
-3. Deploy update API source to VPS.
-4. Publish a second targeted release for Owner Device ID only.
-5. Prove unattended VPS-to-Agent upgrade.
-6. Only after proof, extend rollout to Laptop 5 and other academy laptops.
+Production API/Dashboard updater deployment source:
+`98039f1aad8c9a32cf87bf257eef0cffcf99d8e5`
+
+### Final owner-controlled behavior
+
+- Owner selects a laptop from the Dashboard Device page by its editable friendly name.
+- Dashboard sends the internal Device record ID; backend resolves the durable Agent DeviceId.
+- Windows computer name is not used as update targeting identity.
+- Only Owner can queue an Agent update.
+- Pending update requests expire after 30 minutes.
+- Updater Scheduled Task runs as LocalSystem every 1 minute.
+- Continuous recording, always-on live streaming and idle Teams/Zoom process presence do not block an update.
+- Actual communication microphone use is the final installation safety gate.
+- Agent package download is authenticated over HTTPS and SHA256 verified before silent installation.
+- Existing durable Device ID, DPAPI Agent credential, ProgramData and recordings are preserved.
+
+### Production deployment proof
+
+- Production API and Dashboard were deployed from `98039f1`.
+- Database migration for pending Agent update requests completed successfully.
+- Agent release storage is mounted read-only into the production API.
+- LiveKit, LiveKit Ingress, MediaMTX relay, recording archive and Caddy were not recreated.
+- Production health, Dashboard and migration checks passed.
+
+### Owner remote-update proof
+
+- Owner durable DeviceId: `82f9b22d-2d5b-46b2-b372-ef864219e383`.
+- Owner friendly name: `Abdul Wahid`.
+- Proof release: `ownerproof-98039f1aad8c-1`.
+- Proof version: `1.0.0-98039f1aad8c-ownerproof1`.
+- Proof package SHA256: `861106A1B1B96F86477800A83FAD038B9D62E578828A9B456D20C2F6E1332FEF`.
+- Before Dashboard queue request, manifest response was `enabled:false`.
+- After Owner queued the selected device, manifest response was `enabled:true` for that durable DeviceId.
+- Public package endpoint returned HTTP 200.
+- Windows Agent manifest lookup returned the expected release.
+- `SAFE_TO_UPDATE=True` and `COMMUNICATION_MIC_IN_USE=False` before install.
+- Remote package download: PASS.
+- SHA256 verification: PASS.
+- Silent install: PASS.
+- Durable Device ID preservation: PASS.
+- `UPDATE_START`: `2026-09-01T20:51:27.9524877Z`.
+- `UPDATE_SUCCESS`: `2026-09-01T20:51:52.1967164Z`.
+- Owner installed version changed from `1.0.0-98039f1aad8c-ownerupdate1` to `1.0.0-98039f1aad8c-ownerproof1`.
+
+After successful proof:
+
+- production proof manifest was removed/disabled;
+- proof package was preserved;
+- no automatic release is currently active.
+
+### Heartbeat AgentVersion correction
+
+The original heartbeat request silently defaulted AgentVersion to `0.1.0`.
+Commit `b98a416` removed that fake fallback and wires the installer deployment version into `Cloud.AgentVersion`; HeartbeatWorker now reports that configured installed release version.
+
+Verification:
+
+- Agent targeted tests: **56 / 56 PASS**.
+- Full-solution retest was intentionally skipped because the final change was isolated to Agent version reporting.
+
+Owner currently remains on the already-proven `ownerproof1` package; the heartbeat-version correction can reach Owner with the next normal Agent release rather than another dedicated large proof download.
+
+### Laptop 5 bootstrap
+
+- Laptop 5 friendly name: `Laptop 5`.
+- Durable DeviceId: `8fa05fc9-c72c-494c-a2d0-ff622e7ead77`.
+- One-time USB bootstrap with the updater-enabled latest Agent source was reported complete.
+- Future Agent updates can use Dashboard -> Laptop 5 -> Update Agent without another manual bootstrap.
+
+### Branch / release state
+
+- Feature branch is pushed through `b98a416dbc51a617a9673d741dc1c9f739a65575`.
+- `main` has intentionally NOT been merged or advanced by this updater phase.
+- `main` remains at `2ae57a98992c277acbe7b6d102c1b44ca42a252f` until a separate explicit merge approval.
+- Unrelated local `AGENTS.md` work must remain untouched.
+
+The automatic-updater implementation and initial rollout phase are therefore considered complete.
 <!-- AGENT-AUTO-UPDATE-FOUNDATION-20260902 END -->
 
 <!-- VERIFIED-CLASS-AUDIO-PROD-20260901 START -->

@@ -6,7 +6,7 @@ Older sections below are historical evidence and are not active workflow governa
 
 ## Current source position
 
-- Active development branch: `codex/agent-auto-update`.
+- Active development branch: `codex/local-development-mode`.
 - Latest verified product source before this governance-only checkpoint: `b98a416dbc51a617a9673d741dc1c9f739a65575`.
 - `b98a416` fixes heartbeat AgentVersion reporting by sending the installed deployment version instead of the legacy `0.1.0` fallback.
 - Targeted Agent verification at that source: 56 / 56 PASS.
@@ -49,6 +49,17 @@ Older sections below are historical evidence and are not active workflow governa
 - Automatic-updater phase is closed.
 - Continue with the next requested product feature from this state.
 - Do not spend time on Owner Control Panel until the user explicitly starts that final phase.
+
+## Local development isolation
+
+- Owner PC is being converted from a production classroom device into the local development workstation.
+- Local Agent uses a separate `C:\ProgramData\AcademyAgent.Dev\device.json` identity and must not reuse the old production Owner DeviceId.
+- Local Agent cloud traffic targets only `http://127.0.0.1:5100`.
+- Local RTMP publishing targets only `rtmp://127.0.0.1:1935/live`.
+- Local recording is disabled by default to avoid unnecessary test recording accumulation.
+- Local Dashboard is intended to be available on localhost and optionally the Owner PC LAN address.
+- Installed production Agent tasks are disabled when Local Development Mode starts.
+- Production VPS Owner-device deletion is the next cleanup after local runtime proof.
 <!-- CURRENT-ACTIVE-STATE:END -->
 # HomeQuranLearning.QA — Project State
 

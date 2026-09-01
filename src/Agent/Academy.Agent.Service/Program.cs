@@ -62,12 +62,22 @@ builder.Services.AddHttpClient<IAgentCloudClient, AgentCloudClient>(client =>
 
 builder.Services.AddSingleton<IDeviceIdentityProvider>(_ =>
 {
-    string identityPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-        "AcademyAgent",
-        "device.json");
+    string identityPath =
+        builder.Configuration["DeviceIdentityFile"]
+        ?? string.Empty;
 
-    return new FileDeviceIdentityProvider(identityPath, Environment.MachineName);
+    if (string.IsNullOrWhiteSpace(identityPath))
+    {
+        identityPath = Path.Combine(
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.CommonApplicationData),
+            "AcademyAgent",
+            "device.json");
+    }
+
+    return new FileDeviceIdentityProvider(
+        identityPath,
+        Environment.MachineName);
 });
 
 builder.Services.AddSingleton(_ =>

@@ -36,6 +36,7 @@ export default function LiveVideo({
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioTrackRef = useRef<Track | null>(null);
+  const roomRef = useRef<Room | null>(null);
   const audibleRef = useRef(isAudible);
   const onAudibleChangeRef = useRef(onAudibleChange);
 
@@ -89,6 +90,7 @@ export default function LiveVideo({
       try {
         const r = new Room();
         room = r;
+        roomRef.current = r;
 
         r.on(RoomEvent.TrackSubscribed, (track) => {
           if (
@@ -210,6 +212,10 @@ export default function LiveVideo({
         videoElement.srcObject = null;
       }
 
+      if (roomRef.current === room) {
+        roomRef.current = null;
+      }
+
       if (room) {
         room.disconnect();
       }
@@ -229,18 +235,20 @@ export default function LiveVideo({
     }
 
     setError("");
-    onAudibleChange(true);
-
-    if (!audio || !track) {
-      return;
-    }
-
-    detachBrowserAudio(audio, track);
-
-    track.attach(audio);
-    audio.muted = false;
 
     try {
+      await roomRef.current?.startAudio();
+      onAudibleChange(true);
+
+      if (!audio || !track) {
+        return;
+      }
+
+      detachBrowserAudio(audio, track);
+
+      track.attach(audio);
+      audio.muted = false;
+
       await audio.play();
     } catch (err) {
       detachBrowserAudio(audio, track);

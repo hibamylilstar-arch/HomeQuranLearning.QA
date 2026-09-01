@@ -24,10 +24,12 @@ public static class LiveTeacherAudioPolicy
     public static string BuildFilterComplex()
     {
         return
-            "[1:a]aresample=48000:async=1000:first_pts=0," +
+            "[1:a]asetpts=PTS-STARTPTS," +
+            "aresample=48000:async=1000:first_pts=0," +
             "aformat=sample_rates=48000:channel_layouts=stereo" +
             "[system_audio];" +
-            "[2:a]aresample=48000:async=1000:first_pts=0," +
+            "[2:a]asetpts=PTS-STARTPTS," +
+            "aresample=48000:async=1000:first_pts=0," +
             "aformat=sample_rates=48000:channel_layouts=stereo" +
             "[teacher_audio];" +
             "[system_audio][teacher_audio]" +

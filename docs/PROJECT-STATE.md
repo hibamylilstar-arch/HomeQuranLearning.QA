@@ -1,5 +1,65 @@
 # HomeQuranLearning.QA — Project State
 
+<!-- VERIFIED-CLASS-AUDIO-20260901 START -->
+## Verified USB classroom audio baseline — 2026-09-01
+
+Branch: `codex/strict-headset-microphone`
+Pre-commit HEAD: `fd59be681511ad737ffdd15d883513f8b308cbec`
+
+Owner-machine physically verified installer:
+
+- Version: `1.0.0-fd59be681511-classaudio4`
+- Path: `C:\Dev\HomeQuranLearning.QA\publish\owner-test-classaudio4-20260901-224959\Home Quran Learning Setup.exe`
+- Size: `356221582` bytes
+- SHA256: `4BDE9012D318D44F713C27A46CDC20AD3A8C6C0275532A3591BFE0426EABED50`
+- Signature: unsigned
+
+Final classroom-audio behavior verified on Owner hardware:
+
+- student/system/class playback is captured from the render endpoint of the
+  single verified physical USB headset pair;
+- no Windows Default, Realtek/internal or implicit playback/microphone fallback
+  is used for the teacher headset path;
+- the same physical USB headset microphone is used for teacher audio;
+- Teams/Zoom active render-session detection controls teacher-microphone
+  lifecycle only;
+- teacher microphone is closed while no communication call is active;
+- taskbar microphone indicator turns ON during the Teams call and OFF after
+  call end;
+- live dashboard receives both student and teacher speech;
+- observed live audio latency is approximately 2-3 seconds;
+- stale teacher speech no longer drains minutes later;
+- live raw-audio buffering is bounded with thread queue 16 and UDP FIFO 512
+  instead of the former oversized queue/FIFO;
+- recording Track 0 contains mixed student/system plus teacher audio;
+- recording Track 1 remains teacher microphone QA audio;
+- physical recording playback verified student voice, teacher voice and correct
+  mix with no stale/delayed-audio backlog;
+- protected ddagrab timing, stream-key replacement and live recovery behavior
+  remain preserved;
+- Dashboard selected-feed audio control remains listener-only and only one feed
+  is intended to be audible at a time.
+
+Physical proof:
+
+- idle mic icon OFF: PASS;
+- Teams call mic icon ON: PASS;
+- call-ended mic icon OFF: PASS;
+- live student voice: PASS;
+- live teacher voice: PASS;
+- live stale-audio regression: PASS;
+- recording student voice: PASS;
+- recording teacher voice: PASS;
+- recording mixed audio: PASS;
+- recording stale-audio regression: PASS.
+
+Laptop 5 has not yet been upgraded to this final installer.
+
+Production deployment approval was explicitly granted on 2026-09-01. The VPS
+deployment for this source is dashboard-only because the completed audio
+implementation is Windows-Agent code; API, database, MediaMTX relay, LiveKit,
+ingress and archive services are intentionally not part of this deployment.
+<!-- VERIFIED-CLASS-AUDIO-20260901 END -->
 <!-- VERIFIED-LIVE-FIX-6782031 START -->
 ## Verified live-monitoring recovery baseline — 2026-09-01
 

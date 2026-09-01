@@ -35,6 +35,16 @@ public sealed class LiveStreamingWorker : BackgroundService
 
     private DateTimeOffset _lastTeacherStartAttemptUtc =
         DateTimeOffset.MinValue;
+
+    private DateTimeOffset _lastTeacherUsageCheckUtc =
+        DateTimeOffset.MinValue;
+
+    private bool _teacherCommunicationMicrophoneInUse;
+
+    private static readonly TimeSpan
+        TeacherUsageCheckInterval =
+            TimeSpan.FromSeconds(1);
+
     private string? _currentStreamKey;
     private volatile bool _videoCaptureFailed;
     private Task? _stderrMonitorTask;
@@ -320,8 +330,8 @@ public sealed class LiveStreamingWorker : BackgroundService
             Arguments =
                 $"-fflags nobuffer -flags low_delay " +
                 $"-f lavfi -i ddagrab=framerate=10:dup_frames=1 " +
-                $"-thread_queue_size 1024 -use_wallclock_as_timestamps 1 -f {audioFormat} -ar {sampleRate} -ac {channels} -i \"udp://127.0.0.1:{audioUdpPort}?fifo_size=500000&overrun_nonfatal=1\" " +
-                $"-thread_queue_size 1024 -use_wallclock_as_timestamps 1 -f f32le -ar {LiveTeacherAudioPolicy.TeacherSampleRate} -ac {LiveTeacherAudioPolicy.TeacherChannels} -i \"udp://127.0.0.1:{teacherAudioUdpPort}?fifo_size=500000&overrun_nonfatal=1\" " +
+                $"-thread_queue_size 16 -use_wallclock_as_timestamps 1 -f {audioFormat} -ar {sampleRate} -ac {channels} -i \"udp://127.0.0.1:{audioUdpPort}?buffer_size=65536&fifo_size=512&overrun_nonfatal=1\" " +
+                $"-thread_queue_size 16 -use_wallclock_as_timestamps 1 -f f32le -ar {LiveTeacherAudioPolicy.TeacherSampleRate} -ac {LiveTeacherAudioPolicy.TeacherChannels} -i \"udp://127.0.0.1:{teacherAudioUdpPort}?buffer_size=65536&fifo_size=512&overrun_nonfatal=1\" " +
                 $"-filter_complex \"{LiveTeacherAudioPolicy.BuildFilterComplex()}\" -map 0:v -map \"[live_audio]\" " +
                 $"-vf \"hwdownload,format=bgra,setpts=N/(10*TB)\" " +
                 $"-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p " +
@@ -355,6 +365,12 @@ public sealed class LiveStreamingWorker : BackgroundService
 
         _lastTeacherStartAttemptUtc =
             DateTimeOffset.MinValue;
+
+        _lastTeacherUsageCheckUtc =
+            DateTimeOffset.MinValue;
+
+        _teacherCommunicationMicrophoneInUse =
+            false;
 
         _audioPumpCts =
             new CancellationTokenSource();
@@ -741,6 +757,59 @@ public sealed class LiveStreamingWorker : BackgroundService
             LiveTeacherAudioPolicy.MissingStatus);
     }
 
+    private void
+        StopTeacherAudioCaptureForInactiveCommunication()
+    {
+        MicrophoneCaptureService? capture =
+            null;
+
+        lock (_teacherAudioLifecycleLock)
+        {
+            capture =
+                _teacherAudioService;
+
+            if (capture is null)
+            {
+                _lastTeacherStartAttemptUtc =
+                    DateTimeOffset.MinValue;
+
+                return;
+            }
+
+            _teacherAudioService =
+                null;
+
+            _lastTeacherStartAttemptUtc =
+                DateTimeOffset.MinValue;
+
+            capture.DataAvailable -=
+                OnTeacherAudioDataAvailable;
+
+            capture.RecordingStopped -=
+                OnTeacherAudioRecordingStopped;
+        }
+
+        try
+        {
+            capture.Stop();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(
+                ex,
+                "Teacher microphone pause during inactive communication ended with an error.");
+        }
+
+        lock (_teacherAudioSendLock)
+        {
+            _lastTeacherRealAudioPacketUtc =
+                DateTimeOffset.MinValue;
+        }
+
+        _logger.LogInformation(
+            "Live teacher microphone capture paused because no communication application is actively using a microphone.");
+    }
+
     private async Task StartTeacherAudioPumpAsync(
         int silenceChunkBytes,
         CancellationToken token)
@@ -755,11 +824,43 @@ public sealed class LiveStreamingWorker : BackgroundService
                 DateTimeOffset nowUtc =
                     DateTimeOffset.UtcNow;
 
+                if (_lastTeacherUsageCheckUtc ==
+                        DateTimeOffset.MinValue ||
+                    nowUtc -
+                        _lastTeacherUsageCheckUtc >=
+                            TeacherUsageCheckInterval)
+                {
+                    _lastTeacherUsageCheckUtc =
+                        nowUtc;
+
+                    bool detected =
+                        CommunicationMicrophoneUsageDetector
+                            .IsCommunicationMicrophoneInUse();
+
+                    if (detected !=
+                        _teacherCommunicationMicrophoneInUse)
+                    {
+                        _teacherCommunicationMicrophoneInUse =
+                            detected;
+
+                        _logger.LogInformation(
+                            detected
+                                ? "Communication microphone use detected. Teacher microphone capture may start."
+                                : "Communication microphone use ended. Teacher microphone capture will stop.");
+                    }
+
+                    if (!detected)
+                    {
+                        StopTeacherAudioCaptureForInactiveCommunication();
+                    }
+                }
+
                 bool shouldTryCapture;
 
                 lock (_teacherAudioLifecycleLock)
                 {
                     shouldTryCapture =
+                        _teacherCommunicationMicrophoneInUse &&
                         _teacherAudioService is null &&
                         LiveTeacherAudioPolicy
                             .ShouldRetryCapture(

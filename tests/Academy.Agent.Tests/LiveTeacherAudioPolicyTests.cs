@@ -37,6 +37,23 @@ public sealed class LiveTeacherAudioPolicyTests
     }
 
     [Fact]
+    public void LiveFilter_NormalizesBothAudioInputsBeforeMixing()
+    {
+        string filter =
+            LiveTeacherAudioPolicy.BuildFilterComplex();
+
+        Assert.Contains(
+            "[1:a]asetpts=PTS-STARTPTS,",
+            filter,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "[2:a]asetpts=PTS-STARTPTS,",
+            filter,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TeacherCapture_RetriesAtFiveSeconds()
     {
         DateTimeOffset now =

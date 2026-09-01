@@ -44,6 +44,10 @@ public sealed class RecordingService : IRecordingService
     private DateTimeOffset _startedAt;
     private DateTimeOffset _lastSystemAudioPacketUtc;
     private DateTimeOffset _lastTeacherAudioPacketUtc;
+
+    private DateTimeOffset _lastTeacherStartAttemptUtc =
+        DateTimeOffset.MinValue;
+
     private string? _outputPath;
     private RecordingOptions _currentOptions = new();
 
@@ -92,6 +96,7 @@ public sealed class RecordingService : IRecordingService
         _startedAt = DateTimeOffset.UtcNow;
         _lastSystemAudioPacketUtc = DateTimeOffset.MinValue;
         _lastTeacherAudioPacketUtc = DateTimeOffset.MinValue;
+        _lastTeacherStartAttemptUtc = DateTimeOffset.MinValue;
         _teacherEndpointId = null;
         _teacherEndpointName = null;
         _teacherSourceKind = "VerifiedUsbEndpoint";
@@ -131,7 +136,11 @@ public sealed class RecordingService : IRecordingService
                     systemCaptureFormat,
                     out _systemAudioBytesPerSample);
 
-            TryStartTeacherMicrophone();
+            if (CommunicationMicrophoneUsageDetector
+                .IsCommunicationMicrophoneInUse())
+            {
+                TryStartTeacherMicrophone();
+            }
 
             string arguments =
                 BuildFfmpegArguments(
@@ -370,6 +379,9 @@ public sealed class RecordingService : IRecordingService
                 return true;
             }
 
+            _lastTeacherStartAttemptUtc =
+                DateTimeOffset.UtcNow;
+
             var capture = new MicrophoneCaptureService(
                 WaveFormat.CreateIeeeFloatWaveFormat(
                     TeacherAudioSampleRate,
@@ -574,6 +586,56 @@ public sealed class RecordingService : IRecordingService
         }
     }
 
+    private void
+        StopTeacherMicrophoneForInactiveCommunication()
+    {
+        MicrophoneCaptureService? capture =
+            null;
+
+        lock (_teacherCaptureLock)
+        {
+            capture =
+                _teacherAudioService;
+
+            _teacherAudioService =
+                null;
+
+            _lastTeacherStartAttemptUtc =
+                DateTimeOffset.MinValue;
+
+            if (capture is not null)
+            {
+                capture.DataAvailable -=
+                    OnTeacherAudioDataAvailable;
+
+                capture.RecordingStopped -=
+                    OnTeacherAudioRecordingStopped;
+            }
+        }
+
+        if (capture is not null)
+        {
+            try
+            {
+                capture.Stop();
+            }
+            catch
+            {
+                // Intentional communication-end
+                // microphone release is best effort.
+            }
+        }
+
+        lock (_teacherUdpLock)
+        {
+            _lastTeacherAudioPacketUtc =
+                DateTimeOffset.MinValue;
+        }
+
+        CloseTeacherAudioGap(
+            DateTimeOffset.UtcNow);
+    }
+
     private async Task RunTeacherAudioMonitorAsync(
         CancellationToken cancellationToken)
     {
@@ -581,12 +643,45 @@ public sealed class RecordingService : IRecordingService
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                await Task.Delay(
-                    TimeSpan.FromSeconds(
-                        _currentOptions.TeacherMicrophoneRetrySeconds),
-                    cancellationToken);
+                bool microphoneExpected =
+                    CommunicationMicrophoneUsageDetector
+                        .IsCommunicationMicrophoneInUse();
 
-                TryStartTeacherMicrophone();
+                if (!microphoneExpected)
+                {
+                    StopTeacherMicrophoneForInactiveCommunication();
+                }
+                else
+                {
+                    DateTimeOffset nowUtc =
+                        DateTimeOffset.UtcNow;
+
+                    bool shouldTryCapture;
+
+                    lock (_teacherCaptureLock)
+                    {
+                        shouldTryCapture =
+                            _teacherAudioService is null &&
+                            (
+                                _lastTeacherStartAttemptUtc ==
+                                    DateTimeOffset.MinValue ||
+                                nowUtc -
+                                    _lastTeacherStartAttemptUtc >=
+                                    TimeSpan.FromSeconds(
+                                        _currentOptions
+                                            .TeacherMicrophoneRetrySeconds)
+                            );
+                    }
+
+                    if (shouldTryCapture)
+                    {
+                        TryStartTeacherMicrophone();
+                    }
+                }
+
+                await Task.Delay(
+                    TimeSpan.FromSeconds(1),
+                    cancellationToken);
             }
         }
         catch (OperationCanceledException)

@@ -3,7 +3,8 @@ using NAudio.Wave;
 
 namespace Academy.Agent.Audio;
 
-public sealed class MicrophoneCaptureService : IAudioCaptureService
+public sealed class MicrophoneCaptureService :
+    IAudioCaptureService
 {
     private readonly WaveFormat _targetFormat;
 
@@ -26,11 +27,16 @@ public sealed class MicrophoneCaptureService : IAudioCaptureService
 
     public string? EndpointName { get; private set; }
 
-    public string SourceKind => "VerifiedUsbEndpoint";
+    public string? UsbDeviceKey { get; private set; }
 
-    public event EventHandler<AudioDataAvailableEventArgs>? DataAvailable;
+    public string SourceKind =>
+        "VerifiedUsbEndpoint";
 
-    public event EventHandler? RecordingStopped;
+    public event EventHandler<AudioDataAvailableEventArgs>?
+        DataAvailable;
+
+    public event EventHandler?
+        RecordingStopped;
 
     public void Start()
     {
@@ -40,48 +46,69 @@ public sealed class MicrophoneCaptureService : IAudioCaptureService
                 "Microphone capture is already running.");
         }
 
-        MicrophoneEndpointInfo selected =
-            UsbMicrophoneSelectionPolicy.SelectSingleVerifiedUsb(
-                MicrophoneEndpointCatalog.GetActiveCaptureEndpoints());
+        UsbHeadsetEndpointPair selected =
+            UsbHeadsetSelectionPolicy
+                .SelectSingleVerifiedPair(
+                    UsbHeadsetEndpointCatalog
+                        .GetActivePairs());
 
-        using var enumerator = new MMDeviceEnumerator();
+        using var enumerator =
+            new MMDeviceEnumerator();
 
         MMDevice device =
             enumerator.GetDevice(
-                selected.DeviceId);
+                selected.CaptureDeviceId);
 
         try
         {
+            string? usbDeviceKey =
+                WindowsUsbAudioEndpointClassifier
+                    .GetVerifiedUsbPhysicalDeviceKey(
+                        device.ID);
+
             if (device.DataFlow != DataFlow.Capture ||
                 device.State != DeviceState.Active ||
                 !string.Equals(
                     device.ID,
-                    selected.DeviceId,
+                    selected.CaptureDeviceId,
                     StringComparison.Ordinal) ||
-                !WindowsUsbAudioEndpointClassifier
-                    .IsVerifiedUsbAudioEndpoint(
-                        device.ID))
+                !string.Equals(
+                    usbDeviceKey,
+                    selected.UsbDeviceKey,
+                    StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
-                    "Teacher Mic Missing. The selected capture endpoint is no longer a verified active USB microphone.");
+                    "Teacher Mic Missing. The paired USB headset microphone is no longer active.");
             }
 
-            var capture = new WasapiRecorderBuilder()
-                .WithDevice(device)
-                .WithEventSync()
-                .WithBufferLength(20)
-                .WithFormat(_targetFormat)
-                .Build();
+            var capture =
+                new WasapiRecorderBuilder()
+                    .WithDevice(device)
+                    .WithEventSync()
+                    .WithBufferLength(20)
+                    .WithFormat(_targetFormat)
+                    .Build();
 
             _device = device;
             _capture = capture;
 
-            CaptureFormat = capture.WaveFormat;
-            EndpointId = device.ID;
-            EndpointName = device.FriendlyName;
+            CaptureFormat =
+                capture.WaveFormat;
 
-            capture.DataAvailable += OnDataAvailable;
-            capture.RecordingStopped += OnRecordingStopped;
+            EndpointId =
+                device.ID;
+
+            EndpointName =
+                device.FriendlyName;
+
+            UsbDeviceKey =
+                selected.UsbDeviceKey;
+
+            capture.DataAvailable +=
+                OnDataAvailable;
+
+            capture.RecordingStopped +=
+                OnRecordingStopped;
 
             capture.StartRecording();
         }
@@ -113,7 +140,8 @@ public sealed class MicrophoneCaptureService : IAudioCaptureService
         long devicePosition,
         long qpcPosition)
     {
-        byte[] copy = buffer.ToArray();
+        byte[] copy =
+            buffer.ToArray();
 
         DataAvailable?.Invoke(
             this,
@@ -123,9 +151,10 @@ public sealed class MicrophoneCaptureService : IAudioCaptureService
                 BytesRecorded = copy.Length,
                 WaveFormat =
                     _capture?.WaveFormat
-                    ?? WaveFormat.CreateIeeeFloatWaveFormat(
-                        48000,
-                        1)
+                    ?? WaveFormat
+                        .CreateIeeeFloatWaveFormat(
+                            48000,
+                            1)
             });
     }
 
@@ -134,15 +163,22 @@ public sealed class MicrophoneCaptureService : IAudioCaptureService
         StoppedEventArgs e)
     {
         CleanupCapture();
-        RecordingStopped?.Invoke(this, EventArgs.Empty);
+
+        RecordingStopped?.Invoke(
+            this,
+            EventArgs.Empty);
     }
 
     private void CleanupCapture()
     {
         if (_capture is not null)
         {
-            _capture.DataAvailable -= OnDataAvailable;
-            _capture.RecordingStopped -= OnRecordingStopped;
+            _capture.DataAvailable -=
+                OnDataAvailable;
+
+            _capture.RecordingStopped -=
+                OnRecordingStopped;
+
             _capture.Dispose();
             _capture = null;
         }

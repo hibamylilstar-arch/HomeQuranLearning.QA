@@ -44,6 +44,18 @@ internal static class WindowsUsbAudioEndpointClassifier
             GetPnpEndpointInstanceId(endpointId));
     }
 
+    public static string? GetVerifiedUsbPhysicalDeviceKey(
+        string? endpointId)
+    {
+        if (string.IsNullOrWhiteSpace(endpointId))
+        {
+            return null;
+        }
+
+        return GetVerifiedUsbPhysicalDeviceKeyFromInstance(
+            GetPnpEndpointInstanceId(endpointId));
+    }
+
     public static bool IsVerifiedUsbDeviceInstance(
         string? deviceInstanceId)
     {
@@ -63,6 +75,8 @@ internal static class WindowsUsbAudioEndpointClassifier
             return false;
         }
 
+        bool sawUsb = false;
+
         for (int depth = 0; depth < MaxParentDepth; depth++)
         {
             string? enumerator =
@@ -75,13 +89,21 @@ internal static class WindowsUsbAudioEndpointClassifier
                     devInst,
                     CmDrpBusTypeGuid);
 
+            string? instanceId =
+                ReadDeviceInstanceId(
+                    devInst);
+
             if (string.Equals(
                     enumerator,
                     "USB",
                     StringComparison.OrdinalIgnoreCase) ||
-                busType == UsbBusTypeGuid)
+                busType == UsbBusTypeGuid ||
+                (!string.IsNullOrWhiteSpace(instanceId) &&
+                 instanceId.StartsWith(
+                     @"USB\",
+                     StringComparison.OrdinalIgnoreCase)))
             {
-                return true;
+                sawUsb = true;
             }
 
             if (NativeMethods.CM_Get_Parent(
@@ -96,7 +118,97 @@ internal static class WindowsUsbAudioEndpointClassifier
             devInst = parent;
         }
 
-        return false;
+        return sawUsb;
+    }
+
+    private static string?
+        GetVerifiedUsbPhysicalDeviceKeyFromInstance(
+            string deviceInstanceId)
+    {
+        if (!OperatingSystem.IsWindows() ||
+            string.IsNullOrWhiteSpace(deviceInstanceId))
+        {
+            return null;
+        }
+
+        uint devInst = 0;
+
+        if (NativeMethods.CM_Locate_DevNodeW(
+                ref devInst,
+                deviceInstanceId.Trim(),
+                0) != CrSuccess)
+        {
+            return null;
+        }
+
+        for (int depth = 0; depth < MaxParentDepth; depth++)
+        {
+            string? instanceId =
+                ReadDeviceInstanceId(
+                    devInst);
+
+            if (IsPhysicalUsbDeviceId(instanceId))
+            {
+                return instanceId!
+                    .Trim()
+                    .ToUpperInvariant();
+            }
+
+            if (NativeMethods.CM_Get_Parent(
+                    out uint parent,
+                    devInst,
+                    0) != CrSuccess ||
+                parent == devInst)
+            {
+                break;
+            }
+
+            devInst = parent;
+        }
+
+        return null;
+    }
+
+    private static bool IsPhysicalUsbDeviceId(
+        string? instanceId)
+    {
+        if (string.IsNullOrWhiteSpace(instanceId))
+        {
+            return false;
+        }
+
+        string value = instanceId.Trim();
+
+        return
+            value.StartsWith(
+                @"USB\VID_",
+                StringComparison.OrdinalIgnoreCase) &&
+            !value.Contains(
+                "&MI_",
+                StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? ReadDeviceInstanceId(
+        uint devInst)
+    {
+        var buffer =
+            new StringBuilder(512);
+
+        uint result =
+            NativeMethods.CM_Get_Device_IDW(
+                devInst,
+                buffer,
+                (uint)buffer.Capacity,
+                0);
+
+        if (result != CrSuccess)
+        {
+            return null;
+        }
+
+        return buffer
+            .ToString()
+            .Trim();
     }
 
     private static string? ReadStringProperty(
@@ -179,12 +291,23 @@ internal static class WindowsUsbAudioEndpointClassifier
             "cfgmgr32.dll",
             CharSet = CharSet.Unicode,
             ExactSpelling = true)]
-        internal static extern uint CM_Get_DevNode_Registry_PropertyW(
+        internal static extern uint CM_Get_Device_IDW(
             uint dnDevInst,
-            uint ulProperty,
-            out uint pulRegDataType,
-            byte[] buffer,
-            ref uint pulLength,
+            StringBuilder buffer,
+            uint bufferLen,
             uint ulFlags);
+
+        [DllImport(
+            "cfgmgr32.dll",
+            CharSet = CharSet.Unicode,
+            ExactSpelling = true)]
+        internal static extern uint
+            CM_Get_DevNode_Registry_PropertyW(
+                uint dnDevInst,
+                uint ulProperty,
+                out uint pulRegDataType,
+                byte[] buffer,
+                ref uint pulLength,
+                uint ulFlags);
     }
 }

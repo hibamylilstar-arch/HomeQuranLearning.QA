@@ -178,6 +178,9 @@ $toolsOutput =
 $payloadZip =
     Join-Path $workRoot "agent-payload.zip"
 
+$dotnetArtifactsRoot =
+    Join-Path $workRoot "dotnet-artifacts"
+
 $secretPointer = [IntPtr]::Zero
 $clearAgentApiKey = $null
 
@@ -189,6 +192,7 @@ try {
     Write-Host "Publishing Classroom Agent..." -ForegroundColor Cyan
     & dotnet publish `
         (Join-Path $repo "src\Agent\Academy.Agent.Service\Academy.Agent.Service.csproj") `
+        --artifacts-path $dotnetArtifactsRoot `
         -c Release `
         -r win-x64 `
         --self-contained true `
@@ -203,6 +207,7 @@ try {
     Write-Host "Publishing Microsoft Teams evidence helper..." -ForegroundColor Cyan
     & dotnet publish `
         (Join-Path $repo "src\Agent\Academy.Agent.TeamsHelper\Academy.Agent.TeamsHelper.csproj") `
+        --artifacts-path $dotnetArtifactsRoot `
         -c Release `
         -r win-x64 `
         --self-contained true `
@@ -292,6 +297,7 @@ try {
     Write-Host "Building single-file Windows installer..." -ForegroundColor Cyan
     & dotnet publish `
         (Join-Path $repo "src\Agent\Academy.Agent.Installer\Academy.Agent.Installer.csproj") `
+        --artifacts-path $dotnetArtifactsRoot `
         -c Release `
         -r win-x64 `
         --self-contained true `

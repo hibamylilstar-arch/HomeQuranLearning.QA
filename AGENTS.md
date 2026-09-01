@@ -141,3 +141,7 @@ Do not invent approval gates for ordinary fixes, documentation, targeted tests, 
 - Optional same-Wi-Fi testing may use the Owner PC LAN address; another laptop's localhost must never be treated as the Owner PC.
 - The production Owner device is a dormant reusable VPS test device, not the normal development device.
 - The user should normally only need to copy/paste the complete command block supplied by the AI into the original terminal.
+
+## Classroom USB headset invariant
+
+- Classroom USB audio is brand/model independent: Logitech, HP, Jabra, generic and other standard USB headsets must be detected from verified physical USB ancestry, never from manufacturer/name hard-coding. When a teacher disconnects one USB headset and connects another verified headset with playback + microphone endpoints, Agent audio must automatically recover onto the new headset without reinstalling the Agent. Realtek/internal audio fallback remains forbidden.

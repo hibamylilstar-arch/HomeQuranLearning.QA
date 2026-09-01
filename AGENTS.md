@@ -121,3 +121,7 @@ Do not invent approval gates for ordinary fixes, documentation, targeted tests, 
 - If the user proposes a weaker solution, improve it rather than merely accepting it.
 - If the user is mistaken, correct the technical point respectfully and proceed with the better implementation when the intent is clear.
 - Optimize for: correctness, continuity, minimum manual effort and minimum wasted time.
+
+## Local development runtime
+
+- For local development, use .dev-runtime/LocalDevelopment.ps1 -Action Ensure|Stop|Status. API, Dashboard and Agent run in the background; do not open separate terminal windows for them.

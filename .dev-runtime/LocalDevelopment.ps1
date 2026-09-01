@@ -1,6 +1,6 @@
-﻿param(
+param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Start", "Stop", "Status")]
+    [ValidateSet("Ensure", "Stop", "Status")]
     [string]$Action
 )
 
@@ -9,29 +9,39 @@ $ErrorActionPreference = "Stop"
 $repo =
     Split-Path -Parent $PSScriptRoot
 
-$compose =
-    Join-Path `
-        $repo `
-        "infrastructure\docker\docker-compose.yml"
+$apiProject =
+    Join-Path $repo "src\Backend\Academy.Api\Academy.Api.csproj"
+
+$agentProject =
+    Join-Path $repo "src\Agent\Academy.Agent.Service\Academy.Agent.Service.csproj"
 
 $dashboardRoot =
-    Join-Path `
-        $repo `
-        "src\Dashboard\academy-dashboard"
+    Join-Path $repo "src\Dashboard\academy-dashboard"
 
-$devRoot =
+$compose =
+    Join-Path $repo "infrastructure\docker\docker-compose.yml"
+
+$runtimeRoot =
+    Join-Path $env:LOCALAPPDATA "HomeQuranLearning.Dev"
+
+$logRoot =
+    Join-Path $runtimeRoot "Logs"
+
+$devDataRoot =
     "C:\ProgramData\AcademyAgent.Dev"
 
 $devIdentity =
-    Join-Path $devRoot "device.json"
+    Join-Path $devDataRoot "device.json"
 
 $productionInstallRoot =
     "C:\Program Files\Home Quran Learning\Classroom Agent"
 
-$productionDeviceId =
+$productionOwnerId =
     "82f9b22d-2d5b-46b2-b372-ef864219e383"
 
-function Get-LanAddress {
+New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
+
+function Get-LanIp {
     $route =
         Get-NetRoute `
             -AddressFamily IPv4 `
@@ -47,7 +57,7 @@ function Get-LanAddress {
         return "127.0.0.1"
     }
 
-    $address =
+    $ip =
         Get-NetIPAddress `
             -AddressFamily IPv4 `
             -InterfaceIndex $route.InterfaceIndex `
@@ -56,21 +66,30 @@ function Get-LanAddress {
             $_.IPAddress -ne "127.0.0.1" -and
             $_.IPAddress -notlike "169.254.*"
         } |
-        Select-Object `
-            -ExpandProperty IPAddress `
-            -First 1
+        Select-Object -ExpandProperty IPAddress -First 1
 
-    if ([string]::IsNullOrWhiteSpace($address)) {
+    if ([string]::IsNullOrWhiteSpace($ip)) {
         return "127.0.0.1"
     }
 
-    return $address
+    return $ip
 }
 
-function Wait-LocalPort {
+function Set-LocalDockerEnvironment {
+    $env:POSTGRES_USER = "academy"
+    $env:POSTGRES_PASSWORD = "AcademyLocalDev2026"
+    $env:POSTGRES_DB = "homequranlearning_qa"
+    $env:MINIO_ROOT_USER = "academy_minio"
+    $env:MINIO_ROOT_PASSWORD = "AcademyMinio2026"
+    $env:MINIO_BUCKET = "academy-recordings"
+}
+
+function Wait-Port {
     param(
         [int]$Port,
-        [int]$Seconds
+        [int]$Seconds,
+        [string]$Stdout,
+        [string]$Stderr
     )
 
     $deadline =
@@ -90,29 +109,40 @@ function Wait-LocalPort {
         Start-Sleep -Seconds 1
     }
 
-    throw "STOP: local port $Port did not become ready"
+    Write-Host ""
+    Write-Host "===== STARTUP LOG =====" -ForegroundColor Yellow
+
+    if (Test-Path $Stdout) {
+        Get-Content $Stdout -Tail 80
+    }
+
+    if (Test-Path $Stderr) {
+        Get-Content $Stderr -Tail 80
+    }
+
+    throw "STOP: port $Port did not become ready"
 }
 
-function Stop-ProductionAgentRuntime {
-    $taskNames = @(
+function Disable-ProductionOwnerAgent {
+    $tasks = @(
         "HomeQuranLearning.ClassroomAgent",
         "AcademyAgent.TeamsHelper",
         "HomeQuranLearning.ClassroomAgent.Updater"
     )
 
-    foreach ($taskName in $taskNames) {
+    foreach ($name in $tasks) {
         $task =
             Get-ScheduledTask `
-                -TaskName $taskName `
+                -TaskName $name `
                 -ErrorAction SilentlyContinue
 
         if ($null -ne $task) {
             Stop-ScheduledTask `
-                -TaskName $taskName `
+                -TaskName $name `
                 -ErrorAction SilentlyContinue
 
             Disable-ScheduledTask `
-                -TaskName $taskName `
+                -TaskName $name `
                 -ErrorAction SilentlyContinue |
             Out-Null
         }
@@ -136,46 +166,217 @@ function Stop-ProductionAgentRuntime {
     }
 }
 
-function Set-ComposeEnvironment {
-    $env:POSTGRES_USER = "academy"
-    $env:POSTGRES_PASSWORD = "AcademyLocalDev2026"
-    $env:POSTGRES_DB = "homequranlearning_qa"
-    $env:MINIO_ROOT_USER = "academy_minio"
-    $env:MINIO_ROOT_PASSWORD = "AcademyMinio2026"
-    $env:MINIO_BUCKET = "academy-recordings"
+function Start-LocalApi {
+    $existing =
+        Get-NetTCPConnection `
+            -LocalPort 5100 `
+            -State Listen `
+            -ErrorAction SilentlyContinue
+
+    if ($null -ne $existing) {
+        return
+    }
+
+    $lanIp = Get-LanIp
+
+    $env:ASPNETCORE_ENVIRONMENT = "Development"
+    $env:HttpsRedirection__Enabled = "false"
+    $env:RecordingRetention__Enabled = "false"
+    $env:LiveKit__Host = "ws://${lanIp}:7880"
+
+    $stdout = Join-Path $logRoot "api.stdout.log"
+    $stderr = Join-Path $logRoot "api.stderr.log"
+
+    Remove-Item $stdout,$stderr -Force -ErrorAction SilentlyContinue
+
+    Start-Process `
+        -FilePath "dotnet" `
+        -ArgumentList @(
+            "run",
+            "--project",
+            $apiProject,
+            "--urls",
+            "http://0.0.0.0:5100"
+        ) `
+        -WorkingDirectory $repo `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $stdout `
+        -RedirectStandardError $stderr |
+    Out-Null
+
+    Wait-Port `
+        -Port 5100 `
+        -Seconds 60 `
+        -Stdout $stdout `
+        -Stderr $stderr
 }
 
-function Stop-Dashboard {
-    $listeners =
-        @(
+function Start-LocalDashboard {
+    $existing =
+        Get-NetTCPConnection `
+            -LocalPort 3000 `
+            -State Listen `
+            -ErrorAction SilentlyContinue
+
+    if ($null -ne $existing) {
+        return
+    }
+
+    if (-not (Test-Path (Join-Path $dashboardRoot "node_modules"))) {
+        Push-Location $dashboardRoot
+        try {
+            npm ci
+
+            if ($LASTEXITCODE -ne 0) {
+                throw "STOP: npm ci failed"
+            }
+        }
+        finally {
+            Pop-Location
+        }
+    }
+
+    $env:BACKEND_BASE_URL = "http://127.0.0.1:5100"
+    $env:NODE_ENV = "development"
+
+    $stdout = Join-Path $logRoot "dashboard.stdout.log"
+    $stderr = Join-Path $logRoot "dashboard.stderr.log"
+
+    Remove-Item $stdout,$stderr -Force -ErrorAction SilentlyContinue
+
+    Start-Process `
+        -FilePath "npm.cmd" `
+        -ArgumentList @(
+            "run",
+            "dev",
+            "--",
+            "--hostname",
+            "0.0.0.0"
+        ) `
+        -WorkingDirectory $dashboardRoot `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $stdout `
+        -RedirectStandardError $stderr |
+    Out-Null
+
+    Wait-Port `
+        -Port 3000 `
+        -Seconds 60 `
+        -Stdout $stdout `
+        -Stderr $stderr
+}
+
+function Get-LocalAgentProcesses {
+    return @(
+        Get-CimInstance Win32_Process |
+        Where-Object {
+            $_.Name -eq "Academy.Agent.Service.exe" -or
+            (
+                $_.Name -eq "dotnet.exe" -and
+                $_.CommandLine -like "*Academy.Agent.Service.csproj*"
+            )
+        }
+    )
+}
+
+function Start-LocalAgent {
+    if ((Get-LocalAgentProcesses).Count -gt 0) {
+        return
+    }
+
+    $env:DeviceIdentityFile =
+        "C:\ProgramData\AcademyAgent.Dev\device.json"
+
+    $env:Cloud__Enabled = "true"
+    $env:Cloud__BaseUrl = "http://127.0.0.1:5100"
+    $env:Cloud__ApiKey = "local-dev-agent-key"
+    $env:Cloud__AgentVersion = "local-dev"
+    $env:Cloud__HeartbeatIntervalSeconds = "5"
+
+    $env:Recording__Enabled = "false"
+    $env:Recording__OutputDirectory =
+        "C:\ProgramData\AcademyAgent.Dev\Recordings"
+
+    $env:LiveStreaming__Enabled = "true"
+    $env:LiveStreaming__IngestBaseUrl =
+        "rtmp://127.0.0.1:1935/live"
+
+    $stdout = Join-Path $logRoot "agent.stdout.log"
+    $stderr = Join-Path $logRoot "agent.stderr.log"
+
+    Remove-Item $stdout,$stderr -Force -ErrorAction SilentlyContinue
+
+    Start-Process `
+        -FilePath "dotnet" `
+        -ArgumentList @(
+            "run",
+            "--project",
+            $agentProject
+        ) `
+        -WorkingDirectory $repo `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $stdout `
+        -RedirectStandardError $stderr |
+    Out-Null
+
+    $deadline =
+        (Get-Date).AddSeconds(45)
+
+    while (
+        -not (Test-Path $devIdentity) -and
+        (Get-Date) -lt $deadline
+    ) {
+        Start-Sleep -Seconds 1
+    }
+
+    if (-not (Test-Path $devIdentity)) {
+        if (Test-Path $stdout) {
+            Get-Content $stdout -Tail 80
+        }
+
+        if (Test-Path $stderr) {
+            Get-Content $stderr -Tail 80
+        }
+
+        throw "STOP: DEV Agent identity was not created"
+    }
+
+    $identity =
+        Get-Content $devIdentity -Raw |
+        ConvertFrom-Json
+
+    if ([string]$identity.DeviceId -eq $productionOwnerId) {
+        throw "STOP: DEV identity collided with production Owner identity"
+    }
+}
+
+function Stop-LocalProcesses {
+    foreach ($port in @(3000,5100)) {
+        $listeners = @(
             Get-NetTCPConnection `
-                -LocalPort 3000 `
+                -LocalPort $port `
                 -State Listen `
                 -ErrorAction SilentlyContinue
         )
 
-    foreach ($listener in $listeners) {
-        Stop-Process `
-            -Id $listener.OwningProcess `
-            -Force `
-            -ErrorAction SilentlyContinue
+        foreach ($listener in $listeners) {
+            Stop-Process `
+                -Id $listener.OwningProcess `
+                -Force `
+                -ErrorAction SilentlyContinue
+        }
     }
 
-    Get-CimInstance Win32_Process |
-    Where-Object {
-        $_.Name -eq "pwsh.exe" -and
-        $_.CommandLine -like "*Start-AcademyDashboard.ps1*"
-    } |
-    ForEach-Object {
+    foreach ($process in (Get-LocalAgentProcesses)) {
         Stop-Process `
-            -Id $_.ProcessId `
+            -Id $process.ProcessId `
             -Force `
             -ErrorAction SilentlyContinue
     }
 }
 
-function Show-Status {
-    $lanIp = Get-LanAddress
+function Show-LocalStatus {
+    $lanIp = Get-LanIp
 
     $api =
         Get-NetTCPConnection `
@@ -190,41 +391,33 @@ function Show-Status {
             -ErrorAction SilentlyContinue
 
     $agent =
-        Get-CimInstance Win32_Process |
-        Where-Object {
-            $_.Name -eq "Academy.Agent.Service.exe" -or
-            (
-                $_.Name -eq "dotnet.exe" -and
-                $_.CommandLine -like "*Academy.Agent.Service*"
-            )
-        }
+        Get-LocalAgentProcesses
 
     Write-Host ""
-    Write-Host "===== LOCAL DEVELOPMENT STATUS =====" -ForegroundColor Cyan
+    Write-Host "===== LOCAL RUNTIME STATUS =====" -ForegroundColor Cyan
     Write-Host ("API=" + $(if ($api) { "ON" } else { "OFF" }))
     Write-Host ("DASHBOARD=" + $(if ($dashboard) { "ON" } else { "OFF" }))
-    Write-Host ("AGENT=" + $(if ($agent) { "ON" } else { "OFF" }))
-    Write-Host "LOCAL_DASHBOARD=http://localhost:3000"
-    Write-Host ("LAN_DASHBOARD=http://" + $lanIp + ":3000")
-    Write-Host ("LAN_API=http://" + $lanIp + ":5100")
+    Write-Host ("AGENT=" + $(if ($agent.Count -gt 0) { "ON" } else { "OFF" }))
+    Write-Host "LOCAL=http://localhost:3000"
+    Write-Host ("LAN=http://" + $lanIp + ":3000")
 
-    if (Test-Path -LiteralPath $devIdentity) {
+    if (Test-Path $devIdentity) {
         $identity =
             Get-Content $devIdentity -Raw |
             ConvertFrom-Json
 
         Write-Host ("DEV_DEVICE_ID=" + $identity.DeviceId)
     }
+
+    Write-Host ("LOGS=" + $logRoot)
 }
 
-if ($Action -eq "Start") {
-    Write-Host "===== START LOCAL DEVELOPMENT =====" -ForegroundColor Cyan
+if ($Action -eq "Ensure") {
+    Write-Host "===== ENSURE LOCAL RUNTIME =====" -ForegroundColor Cyan
 
-    Stop-ProductionAgentRuntime
+    Disable-ProductionOwnerAgent
 
-    Write-Host "PRODUCTION_AGENT_RUNTIME=DISABLED" -ForegroundColor Green
-
-    Set-ComposeEnvironment
+    Set-LocalDockerEnvironment
 
     docker info *> $null
 
@@ -242,149 +435,48 @@ if ($Action -eq "Start") {
         livekit-ingress
 
     if ($LASTEXITCODE -ne 0) {
-        throw "STOP: local infrastructure start failed"
+        throw "STOP: local infrastructure failed"
     }
 
-    Start-Process `
-        pwsh `
-        -ArgumentList @(
-            "-NoExit",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            "$PSScriptRoot\Start-AcademyApi.ps1"
-        )
+    docker exec `
+        academy-postgres `
+        psql `
+        -U academy `
+        -d postgres `
+        -v ON_ERROR_STOP=1 `
+        -c "ALTER ROLE academy WITH PASSWORD 'AcademyLocalDev2026';"
 
-    Wait-LocalPort -Port 5100 -Seconds 45
+    if ($LASTEXITCODE -ne 0) {
+        throw "STOP: local DB credential normalization failed"
+    }
+
+    Start-LocalApi
 
     docker compose `
         -f $compose `
         up -d ingress-manager
 
     if ($LASTEXITCODE -ne 0) {
-        throw "STOP: ingress manager start failed"
+        throw "STOP: ingress manager failed"
     }
 
-    if (-not (Test-Path (Join-Path $dashboardRoot "node_modules"))) {
-        Push-Location $dashboardRoot
-        try {
-            npm ci
-
-            if ($LASTEXITCODE -ne 0) {
-                throw "STOP: npm ci failed"
-            }
-        }
-        finally {
-            Pop-Location
-        }
-    }
-
-    Start-Process `
-        pwsh `
-        -ArgumentList @(
-            "-NoExit",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            "$PSScriptRoot\Start-AcademyDashboard.ps1"
-        )
-
-    Wait-LocalPort -Port 3000 -Seconds 60
-
-    Start-Process `
-        pwsh `
-        -ArgumentList @(
-            "-NoExit",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            "$PSScriptRoot\Start-AcademyAgent.ps1"
-        )
-
-    $identityDeadline =
-        (Get-Date).AddSeconds(30)
-
-    while (
-        -not (Test-Path -LiteralPath $devIdentity) -and
-        (Get-Date) -lt $identityDeadline
-    ) {
-        Start-Sleep -Seconds 1
-    }
-
-    if (-not (Test-Path -LiteralPath $devIdentity)) {
-        throw "STOP: DEV identity was not created"
-    }
-
-    $identity =
-        Get-Content $devIdentity -Raw |
-        ConvertFrom-Json
-
-    $devDeviceId =
-        [string]$identity.DeviceId
-
-    if ([string]::IsNullOrWhiteSpace($devDeviceId)) {
-        throw "STOP: DEV DeviceId is empty"
-    }
-
-    if ($devDeviceId -eq $productionDeviceId) {
-        throw "STOP: DEV identity collided with production Owner DeviceId"
-    }
-
-    $registered = $false
-
-    for ($i = 0; $i -lt 20; $i++) {
-        $sql =
-            "SELECT count(*) FROM devices WHERE ""DeviceId""=''$devDeviceId'';"
-
-        $count =
-            docker exec academy-postgres `
-                psql `
-                -U academy `
-                -d homequranlearning_qa `
-                -At `
-                -c $sql
-
-        if (
-            $LASTEXITCODE -eq 0 -and
-            ([string]$count).Trim() -eq "1"
-        ) {
-            $registered = $true
-            break
-        }
-
-        Start-Sleep -Seconds 1
-    }
-
-    if (-not $registered) {
-        throw "STOP: DEV Agent did not register with local API"
-    }
-
-    $lanIp = Get-LanAddress
+    Start-LocalDashboard
+    Start-LocalAgent
 
     Write-Host ""
-    Write-Host "===== LOCAL DEVELOPMENT READY =====" -ForegroundColor Green
-    Write-Host "LOCAL_API=PASS"
-    Write-Host "LOCAL_DASHBOARD=PASS"
-    Write-Host "LOCAL_AGENT=PASS"
-    Write-Host "DEV_IDENTITY_SEPARATE=PASS"
-    Write-Host "DEV_DEVICE_REGISTERED=PASS"
-    Write-Host "PRODUCTION_AGENT_DISABLED=YES"
+    Write-Host "LOCAL_RUNTIME_READY=YES" -ForegroundColor Green
+    Write-Host "VISIBLE_EXTRA_POWERSHELL_WINDOWS=NO"
+    Write-Host "PRODUCTION_OWNER_AGENT=DISABLED"
     Write-Host "DEV_RECORDING_DEFAULT=OFF"
-    Write-Host ("DEV_DEVICE_ID=" + $devDeviceId)
-    Write-Host "LOCAL_DASHBOARD=http://localhost:3000"
-    Write-Host ("LAN_DASHBOARD=http://" + $lanIp + ":3000")
-    Write-Host ("LAN_API=http://" + $lanIp + ":5100")
+
+    Show-LocalStatus
 }
 elseif ($Action -eq "Stop") {
-    Write-Host "===== STOP LOCAL DEVELOPMENT =====" -ForegroundColor Cyan
+    Write-Host "===== STOP LOCAL RUNTIME =====" -ForegroundColor Cyan
 
-    & "$PSScriptRoot\Runtime.ps1" -Action StopAgent
+    Stop-LocalProcesses
 
-    Stop-Dashboard
-
-    & "$PSScriptRoot\Runtime.ps1" -Action StopApi
-
-    Set-ComposeEnvironment
+    Set-LocalDockerEnvironment
 
     docker compose `
         -f $compose `
@@ -396,7 +488,10 @@ elseif ($Action -eq "Stop") {
         redis `
         postgres
 
-    Write-Host "LOCAL_DEVELOPMENT_STOPPED=YES" -ForegroundColor Green
-}
+    Write-Host "LOCAL_RUNTIME_STOPPED=YES" -ForegroundColor Green
 
-Show-Status
+    Show-LocalStatus
+}
+else {
+    Show-LocalStatus
+}

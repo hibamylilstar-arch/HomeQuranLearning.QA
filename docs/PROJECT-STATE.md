@@ -57,7 +57,7 @@ Older sections below are historical evidence and are not active workflow governa
 - Local Agent cloud traffic targets only `http://127.0.0.1:5100`.
 - Local RTMP publishing targets only `rtmp://127.0.0.1:1935/live`.
 - Local recording is disabled by default to avoid unnecessary test recording accumulation.
-- Local Dashboard is intended to be available on localhost and optionally the Owner PC LAN address.
+- Local API, Dashboard and DEV Agent are controlled from one .dev-runtime/LocalDevelopment.ps1 controller. They run as background processes with file logs and no separate visible PowerShell windows. Ensure starts only what is missing; Stop shuts the local runtime down.
 - Installed production Agent tasks are disabled when Local Development Mode starts.
 - Production Owner device will remain as a reusable dormant test device; after local runtime proof its production Agent, ingress, archive target and trial recordings will be disabled/cleared instead of deleting the Device record.
 <!-- CURRENT-ACTIVE-STATE:END -->

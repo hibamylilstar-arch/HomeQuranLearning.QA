@@ -54,7 +54,7 @@ public sealed class LiveTeacherAudioPolicyTests
     }
 
     [Fact]
-    public void TeacherCapture_RetriesAtFiveSeconds()
+    public void TeacherCapture_RetriesAtOneSecond()
     {
         DateTimeOffset now =
             new(
@@ -73,12 +73,12 @@ public sealed class LiveTeacherAudioPolicyTests
 
         Assert.False(
             LiveTeacherAudioPolicy.ShouldRetryCapture(
-                now - TimeSpan.FromSeconds(4),
+                now - TimeSpan.FromMilliseconds(500),
                 now));
 
         Assert.True(
             LiveTeacherAudioPolicy.ShouldRetryCapture(
-                now - TimeSpan.FromSeconds(5),
+                now - TimeSpan.FromSeconds(1),
                 now));
     }
 

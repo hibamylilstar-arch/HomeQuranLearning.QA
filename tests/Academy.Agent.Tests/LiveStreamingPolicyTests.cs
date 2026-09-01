@@ -42,8 +42,8 @@ public sealed class LiveStreamingPolicyTests
     }
 
     [Theory]
-    [InlineData(48000, 2, 16, 9600)]
-    [InlineData(48000, 2, 32, 19200)]
+    [InlineData(48000, 2, 16, 3840)]
+    [InlineData(48000, 2, 32, 7680)]
     public void CalculateSilenceChunkBytes_MatchesCaptureFormat(
         int sampleRate,
         int channels,
@@ -71,12 +71,12 @@ public sealed class LiveStreamingPolicyTests
 
         Assert.False(
             LiveStreamingPolicy.ShouldSendSilence(
-                now - TimeSpan.FromMilliseconds(100),
+                now - TimeSpan.FromMilliseconds(40),
                 now));
 
         Assert.True(
             LiveStreamingPolicy.ShouldSendSilence(
-                now - TimeSpan.FromMilliseconds(300),
+                now - TimeSpan.FromMilliseconds(100),
                 now));
     }
 }

@@ -267,16 +267,16 @@ public sealed class RecordingService : IRecordingService
         return
             "-y " +
             $"-f lavfi -i \"ddagrab=framerate={options.FrameRate}:dup_frames=1\" " +
-            "-thread_queue_size 1024 " +
+            "-thread_queue_size 16 " +
             $"-f {systemAudioFormat} -ar {systemAudioSampleRate} -ac {systemAudioChannels} " +
-            $"-i \"udp://127.0.0.1:{SystemAudioUdpPort}?fifo_size=500000&overrun_nonfatal=1\" " +
-            "-thread_queue_size 1024 " +
+            $"-i \"udp://127.0.0.1:{SystemAudioUdpPort}?buffer_size=65536&fifo_size=512&overrun_nonfatal=1\" " +
+            "-thread_queue_size 16 " +
             $"-f {teacherAudioFormat} -ar {teacherAudioSampleRate} -ac {teacherAudioChannels} " +
-            $"-i \"udp://127.0.0.1:{TeacherAudioUdpPort}?fifo_size=500000&overrun_nonfatal=1\" " +
+            $"-i \"udp://127.0.0.1:{TeacherAudioUdpPort}?buffer_size=65536&fifo_size=512&overrun_nonfatal=1\" " +
             $"-filter_complex \"{audioFilter}\" " +
             "-map 0:v:0 -map \"[mixed]\" -map \"[teacher_qa]\" " +
-            $"-vf \"hwdownload,format=bgra,setpts=N/({options.FrameRate}*TB)\" " +
-            $"-c:v libx264 -preset {options.VideoPreset} -pix_fmt yuv420p " +
+            $"-vf \"hwdownload,format=bgra,scale=-2:240:flags=fast_bilinear,setpts=N/({options.FrameRate}*TB)\" " +
+            $"-c:v libx264 -preset {options.VideoPreset} -tune zerolatency -bf 0 -pix_fmt yuv420p " +
             $"-crf {options.VideoCrf} " +
             $"-maxrate {options.VideoMaxBitrateKbps}k " +
             $"-bufsize {options.VideoBufferSizeKbps}k " +
@@ -680,7 +680,7 @@ public sealed class RecordingService : IRecordingService
                 }
 
                 await Task.Delay(
-                    TimeSpan.FromSeconds(1),
+                    TimeSpan.FromMilliseconds(250),
                     cancellationToken);
             }
         }
@@ -726,7 +726,7 @@ public sealed class RecordingService : IRecordingService
     {
         int bytesPerSecond =
             sampleRate * channels * bytesPerSample;
-        int chunkSize = bytesPerSecond / 20;
+        int chunkSize = bytesPerSecond / 50;
         byte[] silence = new byte[chunkSize];
 
         try
@@ -735,7 +735,7 @@ public sealed class RecordingService : IRecordingService
             {
                 bool audioRecentlyReceived =
                     DateTimeOffset.UtcNow - getLastPacketUtc()
-                    < TimeSpan.FromMilliseconds(150);
+                    < TimeSpan.FromMilliseconds(80);
 
                 UdpClient? sender = getSender();
 
@@ -747,7 +747,7 @@ public sealed class RecordingService : IRecordingService
                     }
                 }
 
-                await Task.Delay(50, cancellationToken);
+                await Task.Delay(20, cancellationToken);
             }
         }
         catch (OperationCanceledException)

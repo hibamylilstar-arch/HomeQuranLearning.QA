@@ -145,3 +145,7 @@ Do not invent approval gates for ordinary fixes, documentation, targeted tests, 
 ## Classroom USB headset invariant
 
 - Classroom USB audio is brand/model independent: Logitech, HP, Jabra, generic and other standard USB headsets must be detected from verified physical USB ancestry, never from manufacturer/name hard-coding. When a teacher disconnects one USB headset and connects another verified headset with playback + microphone endpoints, Agent audio must automatically recover onto the new headset without reinstalling the Agent. Realtek/internal audio fallback remains forbidden.
+
+## Classroom media priority
+
+- Classroom media priority is audio first. Teacher and student speech must receive the lowest practical latency and continuous delivery; video quality is secondary. Normal live monitoring and Agent recordings target approximately 240p at low frame rate/bitrate to reduce teacher-laptop CPU, network bandwidth and storage/VPS load.

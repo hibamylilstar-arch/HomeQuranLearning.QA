@@ -10,7 +10,7 @@ public static class LiveTeacherAudioPolicy
         "Teacher Mic Missing";
 
     public static TimeSpan RetryInterval =>
-        TimeSpan.FromSeconds(5);
+        TimeSpan.FromSeconds(1);
 
     public static bool ShouldRetryCapture(
         DateTimeOffset lastAttemptUtc,
@@ -25,12 +25,12 @@ public static class LiveTeacherAudioPolicy
     {
         return
             "[1:a]asetpts=PTS-STARTPTS," +
-            "aresample=48000:async=1000:first_pts=0," +
-            "aformat=sample_rates=48000:channel_layouts=stereo" +
+            "aresample=48000:async=1:first_pts=0," +
+            "aformat=sample_rates=48000:channel_layouts=mono" +
             "[system_audio];" +
             "[2:a]asetpts=PTS-STARTPTS," +
-            "aresample=48000:async=1000:first_pts=0," +
-            "aformat=sample_rates=48000:channel_layouts=stereo" +
+            "aresample=48000:async=1:first_pts=0," +
+            "aformat=sample_rates=48000:channel_layouts=mono" +
             "[teacher_audio];" +
             "[system_audio][teacher_audio]" +
             "amix=inputs=2:duration=longest:dropout_transition=0" +

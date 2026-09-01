@@ -43,7 +43,7 @@ public sealed class LiveStreamingWorker : BackgroundService
 
     private static readonly TimeSpan
         TeacherUsageCheckInterval =
-            TimeSpan.FromSeconds(1);
+            TimeSpan.FromMilliseconds(250);
 
     private string? _currentStreamKey;
     private volatile bool _videoCaptureFailed;
@@ -321,21 +321,21 @@ public sealed class LiveStreamingWorker : BackgroundService
 
         string audioEncoderArguments =
             outputFormat == "whip"
-                ? "-c:a libopus -b:a 64k -ar 48000 -ac 2"
-                : "-c:a aac -b:a 64k -ar 48000 -ac 2";
+                ? "-c:a libopus -b:a 64k -ar 48000 -ac 1"
+                : "-c:a aac -b:a 64k -ar 48000 -ac 1";
 
         var startInfo = new ProcessStartInfo
         {
             FileName = ffmpegPath,
             Arguments =
                 $"-fflags nobuffer -flags low_delay " +
-                $"-f lavfi -i ddagrab=framerate=10:dup_frames=1 " +
+                $"-f lavfi -i ddagrab=framerate=5:dup_frames=1 " +
                 $"-thread_queue_size 16 -use_wallclock_as_timestamps 1 -f {audioFormat} -ar {sampleRate} -ac {channels} -i \"udp://127.0.0.1:{audioUdpPort}?buffer_size=65536&fifo_size=512&overrun_nonfatal=1\" " +
                 $"-thread_queue_size 16 -use_wallclock_as_timestamps 1 -f f32le -ar {LiveTeacherAudioPolicy.TeacherSampleRate} -ac {LiveTeacherAudioPolicy.TeacherChannels} -i \"udp://127.0.0.1:{teacherAudioUdpPort}?buffer_size=65536&fifo_size=512&overrun_nonfatal=1\" " +
                 $"-filter_complex \"{LiveTeacherAudioPolicy.BuildFilterComplex()}\" -map 0:v -map \"[live_audio]\" " +
-                $"-vf \"hwdownload,format=bgra,setpts=N/(10*TB)\" " +
+                $"-vf \"hwdownload,format=bgra,scale=-2:240:flags=fast_bilinear,setpts=N/(5*TB)\" " +
                 $"-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p " +
-                $"-profile:v baseline -level:v 4.0 -g 10 -bf 0 -b:v 800k -flush_packets 1 " +
+                $"-profile:v baseline -level:v 3.0 -g 5 -bf 0 -b:v 200k -maxrate 250k -bufsize 250k -flush_packets 1 -max_interleave_delta 100000 " +
                 $"{audioEncoderArguments} -f {outputFormat} \"{ingestUrl}\"",
             RedirectStandardOutput = false,
             RedirectStandardError = true,
@@ -590,7 +590,7 @@ public sealed class LiveStreamingWorker : BackgroundService
                 }
 
                 await Task.Delay(
-                    TimeSpan.FromMilliseconds(50),
+                    TimeSpan.FromMilliseconds(20),
                     token);
             }
         }
@@ -901,7 +901,7 @@ public sealed class LiveStreamingWorker : BackgroundService
                 }
 
                 await Task.Delay(
-                    TimeSpan.FromMilliseconds(50),
+                    TimeSpan.FromMilliseconds(20),
                     token);
             }
         }

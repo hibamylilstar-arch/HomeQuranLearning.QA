@@ -3,7 +3,7 @@ namespace Academy.Agent.Service;
 public static class LiveStreamingPolicy
 {
     public static readonly TimeSpan RealAudioHoldoff =
-        TimeSpan.FromMilliseconds(250);
+        TimeSpan.FromMilliseconds(80);
 
     public static bool NeedsPipelineRestart(
         string? currentStreamKey,
@@ -33,7 +33,7 @@ public static class LiveStreamingPolicy
         int sampleRate,
         int channels,
         int bitsPerSample,
-        int intervalMilliseconds = 50)
+        int intervalMilliseconds = 20)
     {
         if (sampleRate <= 0)
         {

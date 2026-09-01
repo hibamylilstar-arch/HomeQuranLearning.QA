@@ -175,7 +175,7 @@ public sealed class RecordingWorker : BackgroundService
                 else
                 {
                     _logger.LogWarning(
-                        "Teacher microphone QA coverage unavailable. Reason={Reason}, Endpoint={Endpoint}",
+                        "Teacher Mic Missing. Verified USB teacher microphone unavailable or ambiguous. Reason={Reason}, Endpoint={Endpoint}",
                         e.Reason ?? "Unknown",
                         e.EndpointName ?? "Unavailable");
 
@@ -186,7 +186,9 @@ public sealed class RecordingWorker : BackgroundService
                             OccurredAtUtc = e.OccurredAtUtc,
                             Source = "RecordingTeacherAudio",
                             Details =
-                                $"TeacherAudioCoverageUnavailable:{e.Reason ?? "Unknown"}"
+                                e.Reason == RecordingService.TeacherMicrophoneMissingReason
+                                    ? "Teacher Mic Missing"
+                                    : $"TeacherAudioCoverageUnavailable:{e.Reason ?? "Unknown"}"
                         });
                 }
             };

@@ -23,6 +23,18 @@ public sealed class LiveStreamingWorker : BackgroundService
     private Task? _audioPumpTask;
     private readonly object _audioSendLock = new();
     private DateTimeOffset _lastRealAudioPacketUtc = DateTimeOffset.MinValue;
+
+    private MicrophoneCaptureService? _teacherAudioService;
+    private UdpClient? _teacherUdpSender;
+    private Task? _teacherAudioPumpTask;
+    private readonly object _teacherAudioSendLock = new();
+    private readonly object _teacherAudioLifecycleLock = new();
+
+    private DateTimeOffset _lastTeacherRealAudioPacketUtc =
+        DateTimeOffset.MinValue;
+
+    private DateTimeOffset _lastTeacherStartAttemptUtc =
+        DateTimeOffset.MinValue;
     private string? _currentStreamKey;
     private volatile bool _videoCaptureFailed;
     private Task? _stderrMonitorTask;
@@ -140,6 +152,8 @@ public sealed class LiveStreamingWorker : BackgroundService
                             _ffmpegProcess is not null ||
                             _audioService is not null ||
                             _udpSender is not null ||
+                            _teacherAudioService is not null ||
+                            _teacherUdpSender is not null ||
                             _currentStreamKey is not null;
 
                         if (hasExistingPipeline)
@@ -223,14 +237,38 @@ public sealed class LiveStreamingWorker : BackgroundService
         int audioUdpPort =
             GetAvailableLoopbackUdpPort();
 
+        int teacherAudioUdpPort =
+            GetAvailableLoopbackUdpPort();
+
+        for (int attempt = 0;
+             teacherAudioUdpPort == audioUdpPort &&
+             attempt < 10;
+             attempt++)
+        {
+            teacherAudioUdpPort =
+                GetAvailableLoopbackUdpPort();
+        }
+
+        if (teacherAudioUdpPort == audioUdpPort)
+        {
+            throw new InvalidOperationException(
+                "Could not allocate distinct live system and teacher audio UDP ports.");
+        }
+
         _udpSender = new UdpClient();
         _udpSender.Connect(
             IPAddress.Loopback,
             audioUdpPort);
 
+        _teacherUdpSender = new UdpClient();
+        _teacherUdpSender.Connect(
+            IPAddress.Loopback,
+            teacherAudioUdpPort);
+
         _logger.LogInformation(
-            "Allocated live audio UDP port {AudioUdpPort}.",
-            audioUdpPort);
+            "Allocated live audio UDP ports. System={SystemAudioUdpPort}, Teacher={TeacherAudioUdpPort}.",
+            audioUdpPort,
+            teacherAudioUdpPort);
 
         _audioService = new AudioCaptureService();
         _audioService.Start();
@@ -255,6 +293,12 @@ public sealed class LiveStreamingWorker : BackgroundService
                 channels,
                 captureFormat.BitsPerSample);
 
+        int teacherSilenceChunkBytes =
+            LiveStreamingPolicy.CalculateSilenceChunkBytes(
+                LiveTeacherAudioPolicy.TeacherSampleRate,
+                LiveTeacherAudioPolicy.TeacherChannels,
+                LiveTeacherAudioPolicy.TeacherBitsPerSample);
+
         string ingestUrl =
             $"{ingestBaseUrl.TrimEnd('/')}/{Uri.EscapeDataString(streamKey)}";
 
@@ -277,7 +321,9 @@ public sealed class LiveStreamingWorker : BackgroundService
                 $"-fflags nobuffer -flags low_delay " +
                 $"-f lavfi -i ddagrab=framerate=10:dup_frames=1 " +
                 $"-thread_queue_size 1024 -use_wallclock_as_timestamps 1 -f {audioFormat} -ar {sampleRate} -ac {channels} -i \"udp://127.0.0.1:{audioUdpPort}?fifo_size=500000&overrun_nonfatal=1\" " +
-                $"-vf \"hwdownload,format=bgra,setpts=N/(10*TB)\" -af \"aresample=async=1000:first_pts=0\" " +
+                $"-thread_queue_size 1024 -use_wallclock_as_timestamps 1 -f f32le -ar {LiveTeacherAudioPolicy.TeacherSampleRate} -ac {LiveTeacherAudioPolicy.TeacherChannels} -i \"udp://127.0.0.1:{teacherAudioUdpPort}?fifo_size=500000&overrun_nonfatal=1\" " +
+                $"-filter_complex \"{LiveTeacherAudioPolicy.BuildFilterComplex()}\" -map 0:v -map \"[live_audio]\" " +
+                $"-vf \"hwdownload,format=bgra,setpts=N/(10*TB)\" " +
                 $"-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p " +
                 $"-profile:v baseline -level:v 4.0 -g 10 -bf 0 -b:v 800k -flush_packets 1 " +
                 $"{audioEncoderArguments} -f {outputFormat} \"{ingestUrl}\"",
@@ -301,11 +347,27 @@ public sealed class LiveStreamingWorker : BackgroundService
 
         _audioService.DataAvailable += OnAudioDataAvailable;
 
-        _lastRealAudioPacketUtc = DateTimeOffset.MinValue;
-        _audioPumpCts = new CancellationTokenSource();
-        _audioPumpTask = StartSilencePumpAsync(
-            silenceChunkBytes,
-            _audioPumpCts.Token);
+        _lastRealAudioPacketUtc =
+            DateTimeOffset.MinValue;
+
+        _lastTeacherRealAudioPacketUtc =
+            DateTimeOffset.MinValue;
+
+        _lastTeacherStartAttemptUtc =
+            DateTimeOffset.MinValue;
+
+        _audioPumpCts =
+            new CancellationTokenSource();
+
+        _audioPumpTask =
+            StartSilencePumpAsync(
+                silenceChunkBytes,
+                _audioPumpCts.Token);
+
+        _teacherAudioPumpTask =
+            StartTeacherAudioPumpAsync(
+                teacherSilenceChunkBytes,
+                _audioPumpCts.Token);
 
         _currentStreamKey = streamKey;
 
@@ -522,6 +584,233 @@ public sealed class LiveStreamingWorker : BackgroundService
             // Expected during shutdown/recovery.
         }
     }
+    private void TryStartTeacherAudioCapture()
+    {
+        lock (_teacherAudioLifecycleLock)
+        {
+            if (_teacherAudioService is not null)
+            {
+                return;
+            }
+
+            _lastTeacherStartAttemptUtc =
+                DateTimeOffset.UtcNow;
+
+            var capture =
+                new MicrophoneCaptureService();
+
+            capture.DataAvailable +=
+                OnTeacherAudioDataAvailable;
+
+            capture.RecordingStopped +=
+                OnTeacherAudioRecordingStopped;
+
+            _teacherAudioService = capture;
+
+            try
+            {
+                capture.Start();
+
+                WaveFormat? captureFormat =
+                    capture.CaptureFormat;
+
+                if (captureFormat is null ||
+                    captureFormat.Encoding !=
+                        WaveFormatEncoding.IeeeFloat ||
+                    captureFormat.SampleRate !=
+                        LiveTeacherAudioPolicy.TeacherSampleRate ||
+                    captureFormat.Channels !=
+                        LiveTeacherAudioPolicy.TeacherChannels ||
+                    captureFormat.BitsPerSample !=
+                        LiveTeacherAudioPolicy.TeacherBitsPerSample)
+                {
+                    throw new InvalidOperationException(
+                        "Verified USB teacher microphone did not provide the required 48 kHz mono float capture format.");
+                }
+
+                _logger.LogInformation(
+                    "Live teacher microphone capture available. Endpoint={Endpoint}.",
+                    capture.EndpointName ?? "Unknown");
+            }
+            catch (Exception ex)
+            {
+                if (ReferenceEquals(
+                        _teacherAudioService,
+                        capture))
+                {
+                    _teacherAudioService = null;
+                }
+
+                capture.DataAvailable -=
+                    OnTeacherAudioDataAvailable;
+
+                capture.RecordingStopped -=
+                    OnTeacherAudioRecordingStopped;
+
+                try
+                {
+                    capture.Stop();
+                }
+                catch
+                {
+                    // Failed-start cleanup is best effort.
+                }
+
+                _logger.LogDebug(
+                    ex,
+                    "{TeacherMicStatus}. Live teacher input remains silence until exactly one verified USB microphone is available.",
+                    LiveTeacherAudioPolicy.MissingStatus);
+            }
+        }
+    }
+
+    private void OnTeacherAudioDataAvailable(
+        object? sender,
+        AudioDataAvailableEventArgs e)
+    {
+        if (e.BytesRecorded <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            lock (_teacherAudioSendLock)
+            {
+                if (_teacherUdpSender is null)
+                {
+                    return;
+                }
+
+                _lastTeacherRealAudioPacketUtc =
+                    DateTimeOffset.UtcNow;
+
+                _teacherUdpSender.Send(
+                    e.Buffer,
+                    e.BytesRecorded);
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            // Expected during shutdown/recovery.
+        }
+        catch (SocketException ex)
+        {
+            _logger.LogDebug(
+                ex,
+                "Live teacher-audio UDP send failed.");
+        }
+    }
+
+    private void OnTeacherAudioRecordingStopped(
+        object? sender,
+        EventArgs e)
+    {
+        MicrophoneCaptureService? stopped =
+            null;
+
+        lock (_teacherAudioLifecycleLock)
+        {
+            if (sender is MicrophoneCaptureService capture &&
+                ReferenceEquals(
+                    capture,
+                    _teacherAudioService))
+            {
+                stopped = capture;
+                _teacherAudioService = null;
+            }
+        }
+
+        if (stopped is not null)
+        {
+            stopped.DataAvailable -=
+                OnTeacherAudioDataAvailable;
+
+            stopped.RecordingStopped -=
+                OnTeacherAudioRecordingStopped;
+        }
+
+        lock (_teacherAudioSendLock)
+        {
+            _lastTeacherRealAudioPacketUtc =
+                DateTimeOffset.MinValue;
+        }
+
+        _logger.LogWarning(
+            "{TeacherMicStatus}. Live stream continues with teacher silence and will retry a verified USB microphone automatically.",
+            LiveTeacherAudioPolicy.MissingStatus);
+    }
+
+    private async Task StartTeacherAudioPumpAsync(
+        int silenceChunkBytes,
+        CancellationToken token)
+    {
+        byte[] silenceChunk =
+            new byte[silenceChunkBytes];
+
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                DateTimeOffset nowUtc =
+                    DateTimeOffset.UtcNow;
+
+                bool shouldTryCapture;
+
+                lock (_teacherAudioLifecycleLock)
+                {
+                    shouldTryCapture =
+                        _teacherAudioService is null &&
+                        LiveTeacherAudioPolicy
+                            .ShouldRetryCapture(
+                                _lastTeacherStartAttemptUtc,
+                                nowUtc);
+                }
+
+                if (shouldTryCapture)
+                {
+                    TryStartTeacherAudioCapture();
+                }
+
+                try
+                {
+                    lock (_teacherAudioSendLock)
+                    {
+                        if (_teacherUdpSender is not null &&
+                            LiveStreamingPolicy.ShouldSendSilence(
+                                _lastTeacherRealAudioPacketUtc,
+                                nowUtc))
+                        {
+                            _teacherUdpSender.Send(
+                                silenceChunk,
+                                silenceChunk.Length);
+                        }
+                    }
+                }
+                catch (ObjectDisposedException)
+                    when (token.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (SocketException ex)
+                {
+                    _logger.LogDebug(
+                        ex,
+                        "Live teacher-silence UDP keepalive send failed.");
+                }
+
+                await Task.Delay(
+                    TimeSpan.FromMilliseconds(50),
+                    token);
+            }
+        }
+        catch (OperationCanceledException)
+            when (token.IsCancellationRequested)
+        {
+            // Expected during shutdown/recovery.
+        }
+    }
+
     private void PublishLiveStreamStartedIfInactive()
     {
         var snapshot =
@@ -597,6 +886,20 @@ public sealed class LiveStreamingWorker : BackgroundService
             _audioPumpTask = null;
         }
 
+        if (_teacherAudioPumpTask is not null)
+        {
+            try
+            {
+                await _teacherAudioPumpTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected during shutdown/recovery.
+            }
+
+            _teacherAudioPumpTask = null;
+        }
+
         _audioPumpCts?.Dispose();
         _audioPumpCts = null;
 
@@ -605,6 +908,48 @@ public sealed class LiveStreamingWorker : BackgroundService
             _audioService.DataAvailable -= OnAudioDataAvailable;
             _audioService.Stop();
             _audioService = null;
+        }
+
+        MicrophoneCaptureService? teacherAudioService;
+
+        lock (_teacherAudioLifecycleLock)
+        {
+            teacherAudioService =
+                _teacherAudioService;
+
+            _teacherAudioService = null;
+        }
+
+        if (teacherAudioService is not null)
+        {
+            teacherAudioService.DataAvailable -=
+                OnTeacherAudioDataAvailable;
+
+            teacherAudioService.RecordingStopped -=
+                OnTeacherAudioRecordingStopped;
+
+            try
+            {
+                teacherAudioService.Stop();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(
+                    ex,
+                    "Teacher microphone cleanup stopped with an error.");
+            }
+        }
+
+        lock (_teacherAudioSendLock)
+        {
+            _teacherUdpSender?.Dispose();
+            _teacherUdpSender = null;
+
+            _lastTeacherRealAudioPacketUtc =
+                DateTimeOffset.MinValue;
+
+            _lastTeacherStartAttemptUtc =
+                DateTimeOffset.MinValue;
         }
 
         lock (_audioSendLock)

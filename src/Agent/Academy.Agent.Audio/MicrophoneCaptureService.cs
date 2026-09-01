@@ -5,21 +5,14 @@ namespace Academy.Agent.Audio;
 
 public sealed class MicrophoneCaptureService : IAudioCaptureService
 {
-    private readonly string? _configuredEndpointId;
     private readonly WaveFormat _targetFormat;
 
     private MMDevice? _device;
     private WasapiRecorder? _capture;
 
     public MicrophoneCaptureService(
-        string? configuredEndpointId = null,
         WaveFormat? targetFormat = null)
     {
-        _configuredEndpointId =
-            string.IsNullOrWhiteSpace(configuredEndpointId)
-                ? null
-                : configuredEndpointId.Trim();
-
         _targetFormat =
             targetFormat
             ?? WaveFormat.CreateIeeeFloatWaveFormat(
@@ -33,10 +26,7 @@ public sealed class MicrophoneCaptureService : IAudioCaptureService
 
     public string? EndpointName { get; private set; }
 
-    public string SourceKind =>
-        _configuredEndpointId is null
-            ? "DefaultCommunicationsEndpoint"
-            : "ConfiguredEndpoint";
+    public string SourceKind => "VerifiedUsbEndpoint";
 
     public event EventHandler<AudioDataAvailableEventArgs>? DataAvailable;
 
@@ -50,48 +40,58 @@ public sealed class MicrophoneCaptureService : IAudioCaptureService
                 "Microphone capture is already running.");
         }
 
+        MicrophoneEndpointInfo selected =
+            UsbMicrophoneSelectionPolicy.SelectSingleVerifiedUsb(
+                MicrophoneEndpointCatalog.GetActiveCaptureEndpoints());
+
         using var enumerator = new MMDeviceEnumerator();
 
         MMDevice device =
-            _configuredEndpointId is null
-                ? enumerator.GetDefaultAudioEndpoint(
-                    DataFlow.Capture,
-                    Role.Communications)
-                : enumerator.GetDevice(
-                    _configuredEndpointId);
-
-        if (device.DataFlow != DataFlow.Capture ||
-            device.State != DeviceState.Active)
-        {
-            device.Dispose();
-
-            throw new InvalidOperationException(
-                "The selected teacher microphone endpoint is not active.");
-        }
-
-        var capture = new WasapiRecorderBuilder()
-            .WithDevice(device)
-            .WithEventSync()
-            .WithBufferLength(20)
-            .WithFormat(_targetFormat)
-            .Build();
-
-        CaptureFormat = capture.WaveFormat;
-        EndpointId = device.ID;
-        EndpointName = device.FriendlyName;
-
-        capture.DataAvailable += OnDataAvailable;
-        capture.RecordingStopped += OnRecordingStopped;
-
-        _device = device;
-        _capture = capture;
+            enumerator.GetDevice(
+                selected.DeviceId);
 
         try
         {
+            if (device.DataFlow != DataFlow.Capture ||
+                device.State != DeviceState.Active ||
+                !string.Equals(
+                    device.ID,
+                    selected.DeviceId,
+                    StringComparison.Ordinal) ||
+                !WindowsUsbAudioEndpointClassifier
+                    .IsVerifiedUsbAudioEndpoint(
+                        device.ID))
+            {
+                throw new InvalidOperationException(
+                    "Teacher Mic Missing. The selected capture endpoint is no longer a verified active USB microphone.");
+            }
+
+            var capture = new WasapiRecorderBuilder()
+                .WithDevice(device)
+                .WithEventSync()
+                .WithBufferLength(20)
+                .WithFormat(_targetFormat)
+                .Build();
+
+            _device = device;
+            _capture = capture;
+
+            CaptureFormat = capture.WaveFormat;
+            EndpointId = device.ID;
+            EndpointName = device.FriendlyName;
+
+            capture.DataAvailable += OnDataAvailable;
+            capture.RecordingStopped += OnRecordingStopped;
+
             capture.StartRecording();
         }
         catch
         {
+            if (_device is null)
+            {
+                device.Dispose();
+            }
+
             CleanupCapture();
             throw;
         }

@@ -49,12 +49,19 @@ pending-manifest recovery, storage key and normal playback remain intact. The
 worker must select the discrete teacher track explicitly; it must never fall
 back to the mixed/system track and label it teacher speech.
 
-The microphone source is the configured capture endpoint when present,
-otherwise the Windows default communications capture endpoint. Its stable
-endpoint identifier and friendly name are recorded as recording metadata. A
-headset hot-plug or endpoint change requires bounded reconnection and a visible
-coverage transition.
+The teacher microphone source is the single active capture endpoint that is
+verified as genuine USB through Windows Core Audio/PnP ancestry. There is no
+Windows default or default-communications fallback because either one can
+select the laptop internal microphone. Friendly-name text alone is not accepted
+as USB proof.
 
+When exactly one verified USB microphone is present, the Agent automatically
+selects it and records its runtime endpoint provenance. If none is present, or
+multiple verified USB microphones make selection ambiguous, the Agent records
+silence on the teacher input, marks the interval `TeacherMicMissing`, continues
+the mixed/system recording safely, and retries discovery. A replacement genuine
+USB headset may be selected automatically when it becomes the single valid
+endpoint; no per-headset installer approval is required.
 ### Alternatives rejected
 
 - Replacing the existing audio track with microphone-only audio would remove

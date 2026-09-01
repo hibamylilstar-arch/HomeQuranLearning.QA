@@ -6,19 +6,84 @@ import { Room, RoomEvent, Track } from "livekit-client";
 interface LiveVideoProps {
   url: string;
   token: string;
+  isAudible: boolean;
+  onAudibleChange: (enabled: boolean) => void;
 }
 
-export default function LiveVideo({ url, token }: LiveVideoProps) {
+function detachBrowserAudio(
+  audio: HTMLAudioElement | null,
+  track: Track | null
+) {
+  if (!audio) {
+    return;
+  }
+
+  if (track) {
+    track.detach(audio);
+  }
+
+  audio.pause();
+  audio.muted = true;
+  audio.srcObject = null;
+}
+
+export default function LiveVideo({
+  url,
+  token,
+  isAudible,
+  onAudibleChange,
+}: LiveVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const audioTrackRef = useRef<Track | null>(null);
+  const audibleRef = useRef(isAudible);
+  const onAudibleChangeRef = useRef(onAudibleChange);
 
   const [connected, setConnected] = useState(false);
-  const [audioEnabled, setAudioEnabled] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    onAudibleChangeRef.current = onAudibleChange;
+  }, [onAudibleChange]);
+
+  useEffect(() => {
+    audibleRef.current = isAudible;
+
+    const audio = audioRef.current;
+    const track = audioTrackRef.current;
+
+    if (!isAudible) {
+      detachBrowserAudio(audio, track);
+      return;
+    }
+
+    if (!audio || !track) {
+      return;
+    }
+
+    if (!audio.srcObject) {
+      track.attach(audio);
+    }
+
+    audio.muted = false;
+
+    audio.play().catch((err: unknown) => {
+      detachBrowserAudio(audio, track);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not start audio"
+      );
+      onAudibleChangeRef.current(false);
+    });
+  }, [isAudible]);
 
   useEffect(() => {
     let room: Room | null = null;
     let cancelled = false;
+
+    const audioElement = audioRef.current;
+    const videoElement = videoRef.current;
 
     async function connect() {
       try {
@@ -26,31 +91,124 @@ export default function LiveVideo({ url, token }: LiveVideoProps) {
         room = r;
 
         r.on(RoomEvent.TrackSubscribed, (track) => {
-          if (track.kind === Track.Kind.Video && videoRef.current) {
+          if (
+            track.kind === Track.Kind.Video &&
+            videoRef.current
+          ) {
             track.attach(videoRef.current);
             videoRef.current.play().catch(() => {});
           }
 
-          if (track.kind === Track.Kind.Audio && audioRef.current) {
-            track.attach(audioRef.current);
+          if (track.kind === Track.Kind.Audio) {
+            const previousTrack = audioTrackRef.current;
+            const audio = audioRef.current;
+
+            if (
+              previousTrack &&
+              previousTrack !== track
+            ) {
+              detachBrowserAudio(
+                audio,
+                previousTrack
+              );
+            }
+
+            audioTrackRef.current = track;
+
+            if (!audio) {
+              return;
+            }
+
+            if (!audibleRef.current) {
+              detachBrowserAudio(audio, track);
+              return;
+            }
+
+            track.attach(audio);
+            audio.muted = false;
+
+            audio.play().catch((err: unknown) => {
+              detachBrowserAudio(audio, track);
+
+              if (!cancelled) {
+                setError(
+                  err instanceof Error
+                    ? err.message
+                    : "Could not start audio"
+                );
+                onAudibleChangeRef.current(false);
+              }
+            });
           }
         });
 
-        r.on(RoomEvent.Connected, () => setConnected(true));
-        r.on(RoomEvent.Disconnected, () => setConnected(false));
+        r.on(RoomEvent.TrackUnsubscribed, (track) => {
+          if (
+            track.kind === Track.Kind.Video &&
+            videoRef.current
+          ) {
+            track.detach(videoRef.current);
+            videoRef.current.srcObject = null;
+          }
+
+          if (
+            track.kind === Track.Kind.Audio &&
+            audioTrackRef.current === track
+          ) {
+            detachBrowserAudio(
+              audioRef.current,
+              track
+            );
+            audioTrackRef.current = null;
+          }
+        });
+
+        r.on(RoomEvent.Connected, () => {
+          if (!cancelled) {
+            setConnected(true);
+            setError("");
+          }
+        });
+
+        r.on(RoomEvent.Disconnected, () => {
+          detachBrowserAudio(
+            audioRef.current,
+            audioTrackRef.current
+          );
+          audioTrackRef.current = null;
+
+          if (!cancelled) {
+            setConnected(false);
+          }
+        });
 
         await r.connect(url, token);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Live connection failed");
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Live connection failed"
+          );
         }
       }
     }
 
-    connect();
+    void connect();
 
     return () => {
       cancelled = true;
+
+      detachBrowserAudio(
+        audioElement,
+        audioTrackRef.current
+      );
+      audioTrackRef.current = null;
+
+      if (videoElement) {
+        videoElement.pause();
+        videoElement.srcObject = null;
+      }
 
       if (room) {
         room.disconnect();
@@ -61,21 +219,38 @@ export default function LiveVideo({ url, token }: LiveVideoProps) {
   }, [url, token]);
 
   async function toggleAudio() {
-    if (!audioRef.current) return;
+    const audio = audioRef.current;
+    const track = audioTrackRef.current;
 
-    if (audioEnabled) {
-      audioRef.current.muted = true;
-      setAudioEnabled(false);
+    if (isAudible) {
+      onAudibleChange(false);
+      detachBrowserAudio(audio, track);
       return;
     }
 
-    audioRef.current.muted = false;
+    setError("");
+    onAudibleChange(true);
+
+    if (!audio || !track) {
+      return;
+    }
+
+    detachBrowserAudio(audio, track);
+
+    track.attach(audio);
+    audio.muted = false;
 
     try {
-      await audioRef.current.play();
-      setAudioEnabled(true);
+      await audio.play();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start audio");
+      detachBrowserAudio(audio, track);
+      onAudibleChange(false);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not start audio"
+      );
     }
   }
 
@@ -93,7 +268,7 @@ export default function LiveVideo({ url, token }: LiveVideoProps) {
         <audio
           ref={audioRef}
           autoPlay
-          muted={!audioEnabled}
+          muted={!isAudible}
         />
       </div>
 
@@ -106,20 +281,21 @@ export default function LiveVideo({ url, token }: LiveVideoProps) {
           }}
           className="rounded bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
         >
-          {audioEnabled ? "Disable Audio" : "Enable Audio"}
+          {isAudible ? "Disable Audio" : "Enable Audio"}
         </button>
       )}
 
       {!connected && !error && (
-        <p className="text-sm text-slate-500">Connecting...</p>
+        <p className="text-sm text-slate-500">
+          Connecting...
+        </p>
       )}
 
       {error && (
-        <p className="text-sm text-red-600">{error}</p>
+        <p className="text-sm text-red-600">
+          {error}
+        </p>
       )}
     </div>
   );
 }
-
-
-

@@ -44,6 +44,8 @@ interface DeviceLiveCardProps {
   device: DeviceListItem;
   session: SessionListItem | null;
   expanded: boolean;
+  isAudible: boolean;
+  onAudibleChange: (enabled: boolean) => void;
   onExpand: () => void;
   onClose: () => void;
 }
@@ -52,6 +54,8 @@ function DeviceLiveCard({
   device,
   session,
   expanded,
+  isAudible,
+  onAudibleChange,
   onExpand,
   onClose,
 }: DeviceLiveCardProps) {
@@ -163,7 +167,12 @@ function DeviceLiveCard({
         aria-label={expanded ? undefined : `Enlarge live feed for ${laptopName}`}
       >
         {access ? (
-          <LiveVideo url={access.url} token={access.token} />
+          <LiveVideo
+            url={access.url}
+            token={access.token}
+            isAudible={isAudible}
+            onAudibleChange={onAudibleChange}
+          />
         ) : feedError ? (
           <div className="flex aspect-video items-center justify-center rounded-lg bg-black px-5 text-center">
             <div className="space-y-3">
@@ -260,6 +269,7 @@ export default function LiveMonitoringPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expandedDeviceId, setExpandedDeviceId] = useState<string | null>(null);
+  const [audibleDeviceId, setAudibleDeviceId] = useState<string | null>(null);
 
   const loadMetadata = useCallback(async (showLoading = false) => {
     if (showLoading) {
@@ -274,6 +284,21 @@ export default function LiveMonitoringPage() {
 
       setDevices(visibleDevices);
       setSessions(liveSessions);
+
+      setAudibleDeviceId((current) => {
+        if (!current) {
+          return null;
+        }
+
+        const stillOnline = visibleDevices.some(
+          (device) =>
+            device.id === current &&
+            isRecentlyOnline(device)
+        );
+
+        return stillOnline ? current : null;
+      });
+
       setError("");
     } catch (err) {
       setError(getErrorMessage(err));
@@ -366,6 +391,18 @@ export default function LiveMonitoringPage() {
                 device={device}
                 session={activeSession}
                 expanded={expandedDeviceId === device.id}
+                isAudible={audibleDeviceId === device.id}
+                onAudibleChange={(enabled) => {
+                  setAudibleDeviceId((current) => {
+                    if (enabled) {
+                      return device.id;
+                    }
+
+                    return current === device.id
+                      ? null
+                      : current;
+                  });
+                }}
                 onExpand={() => setExpandedDeviceId(device.id)}
                 onClose={() => setExpandedDeviceId(null)}
               />

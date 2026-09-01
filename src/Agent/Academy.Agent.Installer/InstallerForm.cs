@@ -15,7 +15,7 @@ internal sealed class InstallerForm : Form
     private readonly Button _primaryButton = new();
     private readonly Label _statusLabel = new();
     private readonly ProgressBar _progressBar = new();
-    private readonly CancellationTokenSource _cancellation = new();
+    private readonly CancellationTokenSource _cancellation = new();    private bool _deploymentReady;
 
     public InstallerForm(InstallerMode mode)
     {
@@ -93,7 +93,7 @@ internal sealed class InstallerForm : Form
                 Text =
                     "Developed & owned by Abdul Wahid" +
                     Environment.NewLine +
-                    "© 2026 Abdul Wahid. All rights reserved."
+                    "Â© 2026 Abdul Wahid. All rights reserved."
             };
 
         header.Controls.Add(logo);
@@ -162,13 +162,24 @@ internal sealed class InstallerForm : Form
             content.Controls.Add(platformLabel);
             content.Controls.Add(_teamsOption);
             content.Controls.Add(_zoomOption);
+            var microphonePolicy =
+                new Label
+                {
+                    Location = new Point(0, 194),
+                    Size = new Size(660, 62),
+                    ForeColor = Color.FromArgb(78, 91, 103),
+                    Text =
+                        "Teacher microphone: Home Quran Learning automatically uses the single connected verified USB capture device. The laptop/internal microphone and Windows default microphone are never used. If no valid USB microphone is available, recording continues and reports Teacher Mic Missing."
+                };
+
+            content.Controls.Add(microphonePolicy);
         }
 
         _statusLabel.Location =
             new Point(
                 0,
                 _mode == InstallerMode.InstallOrRepair
-                    ? 203
+                    ? 270
                     : 125);
         _statusLabel.Size = new Size(660, 50);
         _statusLabel.ForeColor = Color.FromArgb(78, 91, 103);
@@ -234,13 +245,25 @@ internal sealed class InstallerForm : Form
 
             _statusLabel.Text =
                 $"Secure server: {new Uri(deployment.ApiBaseUrl).Host}    Release: {deployment.Version}";
-            _primaryButton.Enabled = true;
+            _deploymentReady = true;
+            UpdateInstallReadiness();
         }
         catch (Exception ex)
         {
             _statusLabel.Text = ex.Message;
             _statusLabel.ForeColor = Color.FromArgb(160, 35, 35);
         }
+    }
+
+
+    private void UpdateInstallReadiness()
+    {
+        if (_mode == InstallerMode.Uninstall)
+        {
+            return;
+        }
+
+        _primaryButton.Enabled = _deploymentReady;
     }
 
     private async void OnPrimaryButtonClick(
@@ -297,9 +320,9 @@ internal sealed class InstallerForm : Form
             _primaryButton.Enabled = true;
             _teamsOption.Enabled = true;
             _zoomOption.Enabled = true;
+            UpdateInstallReadiness();
         }
     }
-
     private static Image? LoadLogo()
     {
         using Stream? stream =

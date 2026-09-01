@@ -18,6 +18,8 @@ public sealed class RecordingService : IRecordingService
     internal const int TeacherAudioTrackIndex = 1;
     internal const string TeacherAudioTrackTitle =
         "Academy Teacher Microphone QA v1";
+    public const string TeacherMicrophoneMissingReason =
+        "TeacherMicMissing";
 
     private const int SystemAudioUdpPort = 5006;
     private const int TeacherAudioUdpPort = 5007;
@@ -49,10 +51,10 @@ public sealed class RecordingService : IRecordingService
     private int _systemAudioChannels = 2;
     private int _systemAudioBytesPerSample = 4;
 
-    private string? _expectedTeacherEndpointId;
+    private string? _teacherEndpointId;
     private string? _teacherEndpointName;
     private string _teacherSourceKind =
-        "DefaultCommunicationsEndpoint";
+        "VerifiedUsbEndpoint";
     private DateTimeOffset? _teacherCoverageStartedAtUtc;
     private DateTimeOffset? _openTeacherGapStartedAtUtc;
     private string? _openTeacherGapReason;
@@ -90,16 +92,9 @@ public sealed class RecordingService : IRecordingService
         _startedAt = DateTimeOffset.UtcNow;
         _lastSystemAudioPacketUtc = DateTimeOffset.MinValue;
         _lastTeacherAudioPacketUtc = DateTimeOffset.MinValue;
-        _expectedTeacherEndpointId =
-            string.IsNullOrWhiteSpace(
-                _currentOptions.TeacherMicrophoneDeviceId)
-                ? null
-                : _currentOptions.TeacherMicrophoneDeviceId.Trim();
+        _teacherEndpointId = null;
         _teacherEndpointName = null;
-        _teacherSourceKind =
-            _expectedTeacherEndpointId is null
-                ? "DefaultCommunicationsEndpoint"
-                : "ConfiguredEndpoint";
+        _teacherSourceKind = "VerifiedUsbEndpoint";
         _teacherCoverageStartedAtUtc = null;
 
         lock (_coverageLock)
@@ -376,7 +371,6 @@ public sealed class RecordingService : IRecordingService
             }
 
             var capture = new MicrophoneCaptureService(
-                _expectedTeacherEndpointId,
                 WaveFormat.CreateIeeeFloatWaveFormat(
                     TeacherAudioSampleRate,
                     TeacherAudioChannels));
@@ -387,7 +381,7 @@ public sealed class RecordingService : IRecordingService
             try
             {
                 capture.Start();
-                _expectedTeacherEndpointId ??= capture.EndpointId;
+                _teacherEndpointId = capture.EndpointId;
                 _teacherEndpointName = capture.EndpointName;
                 _teacherAudioService = capture;
 
@@ -418,7 +412,7 @@ public sealed class RecordingService : IRecordingService
                 DateTimeOffset now = DateTimeOffset.UtcNow;
                 bool opened = BeginTeacherAudioGap(
                     now,
-                    "MicrophoneUnavailable");
+                    TeacherMicrophoneMissingReason);
 
                 if (opened)
                 {
@@ -428,7 +422,7 @@ public sealed class RecordingService : IRecordingService
                         {
                             IsAvailable = false,
                             OccurredAtUtc = now,
-                            Reason = "MicrophoneUnavailable"
+                            Reason = TeacherMicrophoneMissingReason
                         });
                 }
 
@@ -513,7 +507,7 @@ public sealed class RecordingService : IRecordingService
         DateTimeOffset now = DateTimeOffset.UtcNow;
         bool opened = BeginTeacherAudioGap(
             now,
-            "MicrophoneCaptureStopped");
+            TeacherMicrophoneMissingReason);
 
         if (opened)
         {
@@ -524,7 +518,7 @@ public sealed class RecordingService : IRecordingService
                     IsAvailable = false,
                     OccurredAtUtc = now,
                     EndpointName = _teacherEndpointName,
-                    Reason = "MicrophoneCaptureStopped"
+                    Reason = TeacherMicrophoneMissingReason
                 });
         }
     }
@@ -571,7 +565,7 @@ public sealed class RecordingService : IRecordingService
                         EndedAtUtc = endedAtUtc,
                         Reason =
                             _openTeacherGapReason
-                            ?? "MicrophoneUnavailable"
+                            ?? TeacherMicrophoneMissingReason
                     });
             }
 
@@ -785,7 +779,7 @@ public sealed class RecordingService : IRecordingService
                     TeacherAudioTrackIndex = TeacherAudioTrackIndex,
                     TeacherAudioSourceKind = _teacherSourceKind,
                     TeacherAudioEndpointId =
-                        _expectedTeacherEndpointId,
+                        _teacherEndpointId,
                     TeacherAudioEndpointName = _teacherEndpointName,
                     TeacherAudioCoverageStartedAtUtc =
                         _teacherCoverageStartedAtUtc,

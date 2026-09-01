@@ -39,6 +39,63 @@ Resolved live-path defects:
 This installer supersedes `1ddf417` as the current physically verified Agent baseline for future installs/repairs unless a newer baseline is explicitly verified and recorded.
 <!-- VERIFIED-LIVE-FIX-6782031 END -->
 
+<!-- STRICT-TEACHER-HEADSET START -->
+## Generic verified USB teacher-microphone source checkpoint — 2026-09-01
+
+Branch: `codex/strict-headset-microphone`
+
+The original exact-approved-headset design in this branch has been superseded
+before commit by the generic verified-USB policy.
+
+Current teacher-microphone behavior:
+
+- the Agent never uses Windows Default, Default Communications,
+  internal/Realtek Microphone Array or another implicit fallback;
+- Core Audio capture endpoints are mapped to Windows PnP identities and USB is
+  verified through the real PnP parent/device-bus chain rather than friendly
+  name text;
+- exactly one verified USB capture microphone is selected automatically;
+- zero verified USB microphones produces `Teacher Mic Missing`;
+- more than one verified USB microphone is treated as ambiguous and also fails
+  closed as `Teacher Mic Missing`;
+- recording/live operation continues with teacher-input silence while the
+  microphone is missing or ambiguous;
+- discovery retries allow a different genuine USB headset to be selected
+  automatically when it becomes the single valid endpoint;
+- setup no longer requires selection/approval of one exact headset and no
+  exact microphone endpoint is persisted in Agent configuration;
+- Track 0 remains system/student/class audio plus teacher microphone and Track 1
+  remains the isolated verified USB teacher microphone;
+- live publishing now mixes the existing protected system-audio path with an
+  independent verified USB teacher-microphone UDP input;
+- the protected `6782031` ddagrab timing, stream-key replacement and adaptive
+  system-audio silence behavior remain preserved;
+- Dashboard live listening is coordinated globally: all feeds are muted by
+  default and only one browser feed may be audible at a time; disabling or
+  switching audio detaches stale browser audio without stopping video.
+
+Verification completed in this uncommitted source slice:
+
+- USB endpoint mapping static gate: PASS;
+- physical current-machine USB classifier smoke:
+  exactly one `Microphone (Logi USB Headset)` verified and internal Realtek
+  capture was not accepted;
+- Audio/Media generic-USB runtime slice: PASS;
+- obsolete exact-headset installer active-source cleanup: PASS;
+- Installer/Media/Service Release builds: PASS;
+- Agent tests after live teacher-audio implementation: 34 / 34 PASS;
+- Agent test build: zero warnings;
+- live teacher-audio static protected-path gate: PASS;
+- Dashboard single-audible-feed static gate: PASS;
+- Dashboard lint: PASS, 0 warnings;
+- Dashboard production build: PASS.
+
+The physically verified `6782031` installer remains the deployed Agent baseline.
+The generic USB/live/dashboard source above has not yet been packaged,
+installed or physically validated as a replacement installer. Laptop 5 must
+not be manually patched.
+<!-- STRICT-TEACHER-HEADSET END -->
+
 ## Purpose and authority
 
 Canonical resumable project checkpoint. Use it with Git and actual repository state after reboot, new Codex chat, interrupted phase or missing chat history.

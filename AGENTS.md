@@ -110,6 +110,50 @@ Owner capabilities must evolve through real backend contracts and audited action
 
 Do not implement fake Owner controls. If a capability is not wired end-to-end, mark it unavailable/planned until the backend contract exists.
 
+## Teacher audio and live-listening policy
+
+Academy teacher laptops may use any genuine verified USB capture
+headset/microphone. Home Quran Learning must never capture a laptop internal
+microphone for teacher evidence or live audio.
+
+- Discover active Windows capture endpoints through Core Audio and verify USB
+  hardware using Windows PnP/device-bus ancestry. A friendly name containing
+  `USB` is not sufficient proof.
+- Never use Windows Default, Default Communications, internal/Realtek
+  Microphone Array, or any implicit microphone fallback.
+- Exactly one verified USB capture endpoint is selected automatically.
+- Zero verified USB capture endpoints must fail closed as `Teacher Mic Missing`.
+- Multiple verified USB capture endpoints are ambiguous and must also fail
+  closed as `Teacher Mic Missing`; do not choose one arbitrarily.
+- Missing/ambiguous teacher microphone must not stop authorized recording or
+  live publishing. Supply silence to the teacher input and retry discovery.
+- If the previous USB headset is removed and another genuine verified USB
+  capture headset becomes the single valid endpoint, retry may automatically
+  select the new device. No durable per-headset approval is required.
+- Installer Repair/Update must preserve Agent identity/evidence but must not
+  persist or require approval of one exact microphone endpoint.
+- Recording layout remains Track 0 = system/student/class audio plus the
+  verified USB teacher microphone, and Track 1 = verified USB teacher
+  microphone only.
+- A selected Dashboard live feed contains system/student audio plus the current
+  verified USB teacher microphone. Recording-only microphone changes do not
+  automatically prove the live publisher path; verify both paths.
+
+Dashboard live audio controls are listener controls, not stream-lifecycle
+controls:
+
+- all authorized laptop video feeds may remain live continuously;
+- all feeds are muted by default;
+- only one feed may be audible at a time;
+- enabling audio on one feed must mute and detach audio from every other feed;
+- disabling audio must stop that browser audio immediately while its video and
+  Agent publisher continue;
+- navigation, unmount, reconnect, enlargement and stream replacement must not
+  leave duplicate or buffered audio playing.
+
+Do not globally disable Windows microphone hardware or install/change audio
+drivers as a shortcut. Such a system-wide change remains separately high-risk.
+
 ## Runtime, browser, and Teams
 
 Use `.dev-runtime/Runtime.ps1` when appropriate for local API/Agent lifecycle. TeamsHelper on a development/admin machine should run only when Teams testing requires it.

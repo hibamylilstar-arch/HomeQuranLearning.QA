@@ -8,6 +8,7 @@ internal static class AgentConfigurationWriter
         string agentDirectory,
         DeploymentConfig deployment)
     {
+
         string ffmpegPath =
             Path.Combine(
                 InstallerPaths.InstallRoot,
@@ -35,7 +36,6 @@ internal static class AgentConfigurationWriter
                 AudioBitrateKbps = 64,
                 AudioSampleRate = 32000,
                 AudioChannels = 1,
-                TeacherMicrophoneDeviceId = string.Empty,
                 TeacherMicrophoneRetrySeconds = 5,
                 VideoCrf = 32,
                 VideoPreset = "veryfast",

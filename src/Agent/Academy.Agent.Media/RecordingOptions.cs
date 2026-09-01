@@ -10,7 +10,6 @@ public sealed class RecordingOptions
     public int AudioBitrateKbps { get; init; } = 64;
     public int AudioSampleRate { get; init; } = 32000;
     public int AudioChannels { get; init; } = 1;
-    public string? TeacherMicrophoneDeviceId { get; init; }
     public int TeacherMicrophoneRetrySeconds { get; init; } = 5;
     public string FfmpegPath { get; init; } = "ffmpeg";
 

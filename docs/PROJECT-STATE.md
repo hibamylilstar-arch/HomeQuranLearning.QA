@@ -1,5 +1,69 @@
 # HomeQuranLearning.QA — Project State
 
+<!-- VERIFIED-CLASS-AUDIO-PROD-20260901 START -->
+## USB classroom audio production deployment — 2026-09-01
+
+Release commit: 5a0db194b2dac5a792dc87ef91fd37537427fb6d
+Release: fix(agent): stabilize USB class audio lifecycle
+
+Production source before deployment:
+2e4f52e9c0fdedde9fecba716fbd081393e72f68
+
+Production VPS deployment completed successfully.
+
+Deployment scope:
+- Dashboard image rebuilt and Dashboard container recreated.
+- API was not recreated.
+- PostgreSQL was not recreated.
+- LiveKit was not recreated.
+- LiveKit Ingress was not recreated.
+- MediaMTX relay was not recreated.
+- Recording archive services were not recreated.
+- Caddy was not recreated.
+
+Recorded VPS verification:
+- DASHBOARD_BUILD=PASS
+- DASHBOARD_RUNTIME=PASS
+- API_UNTOUCHED=PASS
+- DATABASE_UNTOUCHED=PASS
+- LIVEKIT_UNTOUCHED=PASS
+- INGRESS_UNTOUCHED=PASS
+- MEDIAMTX_UNTOUCHED=PASS
+- ARCHIVE_UNTOUCHED=PASS
+- CADDY_UNTOUCHED=PASS
+- API_HEALTH=PASS
+- PUBLIC_DASHBOARD=PASS
+- LIVE_PORT_1935=PASS
+- LIVE_PORT_1936=PASS
+- VPS_DASHBOARD_DEPLOY=PASS
+
+Production runtime commit:
+5a0db194b2dac5a792dc87ef91fd37537427fb6d
+
+Rollback commit:
+2e4f52e9c0fdedde9fecba716fbd081393e72f68
+
+Final Owner hardware verification:
+- Student live voice: PASS
+- Teacher live voice: PASS
+- Live latency approximately 2-3 seconds: PASS
+- Stale delayed voice backlog removed: PASS
+- Microphone ON during Teams call: PASS
+- Microphone OFF after Teams call: PASS
+- Recording student voice: PASS
+- Recording teacher voice: PASS
+- Recording mixed audio: PASS
+- Recording stale audio regression: PASS
+
+Verified Windows Agent installer version:
+1.0.0-fd59be681511-classaudio4
+
+Verified installer SHA256:
+4BDE9012D318D44F713C27A46CDC20AD3A8C6C0275532A3591BFE0426EABED50
+
+Laptop 5 has not yet been upgraded to this final installer.
+<!-- VERIFIED-CLASS-AUDIO-PROD-20260901 END -->
+
 <!-- VERIFIED-CLASS-AUDIO-20260901 START -->
 ## Verified USB classroom audio baseline — 2026-09-01
 

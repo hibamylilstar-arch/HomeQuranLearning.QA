@@ -60,6 +60,7 @@ Older sections below are historical evidence and are not active workflow governa
 - Local API, Dashboard and DEV Agent are controlled from one .dev-runtime/LocalDevelopment.ps1 controller. They run as background processes with file logs and no separate visible PowerShell windows. Ensure starts only what is missing; Stop shuts the local runtime down.
 - Installed production Agent tasks are disabled when Local Development Mode starts.
 - Production Owner device will remain as a reusable dormant test device; after local runtime proof its production Agent, ingress, archive target and trial recordings will be disabled/cleared instead of deleting the Device record.
+- Runtime ownership rule: the AI manages local Ensure, Status and Stop as part of its own copy/paste commands. The user normally works only in the original Windows PowerShell terminal and is not responsible for manually managing API, Dashboard or Agent processes.
 <!-- CURRENT-ACTIVE-STATE:END -->
 # HomeQuranLearning.QA — Project State
 

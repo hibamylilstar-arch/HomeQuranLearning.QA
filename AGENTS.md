@@ -124,4 +124,20 @@ Do not invent approval gates for ordinary fixes, documentation, targeted tests, 
 
 ## Local development runtime
 
-- For local development, use .dev-runtime/LocalDevelopment.ps1 -Action Ensure|Stop|Status. API, Dashboard and Agent run in the background; do not open separate terminal windows for them.
+- The user's normal interaction is one original Windows PowerShell terminal only.
+- Do not ask the user to open or manage separate API, Dashboard or Agent PowerShell windows.
+- API, Dashboard and DEV Agent must run as background processes with logs under the local development runtime.
+- Before any task that requires the local application, the AI should include .dev-runtime/LocalDevelopment.ps1 -Action Ensure in its own copy/paste command when needed.
+- Ensure is idempotent: use it to start only missing local components instead of restarting healthy components.
+- During work, use .dev-runtime/LocalDevelopment.ps1 -Action Status only when runtime state is materially relevant; do not repeatedly check it without reason.
+- When local services are no longer needed, the AI should include .dev-runtime/LocalDevelopment.ps1 -Action Stop itself when stopping them provides a benefit.
+- Do not make the user remember routine start/stop commands.
+- Do not stop a healthy local runtime between consecutive development steps when the next step still needs it.
+- Do not restart API, Dashboard, Agent, Docker or other healthy local infrastructure merely as a verification ritual.
+- If one local component fails, repair or restart only that affected boundary whenever possible.
+- Local DEV Agent identity is separate from the production Owner device identity.
+- Local development must target local API/RTMP infrastructure and must not accidentally send Owner development traffic to the VPS.
+- Local DEV recordings are disposable and recording remains off by default unless a specific test requires recording.
+- Optional same-Wi-Fi testing may use the Owner PC LAN address; another laptop's localhost must never be treated as the Owner PC.
+- The production Owner device is a dormant reusable VPS test device, not the normal development device.
+- The user should normally only need to copy/paste the complete command block supplied by the AI into the original terminal.

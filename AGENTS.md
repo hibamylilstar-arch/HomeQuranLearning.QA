@@ -1,219 +1,123 @@
-# HomeQuranLearning.QA Engineering Rules
+# HomeQuranLearning.QA Working Rules
 
-This file governs the repository. A more specific nested `AGENTS.md` may add local instructions; the dashboard file under `src/Dashboard/academy-dashboard` adds Next.js guidance only.
+These rules exist to make engineering faster and more reliable, not to create ceremony.
+Use the minimum investigation, verification and process needed for the actual change.
 
-## Authoritative project context
+## 1. Authority and continuation
 
-Before substantive work, read the minimum relevant context:
+- Current Git source, current runtime evidence and the top CURRENT ACTIVE STATE in docs/PROJECT-STATE.md are authoritative.
+- Chat history is supporting context only.
+- A new AI/session must continue from the latest verified state instead of restarting old investigations.
+- Read older historical project-state sections only when they are directly relevant to the current task.
+- The user's latest clear decision is the default product direction. Do not repeatedly ask for the same confirmation.
+- Do not blindly agree with a technically incorrect decision. Briefly explain the issue and improve the approach.
+- Ask a question only when required information cannot be resolved from source/runtime, or a genuinely high-impact irreversible action needs approval.
 
-1. `AGENTS.md`
-2. `docs/PROJECT-STATE.md`
-3. relevant decisions/architecture documents
-4. `docs/OWNER-CONTROL-PLANE.md` for Owner, authorization, retention, device lifecycle, or remote Agent management work
+## 2. User operating model
 
-Chat history is supporting context only. Git, current source/runtime evidence, and `docs/PROJECT-STATE.md` are authoritative.
+- The user can copy/paste commands but should not be asked to manually find, replace or edit source files.
+- Give complete copy/paste-safe commands with exact paths.
+- Clearly separate Windows PowerShell commands from VPS SSH/Bash commands.
+- Never mix shell syntaxes.
+- Do not ask the user to manually type API keys, passwords, tokens or other secrets when they already exist in approved local/server storage.
+- Read required secrets programmatically from existing secure configuration when necessary, use them without printing them, and clear temporary plaintext values.
+- Never print or commit secrets.
+- Keep an existing VPS SSH/root session open unless the user explicitly asks to disconnect.
+- Do not promise background work or future asynchronous completion.
 
-## Working model
+## 3. Fast engineering loop
 
-Treat this as a real production software project.
+For a normal small or medium fix:
 
-Normal development flow:
+1. inspect only the exact relevant source/state;
+2. identify the failing boundary;
+3. make the smallest production-quality fix;
+4. run the smallest meaningful targeted verification;
+5. if green, continue;
+6. update PROJECT-STATE only at a meaningful checkpoint;
+7. stage exact intended files, commit and push the feature branch.
 
-`inspect relevant state -> implement real production-quality slice -> targeted verification -> fix regressions -> update PROJECT-STATE.md -> review intended diff/secrets -> atomic commit -> normal push -> continue`
+Rules:
 
-Do not add process steps that do not reduce risk or uncertainty.
+- Once enough evidence identifies the root cause, stop diagnosing and fix it.
+- Do not run broad diagnostics just because they are available.
+- Do not repeat a verification that already passed unless subsequent changes could invalidate it.
+- Do not run the full solution test suite for a narrowly isolated fix unless the change can realistically affect the wider system.
+- Cross-cutting architecture, database, auth, deployment or release changes may justify broader tests.
+- Distinguish a command/script/harness error from a product defect quickly.
+- If a mutation script partially succeeds and then fails, continue from the actual current state. Do not blindly rerun the whole mutation block.
+- After a simple error, fix it and move forward.
+- Prefer source-first investigation over speculative runtime probing.
+- Do not create ceremonial GO/APPROVE checkpoints for ordinary development.
 
-Use branch/HEAD/worktree checks before meaningful product work. Inspect runtime, database, Docker, browser, or external services only when the current slice touches them.
+## 4. Files and documentation
 
-Never discard, reset, clean, or stash unexpected human work.
+- Do not create extra status files, handoff files, probe files or scripts unless they provide real ongoing value.
+- Temporary build/probe material should live outside the tracked repo or be removed after use.
+- Do not accumulate obsolete installers, dumps or diagnostic artifacts in tracked source.
+- docs/PROJECT-STATE.md is a concise recovery checkpoint, not a command-by-command diary.
+- Keep current state in the form: Completed -> Proof -> Current -> Next.
+- Historical sections may remain for evidence but must not impose obsolete workflow rules.
 
-## Production-first rules
+## 5. Git workflow
 
-- Build real production-capable paths from the start, even while development remains local.
-- No fake production endpoints, fake health data, fake production metrics, placeholder production controls, hidden credentials, hard-coded device IDs, IP-based trust, or localhost-only assumptions in production paths.
-- Development-only mocks or proof data are allowed only when clearly isolated and labelled development/test-only.
-- A UI control that claims to perform a production action must have a real backend contract; otherwise show it as unavailable/planned, not as working.
-- Secrets must come from approved configuration/secret stores and must never be committed, printed, embedded in UI/source, or copied into documentation.
-- Agents remain outbound-only for normal production communications.
-- Device identity must be unique, revocable, auditable, and independent of roaming IP addresses.
-- Preserve historical evidence identity and auditability.
+- Preserve unrelated human work.
+- Never reset, clean, stash, overwrite or discard unexpected work just to simplify the current task.
+- Do not use git add -A.
+- Stage exact intended files.
+- Normal verified development commits and pushes to the current feature branch do not need separate approval.
+- Do not use force push, force-with-lease, hard reset, clean or history rewriting without explicit approval.
+- main is the canonical branch, but feature work may remain on a feature branch until a deliberate integration decision.
 
-## Change isolation and Git safety
+## 6. Verification policy
 
-Prefer the smallest coherent production-quality change.
+- Small isolated code fix: targeted build/test only.
+- UI-only fix: relevant lint/build or focused browser check only when needed.
+- Agent-only fix: relevant Agent test/build only.
+- API-only fix: relevant backend tests/build only.
+- Database/schema change: migration plus affected backend verification.
+- Production deployment: verify the affected deployed services, not unrelated infrastructure.
+- Never fake green or weaken a meaningful assertion to get a pass.
 
-`main` is the canonical green branch. Use a feature branch for substantial product work when appropriate.
+## 7. Production and approval boundary
 
-Never use without separate explicit exceptional approval:
-
-- `git reset --hard`
-- `git clean`
-- `git push --force`
-- `git push --force-with-lease`
-- history rewriting
-
-Do not stage unrelated files, backups, generated noise, temporary probes, or secrets.
-
-Known local line-ending/index noise must be proven harmless before excluding it; never blindly restore/reset it.
-
-For a verified low-risk development slice:
-
-1. update `docs/PROJECT-STATE.md` at a meaningful recoverable checkpoint;
-2. review intended diff and secret exposure;
-3. create one meaningful atomic commit;
-4. normal push to the current feature branch;
-5. continue the approved roadmap.
-
-A separate release approval is not required for ordinary verified local development commits/pushes.
-
-## Verification policy
-
-- Prefer targeted gates during iteration.
-- Run broader build/test/runtime/browser checks when the slice can affect them.
-- Never fake green, suppress a real failure, or weaken meaningful assertions just to pass.
-- Distinguish product defects from harness/probe defects.
-- After enough evidence identifies the failing boundary/root cause, implement the smallest justified fix and verify it.
-- Preserve proven media, recording, LiveKit, Teams, attendance, and historical-session mechanisms unless a demonstrated defect and impact analysis justify change.
-- Retry-sensitive persistence must be idempotent and restart-safe.
-- Temporary runtime/database proof data must use isolated unique IDs and be cleaned up without touching real evidence.
-
-## Current product invariants
-
-- Development and production use the same production-capable architecture. Verified releases may be deployed to the VPS without artificial staging/pilot gates; production mutations still require the explicit high-risk approval defined below.
-- `StudentCallConnected` is explicit Teams student-presence evidence.
-- `TeacherGreetingSent` and `CallAttempted` are teacher evidence only.
-- `CallEnded` ends duration and does not independently prove attendance.
-- `LessonShared`  is strong attendance evidence for both teacher and student, but its timestamp is not an arrival-time signal and must not by itself mark either participant Late.
-- QA alert time represents recording start plus matched speech offset.
-- A recording is QA-processed only after the complete successful QA path.
-- The production-wired QA worker currently remains `spikes/SttSpike/qa_worker.py`; do not move it casually.
-
-## Owner Control Plane
-
-The Owner Control Plane is a first-class product track, separate from the Admin/Manager operational dashboard.
-
-Authorization model:
-
-`authenticated user + granular permission + resource scope`
-
-Backend enforcement is mandatory. Hidden navigation is not authorization.
-
-Owner capabilities must evolve through real backend contracts and audited actions. Planned areas include:
-
-- system health and operational overview;
-- device enrollment, assignment, revoke/disable, last-seen, and lifecycle history;
-- granular permissions/templates/effective access;
-- organization assignments with history;
-- audit events;
-- configurable recording retention;
-- secure, auditable remote Agent lifecycle and future signed updater controls.
-
-Do not implement fake Owner controls. If a capability is not wired end-to-end, mark it unavailable/planned until the backend contract exists.
-
-## Teacher audio and live-listening policy
-
-Academy teacher laptops may use any genuine verified USB capture
-headset/microphone. Home Quran Learning must never capture a laptop internal
-microphone for teacher evidence or live audio.
-
-- Discover active Windows capture endpoints through Core Audio and verify USB
-  hardware using Windows PnP/device-bus ancestry. A friendly name containing
-  `USB` is not sufficient proof.
-- Never use Windows Default, Default Communications, internal/Realtek
-  Microphone Array, or any implicit microphone fallback.
-- Exactly one verified USB capture endpoint is selected automatically.
-- Zero verified USB capture endpoints must fail closed as `Teacher Mic Missing`.
-- Multiple verified USB capture endpoints are ambiguous and must also fail
-  closed as `Teacher Mic Missing`; do not choose one arbitrarily.
-- Missing/ambiguous teacher microphone must not stop authorized recording or
-  live publishing. Supply silence to the teacher input and retry discovery.
-- If the previous USB headset is removed and another genuine verified USB
-  capture headset becomes the single valid endpoint, retry may automatically
-  select the new device. No durable per-headset approval is required.
-- Installer Repair/Update must preserve Agent identity/evidence but must not
-  persist or require approval of one exact microphone endpoint.
-- Recording layout remains Track 0 = system/student/class audio plus the
-  verified USB teacher microphone, and Track 1 = verified USB teacher
-  microphone only.
-- A selected Dashboard live feed contains system/student audio plus the current
-  verified USB teacher microphone. Recording-only microphone changes do not
-  automatically prove the live publisher path; verify both paths.
-
-Dashboard live audio controls are listener controls, not stream-lifecycle
-controls:
-
-- all authorized laptop video feeds may remain live continuously;
-- all feeds are muted by default;
-- only one feed may be audible at a time;
-- enabling audio on one feed must mute and detach audio from every other feed;
-- disabling audio must stop that browser audio immediately while its video and
-  Agent publisher continue;
-- navigation, unmount, reconnect, enlargement and stream replacement must not
-  leave duplicate or buffered audio playing.
-
-Do not globally disable Windows microphone hardware or install/change audio
-drivers as a shortcut. Such a system-wide change remains separately high-risk.
-
-## Runtime, browser, and Teams
-
-Use `.dev-runtime/Runtime.ps1` when appropriate for local API/Agent lifecycle. TeamsHelper on a development/admin machine should run only when Teams testing requires it.
-
-Use bounded readiness checks and avoid indefinite waits.
-
-Automate local dashboard/browser tests when possible. Never print or persist credentials. If MFA/OTP or a human login is required, stop and ask the owner to perform only that login step.
-
-Teams automation is limited to the documented QA test target and approved test plan. Do not inspect unrelated chats, contact unrelated people, impersonate a student, delete content, or alter account/security settings.
-
-## High-risk approval gate
-
-Stop and obtain explicit owner approval before:
+Explicit user approval is required only for genuinely high-impact actions such as:
 
 - production/VPS deployment or cutover;
-- DNS/TLS production changes;
-- production database migrations or destructive non-test DB actions;
-- deleting real recordings or mutating historical evidence;
+- destructive production database or real evidence changes;
 - secret rotation;
-- auth/RBAC/security policy changes with production impact;
-- replacing proven live/recording architecture;
-- changing Teams attendance semantics;
-- system-wide firewall/security changes;
-- driver installation;
-- force/history Git operations;
-- merge/release to canonical production branch when that changes deployment state.
+- production auth/RBAC/security-policy changes;
+- firewall or driver changes;
+- replacing the proven live/recording transport architecture;
+- destructive Git/history operations;
+- a main-branch merge/release when it changes production deployment state.
 
-For these actions use:
+Do not invent approval gates for ordinary fixes, documentation, targeted tests, feature-branch commits or normal pushes.
 
-`========== HIGH-RISK APPROVAL REQUIRED ==========`
+## 8. Protected HomeQuranLearning invariants
 
-Explain the exact change, impact, rollback, evidence, and requested approval.
+- Managed classroom Agents communicate outbound for normal production operation.
+- Durable Agent DeviceId is the machine identity; editable friendly laptop names are user-facing labels; Windows computer names are not durable targeting identity.
+- Teacher audio must use the verified genuine USB headset/microphone path and must not fall back to internal/Realtek microphone capture.
+- Missing or ambiguous verified USB teacher microphone fails closed for teacher-input capture without unnecessarily stopping permitted recording/live video.
+- Preserve the proven live/recording media path unless an actual defect requires a scoped change.
+- Dashboard live feeds remain muted by default and only one selected feed should be audible at a time.
+- Owner-controlled Agent updates target the selected durable device and the communication microphone is the final install safety gate.
+- Do not reopen already proven updater/live/audio investigations without new evidence of a regression.
 
-## Project state and checkpoints
+## 9. Owner Control Panel
 
-Update `docs/PROJECT-STATE.md` at meaningful recoverable checkpoints and before a commit that closes a coherent slice.
+- The correct product name is Owner Control Panel.
+- Owner Control Panel is deferred until the final product phase, after the main operational system is otherwise ready.
+- Existing older Owner Control Plane documentation is historical/reference material only.
+- Do not treat Owner Control Panel as an active dependency, roadmap gate or required current workstream unless the user explicitly starts that final phase.
 
-Keep it factual:
+## 10. Response and execution style
 
-- branch/HEAD;
-- current phase/status;
-- completed work;
-- verification proof;
-- known issues/regressions;
-- intentionally uncommitted/noise files;
-- next production-development slice;
-- whether anything was pushed/deployed.
-
-Do not turn project state into a command-by-command diary.
-
-After a meaningful checkpoint, a concise report is enough:
-
-`Completed -> Proof -> Current state -> Next`
-
-Do not require ceremonial `GO`/`APPROVE` gates for ordinary low-risk development.
-
-## Human actions
-
-Ask the owner to perform a local command or physical action only when this environment cannot perform it or when a human action is inherently required.
-
-Commands given to the owner must be exact, copy/paste-safe, and preferably single-line when PowerShell continuation prompts could cause confusion.
-
-For a physical/mobile test, state exactly what must remain running and what single action the owner should perform.
+- Be concise and implementation-focused.
+- Prefer one reliable command block over many tiny manual steps.
+- Do not waste time proving obvious facts repeatedly.
+- Surface a discovered blocker once, fix it, and continue.
+- If the user proposes a weaker solution, improve it rather than merely accepting it.
+- If the user is mistaken, correct the technical point respectfully and proceed with the better implementation when the intent is clear.
+- Optimize for: correctness, continuity, minimum manual effort and minimum wasted time.

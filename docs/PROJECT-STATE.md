@@ -1,3 +1,55 @@
+<!-- CURRENT-ACTIVE-STATE:START -->
+# CURRENT ACTIVE STATE — 2026-09-02
+
+This section is the default recovery point for a new AI/session.
+Older sections below are historical evidence and are not active workflow governance.
+
+## Current source position
+
+- Active development branch: `codex/agent-auto-update`.
+- Latest verified product source before this governance-only checkpoint: `b98a416dbc51a617a9673d741dc1c9f739a65575`.
+- `b98a416` fixes heartbeat AgentVersion reporting by sending the installed deployment version instead of the legacy `0.1.0` fallback.
+- Targeted Agent verification at that source: 56 / 56 PASS.
+- `main` has intentionally not been advanced by the updater feature yet.
+
+## Automatic updater
+
+- Owner-controlled automatic Agent updater implementation is complete.
+- Production API/Dashboard updater support was deployed and proven.
+- Owner remote update completed successfully end-to-end.
+- Package download, SHA256 validation, silent install and DeviceId preservation all passed.
+- Test/proof release manifest was disabled after successful proof.
+- Laptop 5 received the one-time updater-enabled USB bootstrap.
+- Future teacher-laptop Agent updates are intended to use Dashboard -> selected friendly laptop -> Update Agent.
+- Do not reopen updater diagnostics unless new evidence shows a regression.
+
+## Live / recording / classroom audio
+
+- Existing proven live and recording architecture remains protected and unchanged by the updater work.
+- Teacher audio remains tied to the verified genuine USB headset path with no internal/Realtek microphone fallback.
+- Continuous recording/live operation is normal and does not by itself block an Agent update.
+- Actual communication microphone use is the final update installation safety gate.
+
+## Working method
+
+- Continue from current source/runtime rather than restarting old investigations.
+- Small fixes use minimal source inspection plus targeted verification only.
+- Do not repeat already-passed tests without an affected-code reason.
+- User commands must be complete copy/paste blocks; no manual source editing or secret entry.
+- PROJECT-STATE should remain concise and checkpoint-oriented.
+
+## Owner Control Panel
+
+- Correct name: Owner Control Panel.
+- It is deferred to the final product phase after the main system is otherwise ready.
+- Older Owner Control Plane material is historical/reference only and is not an active project gate.
+
+## Next
+
+- Automatic-updater phase is closed.
+- Continue with the next requested product feature from this state.
+- Do not spend time on Owner Control Panel until the user explicitly starts that final phase.
+<!-- CURRENT-ACTIVE-STATE:END -->
 # HomeQuranLearning.QA — Project State
 
 <!-- AGENT-AUTO-UPDATE-FOUNDATION-20260902 START -->

@@ -5,25 +5,16 @@ namespace Academy.Agent.Tests;
 public sealed class AgentUpdateReadinessPolicyTests
 {
     [Fact]
-    public void IdleAgent_IsSafeToUpdate()
-    {
-        var snapshot = new AgentActivitySnapshot();
-
-        Assert.True(
-            AgentUpdateReadinessPolicy.IsSafeToUpdate(
-                snapshot,
-                communicationMicrophoneInUse: false));
-    }
-
-    [Fact]
-    public void Recording_BlocksUpdate()
+    public void OwnerControlledIdleLaptop_IsSafeToUpdate()
     {
         var snapshot = new AgentActivitySnapshot
         {
-            IsRecordingActive = true
+            IsRecordingActive = true,
+            IsLiveStreamingActive = true,
+            IsCommunicationProcessActive = true
         };
 
-        Assert.False(
+        Assert.True(
             AgentUpdateReadinessPolicy.IsSafeToUpdate(
                 snapshot,
                 communicationMicrophoneInUse: false));
@@ -38,33 +29,5 @@ public sealed class AgentUpdateReadinessPolicyTests
             AgentUpdateReadinessPolicy.IsSafeToUpdate(
                 snapshot,
                 communicationMicrophoneInUse: true));
-    }
-
-    [Fact]
-    public void IdleCommunicationApplication_DoesNotBlockUpdate()
-    {
-        var snapshot = new AgentActivitySnapshot
-        {
-            IsCommunicationProcessActive = true
-        };
-
-        Assert.True(
-            AgentUpdateReadinessPolicy.IsSafeToUpdate(
-                snapshot,
-                communicationMicrophoneInUse: false));
-    }
-
-    [Fact]
-    public void AlwaysOnLivePublisher_DoesNotBlockUpdate()
-    {
-        var snapshot = new AgentActivitySnapshot
-        {
-            IsLiveStreamingActive = true
-        };
-
-        Assert.True(
-            AgentUpdateReadinessPolicy.IsSafeToUpdate(
-                snapshot,
-                communicationMicrophoneInUse: false));
     }
 }

@@ -3,6 +3,8 @@ export interface DeviceListItem {
   deviceId: string;
   deviceName: string;
   recordingDisplayName: string | null;
+  pendingAgentUpdateVersion: string | null;
+  agentUpdateRequestedAtUtc: string | null;
   agentVersion: string;
   status: string;
   lastSeenUtc: string;

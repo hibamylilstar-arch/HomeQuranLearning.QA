@@ -36,6 +36,7 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.DeviceId).IsRequired().HasMaxLength(128);
             entity.HasIndex(x => x.DeviceId).IsUnique();
             entity.Property(x => x.DeviceName).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.PendingAgentUpdateVersion).HasMaxLength(64);
             entity.Property(x => x.LiveKitIngressId).HasMaxLength(256);
             entity.Property(x => x.LiveKitStreamKey).HasMaxLength(512);
             entity.Property(x => x.AgentVersion).IsRequired().HasMaxLength(64);

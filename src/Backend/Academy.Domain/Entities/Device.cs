@@ -14,6 +14,10 @@ public sealed class Device
     // DeviceName remains the real Windows machine name.
     public string? RecordingDisplayName { get; set; }
 
+    public string? PendingAgentUpdateVersion { get; set; }
+
+    public DateTimeOffset? AgentUpdateRequestedAtUtc { get; set; }
+
     // Stable LiveKit ingress assigned to this managed classroom device.
     // Independent of class/session and recording lifecycle.
     public string? LiveKitIngressId { get; set; }

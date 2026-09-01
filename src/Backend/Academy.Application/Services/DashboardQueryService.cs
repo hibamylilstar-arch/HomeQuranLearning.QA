@@ -178,6 +178,10 @@ public sealed class DashboardQueryService
                 DeviceName = x.DeviceName,
                 RecordingDisplayName =
                     x.RecordingDisplayName,
+                PendingAgentUpdateVersion =
+                    x.PendingAgentUpdateVersion,
+                AgentUpdateRequestedAtUtc =
+                    x.AgentUpdateRequestedAtUtc,
                 AgentVersion = x.AgentVersion,
                 Status = x.Status.ToString(),
                 LastSeenUtc = x.LastSeenUtc

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   getDevices,
+  requestAgentUpdate,
   updateRecordingDisplayName,
 } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
@@ -18,6 +19,8 @@ export default function DevicesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [notice, setNotice] = useState("");
 
   const canEdit =
     user?.role === "Owner" ||
@@ -78,6 +81,30 @@ export default function DevicesPage() {
     }
   }
 
+  async function queueAgentUpdate(device: DeviceListItem) {
+    try {
+      setUpdatingId(device.id);
+      setError("");
+      setNotice("");
+
+      const result = await requestAgentUpdate(device.id);
+
+      setNotice(
+        `${result.displayName}: Agent ${result.version} update queued.`
+      );
+
+      await loadDevices();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not queue Agent update"
+      );
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -103,6 +130,12 @@ export default function DevicesPage() {
       {error && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-xs font-medium text-rose-700">
           {error}
+        </div>
+      )}
+
+      {notice && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-xs font-medium text-emerald-700">
+          {notice}
         </div>
       )}
 
@@ -157,7 +190,7 @@ export default function DevicesPage() {
 
                     <div>
                       <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Recording Name
+                        Laptop Name
                       </div>
 
                       {editing ? (
@@ -250,6 +283,37 @@ export default function DevicesPage() {
                           {device.agentVersion || "0.1.0"}
                         </div>
                       </div>
+
+                      {user?.role === "Owner" && (
+                        <div>
+                          <div className="text-[10px] uppercase text-slate-400">
+                            Update
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={
+                              !online ||
+                              updatingId === device.id ||
+                              !device.recordingDisplayName
+                            }
+                            onClick={() =>
+                              queueAgentUpdate(device)
+                            }
+                            className="mt-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {updatingId === device.id
+                              ? "Queuing..."
+                              : "Update Agent"}
+                          </button>
+
+                          {device.pendingAgentUpdateVersion && (
+                            <div className="mt-1 text-[10px] font-semibold text-amber-600">
+                              Queued: {device.pendingAgentUpdateVersion}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       <div>
                         <div className="text-[10px] uppercase text-slate-400">

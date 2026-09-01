@@ -6,11 +6,9 @@ public static class AgentUpdateReadinessPolicy
         AgentActivitySnapshot snapshot,
         bool communicationMicrophoneInUse)
     {
-        // Teams/Zoom process presence and the always-on live
-        // monitoring publisher are infrastructure state, not proof
-        // that a classroom call is currently active.
-        return
-            !snapshot.IsRecordingActive &&
-            !communicationMicrophoneInUse;
+        // Update timing is explicitly Owner-controlled.
+        // Continuous recording, always-on monitoring, and an idle
+        // Teams/Zoom process are normal classroom infrastructure.
+        return !communicationMicrophoneInUse;
     }
 }

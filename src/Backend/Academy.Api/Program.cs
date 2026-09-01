@@ -273,10 +273,13 @@ app.MapPost("/api/agent/session-events", async (
             new { error = ex.Message });
     }
 });
-app.MapGet("/api/agent/update/manifest", (
+app.MapGet("/api/agent/update/manifest", async (
     HttpRequest request,
     string? deviceId,
-    string? currentVersion) =>
+    string? currentVersion,
+    IDeviceRepository deviceRepository,
+    IUnitOfWork unitOfWork,
+    CancellationToken cancellationToken) =>
 {
     if (!request.Headers.TryGetValue(
             "X-Api-Key",
@@ -290,52 +293,70 @@ app.MapGet("/api/agent/update/manifest", (
         string.IsNullOrWhiteSpace(currentVersion))
     {
         return Results.BadRequest(
-            new
-            {
-                error =
-                    "deviceId and currentVersion are required."
-            });
+            new { error = "deviceId and currentVersion are required." });
+    }
+
+    Device? device =
+        await deviceRepository.GetByDeviceIdAsync(
+            deviceId,
+            cancellationToken);
+
+    if (device is null)
+    {
+        return Results.NotFound(
+            new { error = "Unknown device." });
     }
 
     Academy.Api.AgentUpdateReleaseManifest? manifest =
         Academy.Api.AgentUpdateReleaseStore.Read(
             agentUpdateReleaseRoot);
 
-    if (manifest is null ||
-        !manifest.Enabled)
+    if (manifest is null || !manifest.Enabled)
     {
-        return Results.Ok(
-            new
-            {
-                enabled = false
-            });
+        return Results.Ok(new { enabled = false });
     }
 
-    string[] targets =
-        manifest.TargetDeviceIds ?? [];
-
-    bool targeted =
-        targets.Length == 0 ||
-        targets.Any(
-            x => string.Equals(
-                x,
-                deviceId,
-                StringComparison.OrdinalIgnoreCase));
-
-    bool updateAvailable =
-        targeted &&
-        !string.Equals(
-            manifest.Version,
+    if (string.Equals(
             currentVersion,
+            manifest.Version,
+            StringComparison.OrdinalIgnoreCase))
+    {
+        if (device.PendingAgentUpdateVersion is not null)
+        {
+            device.PendingAgentUpdateVersion = null;
+            device.AgentUpdateRequestedAtUtc = null;
+            device.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            deviceRepository.Update(device);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        return Results.Ok(new { enabled = false });
+    }
+
+    bool requestFresh =
+        device.AgentUpdateRequestedAtUtc.HasValue &&
+        device.AgentUpdateRequestedAtUtc.Value >=
+            DateTimeOffset.UtcNow.AddMinutes(-30);
+
+    bool requestMatches =
+        string.Equals(
+            device.PendingAgentUpdateVersion,
+            manifest.Version,
             StringComparison.OrdinalIgnoreCase);
 
-    if (!updateAvailable)
+    if (!requestFresh || !requestMatches)
     {
-        return Results.Ok(
-            new
-            {
-                enabled = false
-            });
+        if (device.AgentUpdateRequestedAtUtc.HasValue &&
+            !requestFresh)
+        {
+            device.PendingAgentUpdateVersion = null;
+            device.AgentUpdateRequestedAtUtc = null;
+            device.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            deviceRepository.Update(device);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        return Results.Ok(new { enabled = false });
     }
 
     return Results.Ok(
@@ -345,11 +366,9 @@ app.MapGet("/api/agent/update/manifest", (
             releaseId = manifest.ReleaseId,
             version = manifest.Version,
             sha256 = manifest.Sha256,
-            requireAuthenticode =
-                manifest.RequireAuthenticode,
+            requireAuthenticode = manifest.RequireAuthenticode,
             signerThumbprint =
-                manifest.SignerThumbprint ??
-                string.Empty
+                manifest.SignerThumbprint ?? string.Empty
         });
 });
 
@@ -622,6 +641,84 @@ app.MapGet("/api/admin/devices", async (
     var devices = await dashboardQueryService.GetVisibleDevicesAsync(userId, role, cancellationToken);
     return Results.Ok(devices);
 }).RequireAuthorization();
+
+app.MapPost("/api/admin/devices/{deviceId:guid}/agent-update", async (
+    Guid deviceId,
+    IDeviceRepository deviceRepository,
+    IUnitOfWork unitOfWork,
+    CancellationToken cancellationToken) =>
+{
+    Device? device =
+        await deviceRepository.GetByIdAsync(
+            deviceId,
+            cancellationToken);
+
+    if (device is null)
+    {
+        return Results.NotFound(
+            new { error = "Device not found." });
+    }
+
+    Academy.Api.AgentUpdateReleaseManifest? manifest =
+        Academy.Api.AgentUpdateReleaseStore.Read(
+            agentUpdateReleaseRoot);
+
+    if (manifest is null || !manifest.Enabled)
+    {
+        return Results.Conflict(
+            new { error = "No Agent update release is currently published." });
+    }
+
+    string packagePath =
+        Academy.Api.AgentUpdateReleaseStore.GetPackagePath(
+            agentUpdateReleaseRoot,
+            manifest.ReleaseId);
+
+    if (!File.Exists(packagePath))
+    {
+        return Results.Conflict(
+            new { error = "Published Agent installer package is missing." });
+    }
+
+    if (string.Equals(
+            device.AgentVersion,
+            manifest.Version,
+            StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.Conflict(
+            new { error = "This laptop already has the published Agent version." });
+    }
+
+    device.PendingAgentUpdateVersion =
+        manifest.Version;
+
+    device.AgentUpdateRequestedAtUtc =
+        DateTimeOffset.UtcNow;
+
+    device.UpdatedAtUtc =
+        DateTimeOffset.UtcNow;
+
+    deviceRepository.Update(device);
+
+    await unitOfWork.SaveChangesAsync(
+        cancellationToken);
+
+    string displayName =
+        !string.IsNullOrWhiteSpace(device.RecordingDisplayName)
+            ? device.RecordingDisplayName
+            : device.DeviceName;
+
+    return Results.Ok(
+        new
+        {
+            queued = true,
+            deviceId = device.Id,
+            displayName,
+            version = manifest.Version,
+            expiresAtUtc =
+                device.AgentUpdateRequestedAtUtc.Value.AddMinutes(30)
+        });
+}).RequireAuthorization(OwnerOnlyPolicy);
 
 app.MapPatch("/api/admin/devices/{deviceId:guid}/recording-display-name", async (
     Guid deviceId,

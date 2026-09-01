@@ -581,7 +581,7 @@ internal sealed class InstallCoordinator
                 "/SC",
                 "MINUTE",
                 "/MO",
-                "15",
+                "1",
                 "/RU",
                 "SYSTEM",
                 "/RL",

@@ -6,6 +6,8 @@ public sealed class DeviceListItem
     public string DeviceId { get; init; } = string.Empty;
     public string DeviceName { get; init; } = string.Empty;
     public string? RecordingDisplayName { get; init; }
+    public string? PendingAgentUpdateVersion { get; init; }
+    public DateTimeOffset? AgentUpdateRequestedAtUtc { get; init; }
     public string AgentVersion { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
     public DateTimeOffset LastSeenUtc { get; init; }

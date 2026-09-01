@@ -471,3 +471,18 @@ export async function updateRecordingDisplayName(
     }
   );
 }
+
+export async function requestAgentUpdate(
+  deviceId: string
+): Promise<{
+  queued: boolean;
+  deviceId: string;
+  displayName: string;
+  version: string;
+  expiresAtUtc: string;
+}> {
+  return proxyFetch(
+    ["devices", deviceId, "agent-update"],
+    { method: "POST" }
+  );
+}

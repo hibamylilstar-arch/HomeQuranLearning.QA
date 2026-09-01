@@ -1040,3 +1040,14 @@ Verified at: 2026-08-31 16:31:19 +05:00
 - Embedded Home Quran Learning executable icon verified.
 - Successful heartbeat, RTMP live publishing and growing local recording verified after both repairs.
 - Existing Windows microphone privacy-history records were not modified.
+
+<!-- OWNER-CONTROLLED-AGENT-UPDATE-20260902 -->
+### Owner-controlled Agent updates
+- Owner selects the editable laptop name shown on Device page, for example Laptop 5.
+- Dashboard submits the selected Device database record Id; backend resolves the permanent Agent DeviceId internally.
+- Windows computer name is not used for update targeting.
+- Only Owner can queue an update.
+- Queued update requests expire after 30 minutes.
+- Agent checks for updates every 1 minute.
+- Continuous recording and always-on live monitoring do not block Owner-controlled maintenance.
+- Verified communication microphone usage remains the final accidental-call safety gate.

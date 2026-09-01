@@ -74,7 +74,7 @@ Current teacher-microphone behavior:
   default and only one browser feed may be audible at a time; disabling or
   switching audio detaches stale browser audio without stopping video.
 
-Verification completed in this uncommitted source slice:
+Verification completed before source commit `80c4dcd`:
 
 - USB endpoint mapping static gate: PASS;
 - physical current-machine USB classifier smoke:

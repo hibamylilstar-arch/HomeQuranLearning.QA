@@ -48,7 +48,8 @@ Downloads/shared storage after installation.
   headset becomes the single valid capture endpoint it may be selected without
   reinstalling or manually editing the laptop.
 - Windows Default, Default Communications and internal/Realtek microphones are
-  never used as teacher microphone fallback.- Live streaming is enabled. The Agent uses its durable `device.json` identity
+  never used as teacher microphone fallback.
+- Live streaming is enabled. The Agent uses its durable `device.json` identity
   and publishes encrypted WHIP/WebRTC media only for an active authorized
   session.
 - The cloud credential is removed from `appsettings.json` and stored with

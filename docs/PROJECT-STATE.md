@@ -61,6 +61,7 @@ Older sections below are historical evidence and are not active workflow governa
 - Installed production Agent tasks are disabled when Local Development Mode starts.
 - Production Owner device will remain as a reusable dormant test device; after local runtime proof its production Agent, ingress, archive target and trial recordings will be disabled/cleared instead of deleting the Device record.
 - Runtime ownership rule: the AI manages local Ensure, Status and Stop as part of its own copy/paste commands. The user normally works only in the original Windows PowerShell terminal and is not responsible for manually managing API, Dashboard or Agent processes.
+- USB headset auto-selection fix completed locally: one verified physical USB headset may expose multiple logical Windows render/capture endpoints. Agent prefers Communications -> Multimedia -> Console -> deterministic fallback within that same physical USB device. Realtek/internal fallback remains forbidden; multiple physical USB headsets still fail closed. Laptop 5 physical verification remains pending until the teacher/headset is available; deployment target is the next Agent updater release.
 <!-- CURRENT-ACTIVE-STATE:END -->
 # HomeQuranLearning.QA — Project State
 

@@ -8,6 +8,8 @@ public static class AgentUpdateReadinessPolicy
     {
         return
             !snapshot.IsRecordingActive &&
+            !snapshot.IsLiveStreamingActive &&
+            !snapshot.IsCommunicationProcessActive &&
             !communicationMicrophoneInUse;
     }
 }

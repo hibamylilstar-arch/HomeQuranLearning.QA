@@ -5,13 +5,14 @@ namespace Academy.Agent.Tests;
 public sealed class AgentUpdateReadinessPolicyTests
 {
     [Fact]
-    public void IdleAgent_IsSafeToUpdate()
+    public void FullyIdleAgent_IsSafeToUpdate()
     {
-        var snapshot =
-            new AgentActivitySnapshot
-            {
-                IsRecordingActive = false
-            };
+        var snapshot = new AgentActivitySnapshot
+        {
+            IsRecordingActive = false,
+            IsLiveStreamingActive = false,
+            IsCommunicationProcessActive = false
+        };
 
         Assert.True(
             AgentUpdateReadinessPolicy.IsSafeToUpdate(
@@ -20,13 +21,12 @@ public sealed class AgentUpdateReadinessPolicyTests
     }
 
     [Fact]
-    public void RecordingAgent_IsNotSafeToUpdate()
+    public void Recording_BlocksUpdate()
     {
-        var snapshot =
-            new AgentActivitySnapshot
-            {
-                IsRecordingActive = true
-            };
+        var snapshot = new AgentActivitySnapshot
+        {
+            IsRecordingActive = true
+        };
 
         Assert.False(
             AgentUpdateReadinessPolicy.IsSafeToUpdate(
@@ -35,13 +35,37 @@ public sealed class AgentUpdateReadinessPolicyTests
     }
 
     [Fact]
-    public void ActiveClassMicrophone_IsNotSafeToUpdate()
+    public void LiveStreaming_BlocksUpdate()
     {
-        var snapshot =
-            new AgentActivitySnapshot
-            {
-                IsRecordingActive = false
-            };
+        var snapshot = new AgentActivitySnapshot
+        {
+            IsLiveStreamingActive = true
+        };
+
+        Assert.False(
+            AgentUpdateReadinessPolicy.IsSafeToUpdate(
+                snapshot,
+                communicationMicrophoneInUse: false));
+    }
+
+    [Fact]
+    public void CommunicationProcess_BlocksUpdate()
+    {
+        var snapshot = new AgentActivitySnapshot
+        {
+            IsCommunicationProcessActive = true
+        };
+
+        Assert.False(
+            AgentUpdateReadinessPolicy.IsSafeToUpdate(
+                snapshot,
+                communicationMicrophoneInUse: false));
+    }
+
+    [Fact]
+    public void CommunicationMicrophone_BlocksUpdate()
+    {
+        var snapshot = new AgentActivitySnapshot();
 
         Assert.False(
             AgentUpdateReadinessPolicy.IsSafeToUpdate(

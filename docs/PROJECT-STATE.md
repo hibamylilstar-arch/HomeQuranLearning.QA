@@ -59,7 +59,7 @@ Older sections below are historical evidence and are not active workflow governa
 - Local recording is disabled by default to avoid unnecessary test recording accumulation.
 - Local Dashboard is intended to be available on localhost and optionally the Owner PC LAN address.
 - Installed production Agent tasks are disabled when Local Development Mode starts.
-- Production VPS Owner-device deletion is the next cleanup after local runtime proof.
+- Production Owner device will remain as a reusable dormant test device; after local runtime proof its production Agent, ingress, archive target and trial recordings will be disabled/cleared instead of deleting the Device record.
 <!-- CURRENT-ACTIVE-STATE:END -->
 # HomeQuranLearning.QA — Project State
 

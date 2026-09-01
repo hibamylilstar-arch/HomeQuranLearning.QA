@@ -142,6 +142,12 @@ string agentApiKey = app.Configuration["AgentApiKey"] ?? string.Empty;
 string workerApiKey = app.Configuration["WorkerApiKey"] ?? string.Empty;
 string archiveRegistrarApiKey = app.Configuration["ArchiveRegistrarApiKey"] ?? string.Empty;
 
+string agentUpdateReleaseRoot =
+    app.Configuration["AgentUpdates:ReleaseRoot"]
+    ?? Path.Combine(
+        AppContext.BaseDirectory,
+        "agent-releases");
+
 var jsonOptions = new System.Text.Json.JsonSerializerOptions(
     System.Text.Json.JsonSerializerDefaults.Web);
 jsonOptions.Converters.Add(new JsonStringEnumConverter());
@@ -267,6 +273,140 @@ app.MapPost("/api/agent/session-events", async (
             new { error = ex.Message });
     }
 });
+app.MapGet("/api/agent/update/manifest", (
+    HttpRequest request,
+    string? deviceId,
+    string? currentVersion) =>
+{
+    if (!request.Headers.TryGetValue(
+            "X-Api-Key",
+            out var values) ||
+        values.ToString() != agentApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (string.IsNullOrWhiteSpace(deviceId) ||
+        string.IsNullOrWhiteSpace(currentVersion))
+    {
+        return Results.BadRequest(
+            new
+            {
+                error =
+                    "deviceId and currentVersion are required."
+            });
+    }
+
+    Academy.Api.AgentUpdateReleaseManifest? manifest =
+        Academy.Api.AgentUpdateReleaseStore.Read(
+            agentUpdateReleaseRoot);
+
+    if (manifest is null ||
+        !manifest.Enabled)
+    {
+        return Results.Ok(
+            new
+            {
+                enabled = false
+            });
+    }
+
+    string[] targets =
+        manifest.TargetDeviceIds ?? [];
+
+    bool targeted =
+        targets.Length == 0 ||
+        targets.Any(
+            x => string.Equals(
+                x,
+                deviceId,
+                StringComparison.OrdinalIgnoreCase));
+
+    bool updateAvailable =
+        targeted &&
+        !string.Equals(
+            manifest.Version,
+            currentVersion,
+            StringComparison.OrdinalIgnoreCase);
+
+    if (!updateAvailable)
+    {
+        return Results.Ok(
+            new
+            {
+                enabled = false
+            });
+    }
+
+    return Results.Ok(
+        new
+        {
+            enabled = true,
+            releaseId = manifest.ReleaseId,
+            version = manifest.Version,
+            sha256 = manifest.Sha256,
+            requireAuthenticode =
+                manifest.RequireAuthenticode,
+            signerThumbprint =
+                manifest.SignerThumbprint ??
+                string.Empty
+        });
+});
+
+app.MapGet("/api/agent/update/package/{releaseId}", (
+    HttpRequest request,
+    string releaseId) =>
+{
+    if (!request.Headers.TryGetValue(
+            "X-Api-Key",
+            out var values) ||
+        values.ToString() != agentApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!Academy.Api.AgentUpdateReleaseStore
+            .IsSafeReleaseId(releaseId))
+    {
+        return Results.BadRequest(
+            new
+            {
+                error = "Invalid releaseId."
+            });
+    }
+
+    Academy.Api.AgentUpdateReleaseManifest? manifest =
+        Academy.Api.AgentUpdateReleaseStore.Read(
+            agentUpdateReleaseRoot);
+
+    if (manifest is null ||
+        !manifest.Enabled ||
+        !string.Equals(
+            manifest.ReleaseId,
+            releaseId,
+            StringComparison.Ordinal))
+    {
+        return Results.NotFound();
+    }
+
+    string packagePath =
+        Academy.Api.AgentUpdateReleaseStore
+            .GetPackagePath(
+                agentUpdateReleaseRoot,
+                releaseId);
+
+    if (!File.Exists(packagePath))
+    {
+        return Results.NotFound();
+    }
+
+    return Results.File(
+        packagePath,
+        "application/octet-stream",
+        "Home Quran Learning Setup.exe",
+        enableRangeProcessing: false);
+});
+
 app.MapGet("/api/agent/class-window", async (
     HttpRequest request,
     SessionService sessionService,

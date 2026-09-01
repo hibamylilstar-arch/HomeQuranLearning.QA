@@ -17,6 +17,9 @@ internal static class NativeMethods
         string? newFileName,
         int flags);
 
+    [DllImport("kernel32.dll")]
+    private static extern uint WTSGetActiveConsoleSessionId();
+
     [DllImport(
         "Wtsapi32.dll",
         SetLastError = true,
@@ -32,6 +35,20 @@ internal static class NativeMethods
     [DllImport("Wtsapi32.dll")]
     private static extern void WTSFreeMemory(
         IntPtr memory);
+
+    public static int GetActiveConsoleSessionId()
+    {
+        uint sessionId =
+            WTSGetActiveConsoleSessionId();
+
+        if (sessionId == uint.MaxValue)
+        {
+            throw new InvalidOperationException(
+                "No active Windows console session is available.");
+        }
+
+        return checked((int)sessionId);
+    }
 
     public static void DeleteAfterRestart(string path)
     {

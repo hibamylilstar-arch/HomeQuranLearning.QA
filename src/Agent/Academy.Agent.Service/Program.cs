@@ -1,4 +1,4 @@
-﻿using Academy.Agent.Cloud;
+using Academy.Agent.Cloud;
 using Academy.Agent.Service;
 
 var builder = Host.CreateApplicationBuilder(
@@ -86,6 +86,7 @@ builder.Services.AddHostedService<TeamsEvidenceJournalWorker>();
 builder.Services.AddHostedService<RecordingWorker>();
 builder.Services.AddHostedService<HeartbeatWorker>();
 builder.Services.AddHostedService<LiveStreamingWorker>();
+builder.Services.AddHostedService<AgentUpdateReadinessWorker>();
 
 var host = builder.Build();
 

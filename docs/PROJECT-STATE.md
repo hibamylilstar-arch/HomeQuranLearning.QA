@@ -1,5 +1,41 @@
 # HomeQuranLearning.QA — Project State
 
+<!-- AGENT-AUTO-UPDATE-FOUNDATION-20260902 START -->
+## Secure Agent automatic update foundation — 2026-09-02
+
+Feature branch: codex/agent-auto-update
+
+Implemented and locally verified:
+- Windows Agent writes a fresh update-readiness state.
+- Active recording blocks update installation.
+- Active communication microphone/class blocks update installation.
+- Dedicated updater Scheduled Task runs as LocalSystem every 15 minutes.
+- Updater authenticates to the existing Agent API over HTTPS.
+- Existing DPAPI LocalMachine Agent API credential is reused without storing plaintext configuration.
+- Installer download requires SHA256 verification before execution.
+- Optional Authenticode signer verification is supported.
+- Installer now supports unattended --silent install/repair.
+- Session-0 SYSTEM updates resolve the active classroom Windows user before recreating interactive Agent/Teams tasks and ACLs.
+- Backend exposes authenticated update manifest and package endpoints.
+- Release manifests support TargetDeviceIds for staged per-device rollout.
+- Production compose source mounts Agent release storage read-only into the API container.
+- Release manifest builder script produces package metadata and SHA256.
+
+Current deployment state:
+- Auto-update feature has NOT been deployed to the VPS.
+- No teacher laptop currently depends on this updater.
+- Existing production runtime remains unchanged.
+- First rollout will use the Owner machine as the bootstrap and automatic-update test device.
+
+Rollout plan:
+1. Build updater-enabled bootstrap installer.
+2. Install bootstrap once on Owner machine.
+3. Deploy update API source to VPS.
+4. Publish a second targeted release for Owner Device ID only.
+5. Prove unattended VPS-to-Agent upgrade.
+6. Only after proof, extend rollout to Laptop 5 and other academy laptops.
+<!-- AGENT-AUTO-UPDATE-FOUNDATION-20260902 END -->
+
 <!-- VERIFIED-CLASS-AUDIO-PROD-20260901 START -->
 ## USB classroom audio production deployment — 2026-09-01
 

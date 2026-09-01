@@ -93,6 +93,9 @@ services:
       SeedOwner__FullName: Owner
       SeedOwner__Email: ${SEED_OWNER_EMAIL}
       SeedOwner__Password: ${SEED_OWNER_PASSWORD}
+      AgentUpdates__ReleaseRoot: /agent-releases
+    volumes:
+      - ${AGENT_RELEASES_DIR:-/opt/homequranlearning-agent-releases}:/agent-releases:ro
     depends_on:
       postgres:
         condition: service_healthy

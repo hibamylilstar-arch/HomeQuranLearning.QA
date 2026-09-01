@@ -222,6 +222,10 @@ try {
         -LiteralPath $ffmpegLicense `
         -Destination (Join-Path $toolsOutput "FFMPEG-LICENSE.txt")
 
+    Copy-Item `
+        -LiteralPath (Join-Path $repo "scripts\AgentAutoUpdate.ps1") `
+        -Destination (Join-Path $toolsOutput "AgentAutoUpdate.ps1")
+
     $secretPointer =
         [Runtime.InteropServices.Marshal]::SecureStringToBSTR(
             $AgentApiKey)

@@ -155,6 +155,10 @@ internal sealed class InstallCoordinator
                     cancellationToken);
             }
 
+            progress.Report("Registering secure automatic Agent updates...");
+            await RegisterUpdaterTaskAsync(
+                cancellationToken);
+
             progress.Report("Starting Classroom Agent in this Windows session...");
             await StartTaskAsync(
                 InstallerPaths.AgentTaskName,
@@ -218,6 +222,9 @@ internal sealed class InstallCoordinator
             cancellationToken);
         await StopAndRemoveTaskAsync(
             InstallerPaths.TeamsHelperTaskName,
+            cancellationToken);
+        await StopAndRemoveTaskAsync(
+            InstallerPaths.UpdaterTaskName,
             cancellationToken);
 
         StopManagedProcesses();
@@ -557,6 +564,34 @@ internal sealed class InstallCoordinator
             "NoModify",
             1,
             RegistryValueKind.DWord);
+    }
+
+    private static async Task RegisterUpdaterTaskAsync(
+        CancellationToken cancellationToken)
+    {
+        string action =
+            $"powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{InstallerPaths.UpdaterScriptPath}\"";
+
+        await RunToolAsync(
+            "schtasks.exe",
+            [
+                "/Create",
+                "/TN",
+                InstallerPaths.UpdaterTaskName,
+                "/SC",
+                "MINUTE",
+                "/MO",
+                "15",
+                "/RU",
+                "SYSTEM",
+                "/RL",
+                "HIGHEST",
+                "/TR",
+                action,
+                "/F"
+            ],
+            [0],
+            cancellationToken);
     }
 
     private static async Task RegisterLogonTaskAsync(

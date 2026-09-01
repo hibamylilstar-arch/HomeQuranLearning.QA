@@ -9,9 +9,21 @@ internal sealed record InteractiveUserIdentity(
 {
     public static InteractiveUserIdentity Resolve()
     {
+        int sessionId =
+            Process.GetCurrentProcess().SessionId;
+
+        // Automatic updater runs as LocalSystem in Session 0.
+        // Resolve the real logged-in classroom user for ACLs and
+        // interactive Agent/Teams scheduled tasks.
+        if (sessionId == 0)
+        {
+            sessionId =
+                NativeMethods.GetActiveConsoleSessionId();
+        }
+
         string accountName =
             NativeMethods.QuerySessionUserName(
-                Process.GetCurrentProcess().SessionId);
+                sessionId);
 
         var account =
             new NTAccount(accountName);

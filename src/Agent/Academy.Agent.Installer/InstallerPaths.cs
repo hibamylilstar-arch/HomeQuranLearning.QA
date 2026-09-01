@@ -8,6 +8,9 @@ internal static class InstallerPaths
     public const string TeamsHelperTaskName =
         "AcademyAgent.TeamsHelper";
 
+    public const string UpdaterTaskName =
+        "HomeQuranLearning.ClassroomAgent.Updater";
+
     public static string InstallRoot =>
         Path.Combine(
             Environment.GetFolderPath(
@@ -36,6 +39,12 @@ internal static class InstallerPaths
             DataRoot,
             "Secrets",
             "agent-api-key.bin");
+
+    public static string UpdaterScriptPath =>
+        Path.Combine(
+            InstallRoot,
+            "tools",
+            "AgentAutoUpdate.ps1");
 
     public static string LogPath =>
         Path.Combine(

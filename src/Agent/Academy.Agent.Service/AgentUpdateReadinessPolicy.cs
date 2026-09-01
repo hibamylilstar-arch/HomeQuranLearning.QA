@@ -6,10 +6,11 @@ public static class AgentUpdateReadinessPolicy
         AgentActivitySnapshot snapshot,
         bool communicationMicrophoneInUse)
     {
+        // Teams/Zoom process presence and the always-on live
+        // monitoring publisher are infrastructure state, not proof
+        // that a classroom call is currently active.
         return
             !snapshot.IsRecordingActive &&
-            !snapshot.IsLiveStreamingActive &&
-            !snapshot.IsCommunicationProcessActive &&
             !communicationMicrophoneInUse;
     }
 }

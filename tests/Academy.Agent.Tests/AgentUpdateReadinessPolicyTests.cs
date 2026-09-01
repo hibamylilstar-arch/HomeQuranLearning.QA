@@ -5,14 +5,9 @@ namespace Academy.Agent.Tests;
 public sealed class AgentUpdateReadinessPolicyTests
 {
     [Fact]
-    public void FullyIdleAgent_IsSafeToUpdate()
+    public void IdleAgent_IsSafeToUpdate()
     {
-        var snapshot = new AgentActivitySnapshot
-        {
-            IsRecordingActive = false,
-            IsLiveStreamingActive = false,
-            IsCommunicationProcessActive = false
-        };
+        var snapshot = new AgentActivitySnapshot();
 
         Assert.True(
             AgentUpdateReadinessPolicy.IsSafeToUpdate(
@@ -35,35 +30,7 @@ public sealed class AgentUpdateReadinessPolicyTests
     }
 
     [Fact]
-    public void LiveStreaming_BlocksUpdate()
-    {
-        var snapshot = new AgentActivitySnapshot
-        {
-            IsLiveStreamingActive = true
-        };
-
-        Assert.False(
-            AgentUpdateReadinessPolicy.IsSafeToUpdate(
-                snapshot,
-                communicationMicrophoneInUse: false));
-    }
-
-    [Fact]
-    public void CommunicationProcess_BlocksUpdate()
-    {
-        var snapshot = new AgentActivitySnapshot
-        {
-            IsCommunicationProcessActive = true
-        };
-
-        Assert.False(
-            AgentUpdateReadinessPolicy.IsSafeToUpdate(
-                snapshot,
-                communicationMicrophoneInUse: false));
-    }
-
-    [Fact]
-    public void CommunicationMicrophone_BlocksUpdate()
+    public void ActualCommunicationMicrophoneUse_BlocksUpdate()
     {
         var snapshot = new AgentActivitySnapshot();
 
@@ -71,5 +38,33 @@ public sealed class AgentUpdateReadinessPolicyTests
             AgentUpdateReadinessPolicy.IsSafeToUpdate(
                 snapshot,
                 communicationMicrophoneInUse: true));
+    }
+
+    [Fact]
+    public void IdleCommunicationApplication_DoesNotBlockUpdate()
+    {
+        var snapshot = new AgentActivitySnapshot
+        {
+            IsCommunicationProcessActive = true
+        };
+
+        Assert.True(
+            AgentUpdateReadinessPolicy.IsSafeToUpdate(
+                snapshot,
+                communicationMicrophoneInUse: false));
+    }
+
+    [Fact]
+    public void AlwaysOnLivePublisher_DoesNotBlockUpdate()
+    {
+        var snapshot = new AgentActivitySnapshot
+        {
+            IsLiveStreamingActive = true
+        };
+
+        Assert.True(
+            AgentUpdateReadinessPolicy.IsSafeToUpdate(
+                snapshot,
+                communicationMicrophoneInUse: false));
     }
 }

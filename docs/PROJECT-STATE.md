@@ -8,7 +8,7 @@ Feature branch: codex/agent-auto-update
 Implemented and locally verified:
 - Windows Agent writes a fresh update-readiness state.
 - Active recording blocks update installation.
-- Active recording, live stream, communication process, or communication microphone blocks update installation.
+- Active recording or verified communication microphone use blocks update installation; idle Teams/Zoom process presence and always-on live monitoring do not.
 - Dedicated updater Scheduled Task runs as LocalSystem every 15 minutes.
 - Updater authenticates to the existing Agent API over HTTPS.
 - Existing DPAPI LocalMachine Agent API credential is reused without storing plaintext configuration.

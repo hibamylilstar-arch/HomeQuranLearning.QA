@@ -43,6 +43,13 @@ if (cloudOptions.Enabled &&
         "The Classroom Agent cloud credential is unavailable.");
 }
 
+if (cloudOptions.Enabled &&
+    string.IsNullOrWhiteSpace(cloudOptions.AgentVersion))
+{
+    throw new InvalidOperationException(
+        "The Classroom Agent installed version is unavailable.");
+}
+
 builder.Services.AddSingleton(cloudOptions);
 builder.Services.AddSingleton<AgentActivityState>();
 builder.Services.AddSingleton<TeamsObservationTargetState>();

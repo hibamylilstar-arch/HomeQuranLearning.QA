@@ -50,6 +50,7 @@ internal static class AgentConfigurationWriter
             {
                 Enabled = true,
                 BaseUrl = deployment.ApiBaseUrl.TrimEnd('/'),
+                AgentVersion = deployment.Version,
                 ApiKey = string.Empty,
                 ApiKeyProtectedFile = InstallerPaths.SecretPath,
                 HeartbeatIntervalSeconds = 30

@@ -1,4 +1,4 @@
-﻿using Academy.Agent.Cloud;
+using Academy.Agent.Cloud;
 
 namespace Academy.Agent.Service;
 
@@ -62,7 +62,10 @@ public sealed class HeartbeatWorker : BackgroundService
                             identity.DeviceId,
 
                         DeviceName =
-                            identity.DeviceName
+                            identity.DeviceName,
+
+                        AgentVersion =
+                            _cloudOptions.AgentVersion
                     };
 
                 var response =

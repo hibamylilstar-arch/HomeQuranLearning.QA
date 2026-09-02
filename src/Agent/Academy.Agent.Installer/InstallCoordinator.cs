@@ -831,7 +831,8 @@ internal sealed class InstallCoordinator
                  new[]
                  {
                      "Academy.Agent.Service",
-                     "Academy.Agent.TeamsHelper"
+                     "Academy.Agent.TeamsHelper",
+                     "ffmpeg"
                  })
         {
             foreach (Process process in

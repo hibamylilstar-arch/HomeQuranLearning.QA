@@ -54,6 +54,7 @@ if (cloudOptions.Enabled &&
 builder.Services.AddSingleton(cloudOptions);
 builder.Services.AddSingleton<ClassroomAudioHub>();
 builder.Services.AddSingleton<ClassroomAudioCaptureCoordinator>();
+builder.Services.AddSingleton<ClassroomAudioRuntime>();
 builder.Services.AddSingleton<AgentActivityState>();
 builder.Services.AddSingleton<TeamsObservationTargetState>();
 builder.Services.AddSingleton<TeamsEvidenceInbox>();

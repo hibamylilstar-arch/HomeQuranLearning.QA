@@ -1,3 +1,4 @@
+using Academy.Agent.Audio;
 using Academy.Agent.Cloud;
 using Academy.Agent.Service;
 
@@ -51,6 +52,8 @@ if (cloudOptions.Enabled &&
 }
 
 builder.Services.AddSingleton(cloudOptions);
+builder.Services.AddSingleton<ClassroomAudioHub>();
+builder.Services.AddSingleton<ClassroomAudioCaptureCoordinator>();
 builder.Services.AddSingleton<AgentActivityState>();
 builder.Services.AddSingleton<TeamsObservationTargetState>();
 builder.Services.AddSingleton<TeamsEvidenceInbox>();

@@ -4,15 +4,12 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  getPlaybackUrl,
   getQaAlerts,
   getRecordings,
-  getTranscriptSegments,
 } from "@/lib/api";
 import type {
   QaAlertListItem,
   RecordingListItem,
-  TranscriptSegmentListItem,
 } from "@/types";
 
 function formatOffset(seconds: number) {
@@ -35,11 +32,9 @@ export default function RecordingPlayerPage() {
   const { recordingId } = useParams<{ recordingId: string }>();
   const searchParams = useSearchParams();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [playbackUrl, setPlaybackUrl] = useState("");
+  const playbackUrl = recordingId ? `/api/proxy/recordings/${encodeURIComponent(recordingId)}/media` : "";
   const [recording, setRecording] = useState<RecordingListItem | null>(null);
-  const [segments, setSegments] = useState<TranscriptSegmentListItem[]>([]);
   const [alerts, setAlerts] = useState<QaAlertListItem[]>([]);
-  const [activeSegmentIndex, setActiveSegmentIndex] = useState<number | null>(null);
   const [playbackError, setPlaybackError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -51,26 +46,14 @@ export default function RecordingPlayerPage() {
 
     setLoading(true);
     setError("");
-    setPlaybackUrl("");
     setPlaybackError("");
-    setActiveSegmentIndex(null);
 
     try {
-      const [playback, transcript, recordings, allAlerts] = await Promise.all([
-        getPlaybackUrl(recordingId)
-          .then((url) => ({ url, error: "" }))
-          .catch((err) => ({
-            url: "",
-            error: err instanceof Error ? err.message : "Playback is unavailable.",
-          })),
-        getTranscriptSegments(recordingId),
+      const [recordings, allAlerts] = await Promise.all([
         getRecordings(),
         getQaAlerts(),
       ]);
 
-      setPlaybackUrl(playback.url);
-      setPlaybackError(playback.error);
-      setSegments(transcript);
       setRecording(recordings.find((item) => item.id === recordingId) ?? null);
       setAlerts(allAlerts.filter((item) => item.recordingId === recordingId));
     } catch (err) {
@@ -112,13 +95,6 @@ export default function RecordingPlayerPage() {
               new Date(recording.startedAtUtc).getTime()) /
             1000
           : null;
-        const matchingSegment =
-          offset !== null && Number.isFinite(offset)
-            ? segments.find(
-                (segment) =>
-                  offset >= segment.startSeconds && offset <= segment.endSeconds
-              )
-            : undefined;
 
         return {
           alert,
@@ -126,20 +102,16 @@ export default function RecordingPlayerPage() {
             offset !== null && Number.isFinite(offset) && offset >= 0
               ? offset
               : null,
-          matchingSegment,
         };
       }),
-    [alerts, recording, segments]
+    [alerts, recording]
   );
 
-  function seekTo(seconds: number, segmentIndex?: number) {
+  function seekTo(seconds: number) {
     const video = videoRef.current;
     if (video) {
       video.currentTime = Math.max(0, seconds);
       void video.play().catch(() => undefined);
-    }
-    if (segmentIndex !== undefined) {
-      setActiveSegmentIndex(segmentIndex);
     }
   }
 
@@ -148,13 +120,36 @@ export default function RecordingPlayerPage() {
       <div>
         <h2 className="text-2xl font-semibold">Recording QA Review</h2>
         <p className="text-sm text-slate-500">
-          Playback, timestamped transcript, and linked QA evidence for {recordingId}
+          Secure recording playback and linked QA evidence for {recordingId}
         </p>
       </div>
 
+      {playbackUrl ? (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-black shadow-sm">
+          <video
+            ref={videoRef}
+            controls
+            playsInline
+            preload="metadata"
+            className="aspect-video w-full bg-black"
+            src={playbackUrl}
+            onLoadedMetadata={() => setPlaybackError("")}
+            onError={() =>
+              setPlaybackError("Playback could not start. Check the recording source or connection.")
+            }
+          />
+        </div>
+      ) : null}
+
+      {playbackError ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          {playbackError}
+        </div>
+      ) : null}
+
       {error ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-5">
-          <h3 className="text-sm font-semibold text-rose-800">Recording unavailable</h3>
+          <h3 className="text-sm font-semibold text-rose-800">Review data unavailable</h3>
           <p className="mt-1 text-sm text-rose-700">{error}</p>
           <button
             type="button"
@@ -166,81 +161,11 @@ export default function RecordingPlayerPage() {
         </div>
       ) : loading ? (
         <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">
-          Preparing secure playback and transcript evidence...
+          Loading linked QA evidence...
         </div>
       ) : (
         <>
-          {playbackUrl ? (
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-black shadow-sm">
-              <video
-                ref={videoRef}
-                controls
-                className="aspect-video w-full"
-                src={playbackUrl}
-              />
-            </div>
-          ) : playbackError ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-              Playback is unavailable for this recording, but transcript and QA evidence remain available for review.
-            </div>
-          ) : null}
-
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
-            <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-              <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Timestamped transcript
-                    </h3>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      Select a segment to jump the recording to its speech offset.
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase text-indigo-700">
-                    {segments.length} segments
-                  </span>
-                </div>
-              </div>
-
-              {segments.length === 0 ? (
-                <p className="p-5 text-sm text-slate-500">
-                  No transcript segments were persisted for this recording.
-                </p>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {segments.map((segment) => {
-                    const active = activeSegmentIndex === segment.segmentIndex;
-                    return (
-                      <button
-                        key={segment.id}
-                        type="button"
-                        onClick={() => seekTo(segment.startSeconds, segment.segmentIndex)}
-                        className={`flex w-full gap-3 px-5 py-4 text-left transition-colors ${
-                          active
-                            ? "bg-indigo-50 ring-1 ring-inset ring-indigo-200"
-                            : "hover:bg-slate-50"
-                        }`}
-                      >
-                        <span className="mt-0.5 min-w-12 font-mono text-xs font-semibold text-indigo-700">
-                          {formatOffset(segment.startSeconds)}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-sm leading-6 text-slate-800">
-                            {segment.text}
-                          </span>
-                          <span className="mt-1 block text-[10px] uppercase tracking-wide text-slate-400">
-                            {segment.startSeconds.toFixed(2)}s – {segment.endSeconds.toFixed(2)}s
-                            {segment.language ? ` · ${segment.language}` : ""}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-
+          <div className="grid gap-5">
             <aside className="rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
                 <h3 className="text-sm font-semibold text-slate-900">Linked QA alerts</h3>
@@ -257,7 +182,7 @@ export default function RecordingPlayerPage() {
                 <p className="p-5 text-sm text-slate-500">No QA alerts are linked to this recording.</p>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {alertRows.map(({ alert, offset, matchingSegment }) => (
+                  {alertRows.map(({ alert, offset }) => (
                     <div key={alert.id} className="space-y-2 px-5 py-4">
                       <div className="flex items-start justify-between gap-2">
                         <span className="font-mono text-xs font-semibold text-rose-700">
@@ -270,19 +195,15 @@ export default function RecordingPlayerPage() {
                       <p className="text-[10px] text-slate-400">
                         {offset !== null ? `Speech offset ${offset.toFixed(2)}s` : "Speech offset unavailable"}
                       </p>
-                      {matchingSegment && offset !== null ? (
+                      {offset !== null ? (
                         <button
                           type="button"
-                          onClick={() => seekTo(offset, matchingSegment.segmentIndex)}
-                          className="w-full rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-left text-xs text-indigo-800 hover:bg-indigo-100"
+                          onClick={() => seekTo(offset)}
+                          className="w-full rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-left text-xs font-semibold text-indigo-800 hover:bg-indigo-100"
                         >
-                          Jump to transcript: “{matchingSegment.text}”
+                          Jump to this alert
                         </button>
-                      ) : (
-                        <p className="text-[10px] text-slate-400">
-                          No persisted segment covers this alert timestamp.
-                        </p>
-                      )}
+                      ) : null}
                     </div>
                   ))}
                 </div>

@@ -99,9 +99,16 @@ export async function GET(
     upstreamHeaders.set("Range", range);
   }
 
+  const ifRange = request.headers.get("if-range");
+
+  if (ifRange) {
+    upstreamHeaders.set("If-Range", ifRange);
+  }
+
   const mediaResponse = await fetch(metadata.url, {
     headers: upstreamHeaders,
     cache: "no-store",
+    signal: request.signal,
   });
 
   if (!mediaResponse.ok && mediaResponse.status !== 206) {

@@ -112,11 +112,11 @@ function DeviceLiveCard({
     <article
       className={
         expanded
-          ? "fixed inset-3 z-50 flex max-h-[calc(100vh-1.5rem)] flex-col overflow-y-auto rounded-2xl border border-emerald-500/40 bg-slate-950 shadow-2xl sm:inset-6 lg:inset-x-[7vw] lg:inset-y-[5vh]"
+          ? "fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden border-0 bg-slate-950 shadow-2xl sm:inset-4 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl sm:border sm:border-emerald-500/40 lg:inset-x-[7vw] lg:inset-y-[5vh]"
           : "min-w-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl transition-colors duration-200 hover:border-emerald-500/40"
       }
     >
-      <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 bg-slate-900/95 px-4 py-3">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 bg-slate-900/95 px-4 py-3">
         <div className="min-w-0">
           <h3 className="truncate text-sm font-bold text-white sm:text-base">
             {laptopName}
@@ -150,7 +150,7 @@ function DeviceLiveCard({
       </div>
 
       <div
-        className={expanded ? "min-h-0 flex-1 bg-black p-2 sm:p-4" : "bg-black p-2"}
+        className={expanded ? "min-h-0 flex-1 overflow-y-auto bg-slate-950 p-2 sm:p-4" : "bg-slate-950 p-2"}
         onClick={expanded ? undefined : onExpand}
         role={expanded ? undefined : "button"}
         tabIndex={expanded ? undefined : 0}
@@ -170,6 +170,7 @@ function DeviceLiveCard({
           <LiveVideo
             url={access.url}
             token={access.token}
+            expanded={expanded}
             isAudible={isAudible}
             onAudibleChange={onAudibleChange}
           />
@@ -199,9 +200,8 @@ function DeviceLiveCard({
             </div>
           </div>
         ) : null}
-      </div>
 
-      <div className="border-t border-slate-800 bg-slate-900/90 px-4 py-3">
+        <div className="mt-2 rounded-lg border border-slate-800 bg-slate-900/90 px-3 py-3 sm:px-4">
         {session ? (
           <div className="grid min-w-0 gap-2 text-xs sm:grid-cols-2 xl:grid-cols-4">
             <div className="min-w-0">
@@ -258,6 +258,7 @@ function DeviceLiveCard({
             </span>
           </div>
         )}
+        </div>
       </div>
     </article>
   );

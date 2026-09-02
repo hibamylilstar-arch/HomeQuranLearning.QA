@@ -8,6 +8,7 @@ interface LiveVideoProps {
   token: string;
   isAudible: boolean;
   onAudibleChange: (enabled: boolean) => void;
+  expanded?: boolean;
 }
 
 function detachBrowserAudio(
@@ -32,6 +33,7 @@ export default function LiveVideo({
   token,
   isAudible,
   onAudibleChange,
+  expanded = false,
 }: LiveVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -264,7 +266,13 @@ export default function LiveVideo({
 
   return (
     <div className="space-y-2">
-      <div className="aspect-video w-full overflow-hidden rounded-lg bg-black">
+      <div
+        className={
+          expanded
+            ? "aspect-video max-h-[52dvh] w-full overflow-hidden rounded-lg bg-black"
+            : "aspect-video w-full overflow-hidden rounded-lg bg-black"
+        }
+      >
         <video
           ref={videoRef}
           autoPlay
@@ -287,7 +295,7 @@ export default function LiveVideo({
             event.stopPropagation();
             void toggleAudio();
           }}
-          className="rounded bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+          className="w-full rounded bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 sm:w-auto"
         >
           {isAudible ? "Disable Audio" : "Enable Audio"}
         </button>

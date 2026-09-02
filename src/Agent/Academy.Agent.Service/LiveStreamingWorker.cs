@@ -4,7 +4,6 @@ using System.Net.Sockets;
 using System.Text.Json;
 using Academy.Agent.Audio;
 using Academy.Agent.Cloud;
-using NAudio.Wave;
 
 namespace Academy.Agent.Service;
 
@@ -15,35 +14,19 @@ public sealed class LiveStreamingWorker : BackgroundService
     private readonly AgentActivityState _activityState;
     private readonly IDeviceIdentityProvider _identityProvider;
     private readonly CloudOptions _cloudOptions;
+    private readonly ClassroomAudioHub _classroomAudioHub;
+    private readonly ClassroomAudioRuntime _classroomAudioRuntime;
 
     private Process? _ffmpegProcess;
-    private AudioCaptureService? _audioService;
+
     private UdpClient? _udpSender;
+    private UdpClient? _teacherUdpSender;
+
     private CancellationTokenSource? _audioPumpCts;
     private Task? _audioPumpTask;
-    private readonly object _audioSendLock = new();
-    private DateTimeOffset _lastRealAudioPacketUtc = DateTimeOffset.MinValue;
 
-    private MicrophoneCaptureService? _teacherAudioService;
-    private UdpClient? _teacherUdpSender;
-    private Task? _teacherAudioPumpTask;
-    private readonly object _teacherAudioSendLock = new();
-    private readonly object _teacherAudioLifecycleLock = new();
-
-    private DateTimeOffset _lastTeacherRealAudioPacketUtc =
-        DateTimeOffset.MinValue;
-
-    private DateTimeOffset _lastTeacherStartAttemptUtc =
-        DateTimeOffset.MinValue;
-
-    private DateTimeOffset _lastTeacherUsageCheckUtc =
-        DateTimeOffset.MinValue;
-
-    private bool _teacherCommunicationMicrophoneInUse;
-
-    private static readonly TimeSpan
-        TeacherUsageCheckInterval =
-            TimeSpan.FromMilliseconds(250);
+    private ClassroomAudioSubscription? _audioSubscription;
+    private ClassroomAudioRuntimeLease? _audioRuntimeLease;
 
     private string? _currentStreamKey;
     private volatile bool _videoCaptureFailed;
@@ -60,13 +43,17 @@ public sealed class LiveStreamingWorker : BackgroundService
         IConfiguration configuration,
         AgentActivityState activityState,
         IDeviceIdentityProvider identityProvider,
-        CloudOptions cloudOptions)
+        CloudOptions cloudOptions,
+        ClassroomAudioHub classroomAudioHub,
+        ClassroomAudioRuntime classroomAudioRuntime)
     {
         _logger = logger;
         _configuration = configuration;
         _activityState = activityState;
         _identityProvider = identityProvider;
         _cloudOptions = cloudOptions;
+        _classroomAudioHub = classroomAudioHub;
+        _classroomAudioRuntime = classroomAudioRuntime;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -160,10 +147,11 @@ public sealed class LiveStreamingWorker : BackgroundService
 
                         bool hasExistingPipeline =
                             _ffmpegProcess is not null ||
-                            _audioService is not null ||
                             _udpSender is not null ||
-                            _teacherAudioService is not null ||
                             _teacherUdpSender is not null ||
+                            _audioPumpCts is not null ||
+                            _audioSubscription is not null ||
+                            _audioRuntimeLease is not null ||
                             _currentStreamKey is not null;
 
                         if (hasExistingPipeline)
@@ -239,9 +227,37 @@ public sealed class LiveStreamingWorker : BackgroundService
         string ffmpegPath,
         string ingestBaseUrl)
     {
-        if (_ffmpegProcess is not null && !_ffmpegProcess.HasExited)
+        if (_ffmpegProcess is not null &&
+            !_ffmpegProcess.HasExited)
         {
             return;
+        }
+
+        PcmFrameFormat systemFormat =
+            _classroomAudioHub.SystemFormat;
+
+        PcmFrameFormat teacherFormat =
+            _classroomAudioHub.TeacherFormat;
+
+        if (systemFormat.SampleRate != 48000 ||
+            systemFormat.Channels != 2 ||
+            systemFormat.BitsPerSample != 32 ||
+            systemFormat.FrameDurationMilliseconds != 20)
+        {
+            throw new InvalidOperationException(
+                "Shared classroom system audio must be 48 kHz stereo float with 20 ms frames.");
+        }
+
+        if (teacherFormat.SampleRate !=
+                LiveTeacherAudioPolicy.TeacherSampleRate ||
+            teacherFormat.Channels !=
+                LiveTeacherAudioPolicy.TeacherChannels ||
+            teacherFormat.BitsPerSample !=
+                LiveTeacherAudioPolicy.TeacherBitsPerSample ||
+            teacherFormat.FrameDurationMilliseconds != 20)
+        {
+            throw new InvalidOperationException(
+                "Shared classroom teacher audio must be 48 kHz mono float with 20 ms frames.");
         }
 
         int audioUdpPort =
@@ -265,134 +281,112 @@ public sealed class LiveStreamingWorker : BackgroundService
                 "Could not allocate distinct live system and teacher audio UDP ports.");
         }
 
-        _udpSender = new UdpClient();
-        _udpSender.Connect(
-            IPAddress.Loopback,
-            audioUdpPort);
-
-        _teacherUdpSender = new UdpClient();
-        _teacherUdpSender.Connect(
-            IPAddress.Loopback,
-            teacherAudioUdpPort);
-
-        _logger.LogInformation(
-            "Allocated live audio UDP ports. System={SystemAudioUdpPort}, Teacher={TeacherAudioUdpPort}.",
-            audioUdpPort,
-            teacherAudioUdpPort);
-
-        _audioService = new AudioCaptureService();
-        _audioService.Start();
-
-        WaveFormat captureFormat = _audioService.CaptureFormat
-            ?? WaveFormat.CreateIeeeFloatWaveFormat(48000, 2);
-
-        int sampleRate = captureFormat.SampleRate;
-        int channels = captureFormat.Channels;
-
-        string audioFormat = captureFormat.Encoding switch
+        try
         {
-            WaveFormatEncoding.IeeeFloat => "f32le",
-            WaveFormatEncoding.Pcm when captureFormat.BitsPerSample == 16 => "s16le",
-            _ => throw new NotSupportedException(
-                $"Unsupported live audio format: {captureFormat.Encoding}, {captureFormat.BitsPerSample}-bit")
-        };
+            _udpSender =
+                new UdpClient();
 
-        int silenceChunkBytes =
-            LiveStreamingPolicy.CalculateSilenceChunkBytes(
-                sampleRate,
-                channels,
-                captureFormat.BitsPerSample);
+            _udpSender.Connect(
+                IPAddress.Loopback,
+                audioUdpPort);
 
-        int teacherSilenceChunkBytes =
-            LiveStreamingPolicy.CalculateSilenceChunkBytes(
-                LiveTeacherAudioPolicy.TeacherSampleRate,
-                LiveTeacherAudioPolicy.TeacherChannels,
-                LiveTeacherAudioPolicy.TeacherBitsPerSample);
+            _teacherUdpSender =
+                new UdpClient();
 
-        string ingestUrl =
-            $"{ingestBaseUrl.TrimEnd('/')}/{Uri.EscapeDataString(streamKey)}";
+            _teacherUdpSender.Connect(
+                IPAddress.Loopback,
+                teacherAudioUdpPort);
 
-        string outputFormat =
-            ingestUrl.StartsWith(
-                "https://",
-                StringComparison.OrdinalIgnoreCase)
-                ? "whip"
-                : "flv";
+            _logger.LogInformation(
+                "Allocated live audio UDP ports. System={SystemAudioUdpPort}, Teacher={TeacherAudioUdpPort}.",
+                audioUdpPort,
+                teacherAudioUdpPort);
 
-        string audioEncoderArguments =
-            outputFormat == "whip"
-                ? "-c:a libopus -b:a 64k -ar 48000 -ac 1"
-                : "-c:a aac -b:a 64k -ar 48000 -ac 1";
+            string ingestUrl =
+                $"{ingestBaseUrl.TrimEnd('/')}/{Uri.EscapeDataString(streamKey)}";
 
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = ffmpegPath,
-            Arguments =
-                $"-fflags nobuffer -flags low_delay " +
-                $"-f lavfi -i ddagrab=framerate=5:dup_frames=1 " +
-                $"-thread_queue_size 16 -use_wallclock_as_timestamps 1 -f {audioFormat} -ar {sampleRate} -ac {channels} -i \"udp://127.0.0.1:{audioUdpPort}?buffer_size=65536&fifo_size=512&overrun_nonfatal=1\" " +
-                $"-thread_queue_size 16 -use_wallclock_as_timestamps 1 -f f32le -ar {LiveTeacherAudioPolicy.TeacherSampleRate} -ac {LiveTeacherAudioPolicy.TeacherChannels} -i \"udp://127.0.0.1:{teacherAudioUdpPort}?buffer_size=65536&fifo_size=512&overrun_nonfatal=1\" " +
-                $"-filter_complex \"{LiveTeacherAudioPolicy.BuildFilterComplex()}\" -map 0:v -map \"[live_audio]\" " +
-                $"-vf \"hwdownload,format=bgra,scale=-2:240:flags=fast_bilinear,setpts=N/(5*TB)\" " +
-                $"-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p " +
-                $"-profile:v baseline -level:v 3.0 -g 5 -bf 0 -b:v 200k -maxrate 250k -bufsize 250k -flush_packets 1 -max_interleave_delta 100000 " +
-                $"{audioEncoderArguments} -f {outputFormat} \"{ingestUrl}\"",
-            RedirectStandardOutput = false,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
+            string outputFormat =
+                ingestUrl.StartsWith(
+                    "https://",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "whip"
+                    : "flv";
 
-        _videoCaptureFailed = false;
+            string audioEncoderArguments =
+                outputFormat == "whip"
+                    ? "-c:a libopus -b:a 64k -ar 48000 -ac 1"
+                    : "-c:a aac -b:a 64k -ar 48000 -ac 1";
 
-        lock (_ffmpegDiagnosticLock)
-        {
-            _ffmpegStderrTail.Clear();
+            var startInfo =
+                new ProcessStartInfo
+                {
+                    FileName = ffmpegPath,
+                    Arguments =
+                        $"-fflags nobuffer -flags low_delay " +
+                        $"-f lavfi -i ddagrab=framerate=5:dup_frames=1 " +
+                        $"-thread_queue_size 16 -use_wallclock_as_timestamps 1 -f f32le -ar {systemFormat.SampleRate} -ac {systemFormat.Channels} -i \"udp://127.0.0.1:{audioUdpPort}?buffer_size=65536&fifo_size=512&overrun_nonfatal=1\" " +
+                        $"-thread_queue_size 16 -use_wallclock_as_timestamps 1 -f f32le -ar {teacherFormat.SampleRate} -ac {teacherFormat.Channels} -i \"udp://127.0.0.1:{teacherAudioUdpPort}?buffer_size=65536&fifo_size=512&overrun_nonfatal=1\" " +
+                        $"-filter_complex \"{LiveTeacherAudioPolicy.BuildFilterComplex()}\" -map 0:v -map \"[live_audio]\" " +
+                        $"-vf \"hwdownload,format=bgra,scale=-2:240:flags=fast_bilinear,setpts=N/(5*TB)\" " +
+                        $"-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p " +
+                        $"-profile:v baseline -level:v 3.0 -g 5 -bf 0 -b:v 200k -maxrate 250k -bufsize 250k -flush_packets 1 -max_interleave_delta 100000 " +
+                        $"{audioEncoderArguments} -f {outputFormat} \"{ingestUrl}\"",
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+            _videoCaptureFailed = false;
+
+            lock (_ffmpegDiagnosticLock)
+            {
+                _ffmpegStderrTail.Clear();
+            }
+
+            _ffmpegProcess =
+                Process.Start(startInfo)
+                ?? throw new InvalidOperationException(
+                    "Could not start live FFmpeg.");
+
+            _stderrMonitorTask =
+                MonitorFfmpegStderrAsync(
+                    _ffmpegProcess);
+
+            // Subscribe before starting the shared runtime so the first
+            // canonical frame cannot be missed.
+            _audioSubscription =
+                _classroomAudioHub.Subscribe(
+                    "live-ffmpeg",
+                    capacityFrames: 4);
+
+            _audioRuntimeLease =
+                _classroomAudioRuntime.Acquire();
+
+            _audioPumpCts =
+                new CancellationTokenSource();
+
+            _audioPumpTask =
+                PumpClassroomAudioAsync(
+                    _audioSubscription,
+                    _audioPumpCts.Token);
+
+            _currentStreamKey =
+                streamKey;
+
+            _logger.LogInformation(
+                "FFmpeg always-on device live stream process started with shared canonical classroom audio.");
         }
+        catch
+        {
+            await StopFfmpegAsync(
+                publishStopEvidence: false);
 
-        _ffmpegProcess = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Could not start live FFmpeg.");
-
-        _stderrMonitorTask = MonitorFfmpegStderrAsync(_ffmpegProcess);
-
-        _audioService.DataAvailable += OnAudioDataAvailable;
-
-        _lastRealAudioPacketUtc =
-            DateTimeOffset.MinValue;
-
-        _lastTeacherRealAudioPacketUtc =
-            DateTimeOffset.MinValue;
-
-        _lastTeacherStartAttemptUtc =
-            DateTimeOffset.MinValue;
-
-        _lastTeacherUsageCheckUtc =
-            DateTimeOffset.MinValue;
-
-        _teacherCommunicationMicrophoneInUse =
-            false;
-
-        _audioPumpCts =
-            new CancellationTokenSource();
-
-        _audioPumpTask =
-            StartSilencePumpAsync(
-                silenceChunkBytes,
-                _audioPumpCts.Token);
-
-        _teacherAudioPumpTask =
-            StartTeacherAudioPumpAsync(
-                teacherSilenceChunkBytes,
-                _audioPumpCts.Token);
-
-        _currentStreamKey = streamKey;
-
-        // Always-on device monitoring is infrastructure state, not classroom-session evidence.
-        _logger.LogInformation(
-            "FFmpeg always-on device live stream process started.");
-
-        await Task.CompletedTask;
+            throw;
+        }
     }
+
+
 
     private async Task MonitorFfmpegStderrAsync(Process process)
     {
@@ -510,407 +504,64 @@ public sealed class LiveStreamingWorker : BackgroundService
             }
         }
     }
-    private void OnAudioDataAvailable(
-        object? sender,
-        AudioDataAvailableEventArgs e)
-    {
-        if (e.BytesRecorded <= 0)
-        {
-            return;
-        }
-
-        try
-        {
-            lock (_audioSendLock)
-            {
-                if (_udpSender is null)
-                {
-                    return;
-                }
-
-                _lastRealAudioPacketUtc =
-                    DateTimeOffset.UtcNow;
-
-                _udpSender.Send(
-                    e.Buffer,
-                    e.BytesRecorded);
-            }
-        }
-        catch (ObjectDisposedException)
-        {
-            // Expected during shutdown/recovery.
-        }
-        catch (SocketException ex)
-        {
-            _logger.LogDebug(
-                ex,
-                "Live real-audio UDP send failed.");
-        }
-    }
-
-    private async Task StartSilencePumpAsync(
-        int silenceChunkBytes,
+    private async Task PumpClassroomAudioAsync(
+        ClassroomAudioSubscription subscription,
         CancellationToken token)
     {
-        byte[] silenceChunk =
-            new byte[silenceChunkBytes];
-
         try
         {
             while (!token.IsCancellationRequested)
             {
+                ClassroomAudioFrame frame =
+                    await subscription.ReadNextAsync(
+                        token);
+
+                UdpClient? systemSender =
+                    _udpSender;
+
+                UdpClient? teacherSender =
+                    _teacherUdpSender;
+
+                if (systemSender is null ||
+                    teacherSender is null)
+                {
+                    return;
+                }
+
                 try
                 {
-                    lock (_audioSendLock)
-                    {
-                        DateTimeOffset nowUtc =
-                            DateTimeOffset.UtcNow;
+                    await systemSender.SendAsync(
+                        frame.SystemPcm,
+                        token);
 
-                        if (_udpSender is not null &&
-                            LiveStreamingPolicy.ShouldSendSilence(
-                                _lastRealAudioPacketUtc,
-                                nowUtc))
-                        {
-                            _udpSender.Send(
-                                silenceChunk,
-                                silenceChunk.Length);
-                        }
-                    }
+                    await teacherSender.SendAsync(
+                        frame.TeacherPcm,
+                        token);
                 }
                 catch (ObjectDisposedException)
                     when (token.IsCancellationRequested)
                 {
-                    break;
+                    return;
                 }
                 catch (SocketException ex)
                 {
                     _logger.LogDebug(
                         ex,
-                        "Live silence UDP keepalive send failed.");
+                        "Canonical live audio UDP send failed.");
                 }
-
-                await Task.Delay(
-                    TimeSpan.FromMilliseconds(20),
-                    token);
             }
         }
         catch (OperationCanceledException)
             when (token.IsCancellationRequested)
         {
-            // Expected during shutdown/recovery.
-        }
-    }
-    private void TryStartTeacherAudioCapture()
-    {
-        lock (_teacherAudioLifecycleLock)
-        {
-            if (_teacherAudioService is not null)
-            {
-                return;
-            }
-
-            _lastTeacherStartAttemptUtc =
-                DateTimeOffset.UtcNow;
-
-            var capture =
-                new MicrophoneCaptureService();
-
-            capture.DataAvailable +=
-                OnTeacherAudioDataAvailable;
-
-            capture.RecordingStopped +=
-                OnTeacherAudioRecordingStopped;
-
-            _teacherAudioService = capture;
-
-            try
-            {
-                capture.Start();
-
-                WaveFormat? captureFormat =
-                    capture.CaptureFormat;
-
-                if (captureFormat is null ||
-                    captureFormat.Encoding !=
-                        WaveFormatEncoding.IeeeFloat ||
-                    captureFormat.SampleRate !=
-                        LiveTeacherAudioPolicy.TeacherSampleRate ||
-                    captureFormat.Channels !=
-                        LiveTeacherAudioPolicy.TeacherChannels ||
-                    captureFormat.BitsPerSample !=
-                        LiveTeacherAudioPolicy.TeacherBitsPerSample)
-                {
-                    throw new InvalidOperationException(
-                        "Verified USB teacher microphone did not provide the required 48 kHz mono float capture format.");
-                }
-
-                _logger.LogInformation(
-                    "Live teacher microphone capture available. Endpoint={Endpoint}.",
-                    capture.EndpointName ?? "Unknown");
-            }
-            catch (Exception ex)
-            {
-                if (ReferenceEquals(
-                        _teacherAudioService,
-                        capture))
-                {
-                    _teacherAudioService = null;
-                }
-
-                capture.DataAvailable -=
-                    OnTeacherAudioDataAvailable;
-
-                capture.RecordingStopped -=
-                    OnTeacherAudioRecordingStopped;
-
-                try
-                {
-                    capture.Stop();
-                }
-                catch
-                {
-                    // Failed-start cleanup is best effort.
-                }
-
-                _logger.LogDebug(
-                    ex,
-                    "{TeacherMicStatus}. Live teacher input remains silence until exactly one verified USB microphone is available.",
-                    LiveTeacherAudioPolicy.MissingStatus);
-            }
-        }
-    }
-
-    private void OnTeacherAudioDataAvailable(
-        object? sender,
-        AudioDataAvailableEventArgs e)
-    {
-        if (e.BytesRecorded <= 0)
-        {
-            return;
-        }
-
-        try
-        {
-            lock (_teacherAudioSendLock)
-            {
-                if (_teacherUdpSender is null)
-                {
-                    return;
-                }
-
-                _lastTeacherRealAudioPacketUtc =
-                    DateTimeOffset.UtcNow;
-
-                _teacherUdpSender.Send(
-                    e.Buffer,
-                    e.BytesRecorded);
-            }
         }
         catch (ObjectDisposedException)
-        {
-            // Expected during shutdown/recovery.
-        }
-        catch (SocketException ex)
-        {
-            _logger.LogDebug(
-                ex,
-                "Live teacher-audio UDP send failed.");
-        }
-    }
-
-    private void OnTeacherAudioRecordingStopped(
-        object? sender,
-        EventArgs e)
-    {
-        MicrophoneCaptureService? stopped =
-            null;
-
-        lock (_teacherAudioLifecycleLock)
-        {
-            if (sender is MicrophoneCaptureService capture &&
-                ReferenceEquals(
-                    capture,
-                    _teacherAudioService))
-            {
-                stopped = capture;
-                _teacherAudioService = null;
-            }
-        }
-
-        if (stopped is not null)
-        {
-            stopped.DataAvailable -=
-                OnTeacherAudioDataAvailable;
-
-            stopped.RecordingStopped -=
-                OnTeacherAudioRecordingStopped;
-        }
-
-        lock (_teacherAudioSendLock)
-        {
-            _lastTeacherRealAudioPacketUtc =
-                DateTimeOffset.MinValue;
-        }
-
-        _logger.LogWarning(
-            "{TeacherMicStatus}. Live stream continues with teacher silence and will retry a verified USB microphone automatically.",
-            LiveTeacherAudioPolicy.MissingStatus);
-    }
-
-    private void
-        StopTeacherAudioCaptureForInactiveCommunication()
-    {
-        MicrophoneCaptureService? capture =
-            null;
-
-        lock (_teacherAudioLifecycleLock)
-        {
-            capture =
-                _teacherAudioService;
-
-            if (capture is null)
-            {
-                _lastTeacherStartAttemptUtc =
-                    DateTimeOffset.MinValue;
-
-                return;
-            }
-
-            _teacherAudioService =
-                null;
-
-            _lastTeacherStartAttemptUtc =
-                DateTimeOffset.MinValue;
-
-            capture.DataAvailable -=
-                OnTeacherAudioDataAvailable;
-
-            capture.RecordingStopped -=
-                OnTeacherAudioRecordingStopped;
-        }
-
-        try
-        {
-            capture.Stop();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(
-                ex,
-                "Teacher microphone pause during inactive communication ended with an error.");
-        }
-
-        lock (_teacherAudioSendLock)
-        {
-            _lastTeacherRealAudioPacketUtc =
-                DateTimeOffset.MinValue;
-        }
-
-        _logger.LogInformation(
-            "Live teacher microphone capture paused because no communication application is actively using a microphone.");
-    }
-
-    private async Task StartTeacherAudioPumpAsync(
-        int silenceChunkBytes,
-        CancellationToken token)
-    {
-        byte[] silenceChunk =
-            new byte[silenceChunkBytes];
-
-        try
-        {
-            while (!token.IsCancellationRequested)
-            {
-                DateTimeOffset nowUtc =
-                    DateTimeOffset.UtcNow;
-
-                if (_lastTeacherUsageCheckUtc ==
-                        DateTimeOffset.MinValue ||
-                    nowUtc -
-                        _lastTeacherUsageCheckUtc >=
-                            TeacherUsageCheckInterval)
-                {
-                    _lastTeacherUsageCheckUtc =
-                        nowUtc;
-
-                    bool detected =
-                        CommunicationMicrophoneUsageDetector
-                            .IsCommunicationMicrophoneInUse();
-
-                    if (detected !=
-                        _teacherCommunicationMicrophoneInUse)
-                    {
-                        _teacherCommunicationMicrophoneInUse =
-                            detected;
-
-                        _logger.LogInformation(
-                            detected
-                                ? "Communication microphone use detected. Teacher microphone capture may start."
-                                : "Communication microphone use ended. Teacher microphone capture will stop.");
-                    }
-
-                    if (!detected)
-                    {
-                        StopTeacherAudioCaptureForInactiveCommunication();
-                    }
-                }
-
-                bool shouldTryCapture;
-
-                lock (_teacherAudioLifecycleLock)
-                {
-                    shouldTryCapture =
-                        _teacherCommunicationMicrophoneInUse &&
-                        _teacherAudioService is null &&
-                        LiveTeacherAudioPolicy
-                            .ShouldRetryCapture(
-                                _lastTeacherStartAttemptUtc,
-                                nowUtc);
-                }
-
-                if (shouldTryCapture)
-                {
-                    TryStartTeacherAudioCapture();
-                }
-
-                try
-                {
-                    lock (_teacherAudioSendLock)
-                    {
-                        if (_teacherUdpSender is not null &&
-                            LiveStreamingPolicy.ShouldSendSilence(
-                                _lastTeacherRealAudioPacketUtc,
-                                nowUtc))
-                        {
-                            _teacherUdpSender.Send(
-                                silenceChunk,
-                                silenceChunk.Length);
-                        }
-                    }
-                }
-                catch (ObjectDisposedException)
-                    when (token.IsCancellationRequested)
-                {
-                    break;
-                }
-                catch (SocketException ex)
-                {
-                    _logger.LogDebug(
-                        ex,
-                        "Live teacher-silence UDP keepalive send failed.");
-                }
-
-                await Task.Delay(
-                    TimeSpan.FromMilliseconds(20),
-                    token);
-            }
-        }
-        catch (OperationCanceledException)
             when (token.IsCancellationRequested)
         {
-            // Expected during shutdown/recovery.
         }
     }
+
+
 
     private void PublishLiveStreamStartedIfInactive()
     {
@@ -973,6 +624,11 @@ public sealed class LiveStreamingWorker : BackgroundService
             _audioPumpCts.Cancel();
         }
 
+        // Disposal wakes ReadNextAsync immediately even if the pump is
+        // currently waiting for the next canonical frame.
+        _audioSubscription?.Dispose();
+        _audioSubscription = null;
+
         if (_audioPumpTask is not null)
         {
             try
@@ -981,85 +637,28 @@ public sealed class LiveStreamingWorker : BackgroundService
             }
             catch (OperationCanceledException)
             {
-                // Expected during shutdown/recovery.
+            }
+            catch (ObjectDisposedException)
+            {
             }
 
             _audioPumpTask = null;
         }
 
-        if (_teacherAudioPumpTask is not null)
-        {
-            try
-            {
-                await _teacherAudioPumpTask;
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected during shutdown/recovery.
-            }
-
-            _teacherAudioPumpTask = null;
-        }
-
         _audioPumpCts?.Dispose();
         _audioPumpCts = null;
 
-        if (_audioService is not null)
-        {
-            _audioService.DataAvailable -= OnAudioDataAvailable;
-            _audioService.Stop();
-            _audioService = null;
-        }
+        // Release Live's ownership only after its sink has stopped reading.
+        // Once Recording is migrated, its independent lease will keep the
+        // shared physical capture alive when Live restarts.
+        _audioRuntimeLease?.Dispose();
+        _audioRuntimeLease = null;
 
-        MicrophoneCaptureService? teacherAudioService;
+        _teacherUdpSender?.Dispose();
+        _teacherUdpSender = null;
 
-        lock (_teacherAudioLifecycleLock)
-        {
-            teacherAudioService =
-                _teacherAudioService;
-
-            _teacherAudioService = null;
-        }
-
-        if (teacherAudioService is not null)
-        {
-            teacherAudioService.DataAvailable -=
-                OnTeacherAudioDataAvailable;
-
-            teacherAudioService.RecordingStopped -=
-                OnTeacherAudioRecordingStopped;
-
-            try
-            {
-                teacherAudioService.Stop();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(
-                    ex,
-                    "Teacher microphone cleanup stopped with an error.");
-            }
-        }
-
-        lock (_teacherAudioSendLock)
-        {
-            _teacherUdpSender?.Dispose();
-            _teacherUdpSender = null;
-
-            _lastTeacherRealAudioPacketUtc =
-                DateTimeOffset.MinValue;
-
-            _lastTeacherStartAttemptUtc =
-                DateTimeOffset.MinValue;
-        }
-
-        lock (_audioSendLock)
-        {
-            _udpSender?.Dispose();
-            _udpSender = null;
-            _lastRealAudioPacketUtc =
-                DateTimeOffset.MinValue;
-        }
+        _udpSender?.Dispose();
+        _udpSender = null;
 
         if (_ffmpegProcess is null ||
             _ffmpegProcess.HasExited)

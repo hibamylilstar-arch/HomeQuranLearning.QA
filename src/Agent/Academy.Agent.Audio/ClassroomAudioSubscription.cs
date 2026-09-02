@@ -1,10 +1,14 @@
 namespace Academy.Agent.Audio;
 
 /// <summary>
-/// Independent bounded consumer queue for canonical classroom audio.
+/// Independent bounded single-consumer queue for canonical classroom audio.
 ///
 /// A slow consumer never blocks the hub or any other consumer. When full,
 /// this queue discards its oldest frame so latency remains bounded.
+///
+/// ReadNextAsync is signaled by publication rather than a second timer or
+/// polling loop, preserving the canonical hub timeline as the only audio
+/// cadence.
 /// </summary>
 public sealed class ClassroomAudioSubscription :
     IDisposable
@@ -13,6 +17,9 @@ public sealed class ClassroomAudioSubscription :
 
     private readonly Queue<ClassroomAudioFrame>
         _frames = new();
+
+    private readonly SemaphoreSlim
+        _available = new(0, 1);
 
     private Action<ClassroomAudioSubscription>?
         _onDispose;
@@ -88,6 +95,8 @@ public sealed class ClassroomAudioSubscription :
     {
         ArgumentNullException.ThrowIfNull(frame);
 
+        bool signal;
+
         lock (_sync)
         {
             if (_disposed)
@@ -102,6 +111,13 @@ public sealed class ClassroomAudioSubscription :
             }
 
             _frames.Enqueue(frame);
+
+            signal = true;
+        }
+
+        if (signal)
+        {
+            SignalAvailable();
         }
     }
 
@@ -118,6 +134,38 @@ public sealed class ClassroomAudioSubscription :
 
             frame = _frames.Dequeue();
             return true;
+        }
+    }
+
+    /// <summary>
+    /// Waits until this subscription has a frame and returns the oldest
+    /// available frame. Publication wakes the reader directly; no additional
+    /// audio timer is introduced.
+    ///
+    /// Each subscription is intended to have one consumer.
+    /// </summary>
+    public async ValueTask<ClassroomAudioFrame>
+        ReadNextAsync(
+            CancellationToken cancellationToken = default)
+    {
+        while (true)
+        {
+            lock (_sync)
+            {
+                if (_frames.Count > 0)
+                {
+                    return _frames.Dequeue();
+                }
+
+                if (_disposed)
+                {
+                    throw new ObjectDisposedException(
+                        nameof(ClassroomAudioSubscription));
+                }
+            }
+
+            await _available.WaitAsync(
+                cancellationToken);
         }
     }
 
@@ -140,6 +188,23 @@ public sealed class ClassroomAudioSubscription :
             _onDispose = null;
         }
 
+        // Wake a pending ReadNextAsync so it can observe disposal instead of
+        // remaining blocked forever.
+        SignalAvailable();
+
         onDispose?.Invoke(this);
+    }
+
+    private void SignalAvailable()
+    {
+        try
+        {
+            _available.Release();
+        }
+        catch (SemaphoreFullException)
+        {
+            // The signal is intentionally binary. One wake-up is enough
+            // because the reader drains queued frames before waiting again.
+        }
     }
 }

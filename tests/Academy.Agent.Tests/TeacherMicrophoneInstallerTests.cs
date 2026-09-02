@@ -45,7 +45,7 @@ public sealed class TeacherMicrophoneInstallerTests
                     out _));
 
             Assert.Equal(
-                5,
+                1,
                 recording
                     .GetProperty("TeacherMicrophoneRetrySeconds")
                     .GetInt32());

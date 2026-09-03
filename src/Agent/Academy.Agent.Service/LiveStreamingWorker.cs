@@ -324,8 +324,8 @@ public sealed class LiveStreamingWorker : BackgroundService
                     Arguments =
                         $"-fflags nobuffer -flags low_delay " +
                         $"-f lavfi -i ddagrab=framerate=5:dup_frames=1 " +
-                        $"-thread_queue_size 16 -use_wallclock_as_timestamps 1 -f f32le -ar {systemFormat.SampleRate} -ac {systemFormat.Channels} -i \"udp://127.0.0.1:{audioUdpPort}?buffer_size=65536&fifo_size=512&overrun_nonfatal=1\" " +
-                        $"-thread_queue_size 16 -use_wallclock_as_timestamps 1 -f f32le -ar {teacherFormat.SampleRate} -ac {teacherFormat.Channels} -i \"udp://127.0.0.1:{teacherAudioUdpPort}?buffer_size=65536&fifo_size=512&overrun_nonfatal=1\" " +
+                        $"-thread_queue_size 16 -f f32le -ar {systemFormat.SampleRate} -ac {systemFormat.Channels} -i \"udp://127.0.0.1:{audioUdpPort}?buffer_size=65536&fifo_size=512&overrun_nonfatal=1\" " +
+                        $"-thread_queue_size 16 -f f32le -ar {teacherFormat.SampleRate} -ac {teacherFormat.Channels} -i \"udp://127.0.0.1:{teacherAudioUdpPort}?buffer_size=65536&fifo_size=512&overrun_nonfatal=1\" " +
                         $"-filter_complex \"{LiveTeacherAudioPolicy.BuildFilterComplex()}\" -map 0:v -map \"[live_audio]\" " +
                         $"-vf \"hwdownload,format=bgra,scale=-2:240:flags=fast_bilinear,setpts=N/(5*TB)\" " +
                         $"-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p " +

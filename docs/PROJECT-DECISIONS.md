@@ -223,3 +223,22 @@ source change -> targeted verification -> Owner physical canary -> immutable reu
 Operational meaning:
 
 Owner proves the version once. The same verified version can then be sent, without rebuilding it, to any selected compatible academy laptop at the Owner's discretion.
+## DEV-004 - Product-intent-first AI engineering
+
+Status: accepted 2026-09-04; extends DEV-001, DEV-002 and DEV-003.
+
+- Product behavior is decided by the Owner. AI engineers are responsible for turning that intent into the strongest practical implementation, not for silently narrowing the product.
+- AI engineers must not independently introduce product restrictions such as battery execution bans, arbitrary queue-expiry windows, Owner-only capability restrictions, unnecessary rollout gates or similar limitations merely as precautionary defaults.
+- If an optional restriction or policy could materially help, the AI must explain the benefit, downside and recommendation so the Owner can decide before that restriction becomes product behavior.
+- Raw Owner intent should be technically polished. Reliability mechanisms such as persistent intent, resumable work, automatic retry, reboot recovery, integrity verification and idempotent completion should be added when they strengthen the requested behavior rather than restrict it.
+- Routine implementation integrity remains an engineering responsibility and does not require repeated Owner approval when it does not redefine product behavior. Examples include SHA/package verification, protecting secrets, refusing unmanaged destructive paths, preventing corrupt installs, atomic state changes, meaningful validation and auditability.
+- Extra architecture layers, temporary workarounds, probe packages, duplicate staging, artificial gates and redundant verification require concrete evidence that they solve a real engineering problem.
+- Owner-first remains a physical canary/quality gate only. It must not be transformed into Owner-only architecture, device-bound packages or a permanent deployment restriction.
+- AI engineers should not blindly agree with a technically weak implementation. They should preserve the Owner's goal, explain real trade-offs and recommend the stronger design.
+- A genuinely unavoidable security, platform, legal or technical constraint must be surfaced explicitly. Apply the smallest necessary constraint; do not hide a product decision inside an implementation detail.
+- Automation and recovery should reduce manual intervention wherever they remain consistent with Owner control.
+- This decision applies to ChatGPT, Codex, Gemini, DeepSeek, Claude and any future AI engineer working on HomeQuranLearning.QA.
+
+Permanent engineering principle:
+
+`User intent first. AI improves implementation; AI does not invent product restrictions.`

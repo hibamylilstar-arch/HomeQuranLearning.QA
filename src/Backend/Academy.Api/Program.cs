@@ -333,21 +333,19 @@ app.MapGet("/api/agent/update/manifest", async (
         return Results.Ok(new { enabled = false });
     }
 
-    bool requestFresh =
-        device.AgentUpdateRequestedAtUtc.HasValue &&
-        device.AgentUpdateRequestedAtUtc.Value >=
-            DateTimeOffset.UtcNow.AddMinutes(-30);
-
     bool requestMatches =
         string.Equals(
             device.PendingAgentUpdateVersion,
             manifest.Version,
             StringComparison.OrdinalIgnoreCase);
 
-    if (!requestFresh || !requestMatches)
+    if (!requestMatches)
     {
-        if (device.AgentUpdateRequestedAtUtc.HasValue &&
-            !requestFresh)
+        // A queued update is durable for the version that the Owner
+        // explicitly selected. If that release is no longer the active
+        // published version, the old request is no longer fulfillable and
+        // must not silently target the replacement release.
+        if (device.PendingAgentUpdateVersion is not null)
         {
             device.PendingAgentUpdateVersion = null;
             device.AgentUpdateRequestedAtUtc = null;
@@ -423,7 +421,7 @@ app.MapGet("/api/agent/update/package/{releaseId}", (
         packagePath,
         "application/octet-stream",
         "Home Quran Learning Setup.exe",
-        enableRangeProcessing: false);
+        enableRangeProcessing: true);
 });
 
 app.MapGet("/api/agent/class-window", async (
@@ -715,8 +713,8 @@ app.MapPost("/api/admin/devices/{deviceId:guid}/agent-update", async (
             deviceId = device.Id,
             displayName,
             version = manifest.Version,
-            expiresAtUtc =
-                device.AgentUpdateRequestedAtUtc.Value.AddMinutes(30)
+            requestedAtUtc =
+                device.AgentUpdateRequestedAtUtc.Value
         });
 }).RequireAuthorization(OwnerOnlyPolicy);
 

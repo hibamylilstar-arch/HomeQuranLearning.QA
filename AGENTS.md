@@ -210,3 +210,24 @@ Mandatory rules:
 - Future AI engineers must preserve this model: source fix -> targeted verification -> Owner canary -> immutable reusable release -> selective dashboard rollout.
 
 In short: Owner verification is the quality gate, not a permanent deployment restriction. Once an Agent version is proven on Owner, that exact verified release is the normal artifact used to update any other selected compatible academy laptop.
+## 13. Product-intent-first AI engineering
+
+The Owner decides product behavior. AI engineers improve the implementation of that intent; they must not silently invent product restrictions, availability limits or workflow gates.
+
+Mandatory rules:
+
+- The Owner/user decides product behavior, operating policy, rollout behavior and acceptable product constraints.
+- Do not independently add restrictions such as battery-only execution limits, arbitrary request-expiry windows, device-only capability restrictions, artificial rollout gates or similar behavior unless the Owner explicitly requested them or a concrete unavoidable technical/security requirement proves they are necessary.
+- When an optional restriction or guardrail could be useful, explain its benefit, downside and engineering recommendation before making it part of product behavior. Let the Owner decide.
+- Improve raw product ideas into robust engineering. For example, "continue when Internet returns" should be translated into durable intent, resumable transfer, integrity verification, retry/reboot recovery and idempotent completion where appropriate.
+- Routine technical integrity does not require separate product approval. Engineers should automatically preserve safeguards such as package/hash verification, secret protection, managed-path boundaries, corruption prevention, atomic state changes, validation, bounded error handling and auditability when they do not redefine requested product behavior.
+- Do not create extra architecture layers, temporary workarounds, artificial gates, probe packages, per-device binaries, duplicate staging paths or redundant validation merely because they appear safer. They require a concrete evidence-based engineering purpose.
+- Owner-first remains a canary-validation model, not Owner-only architecture or capability restriction.
+- Do not merely agree with a weak technical implementation. Preserve the Owner's intent, explain meaningful trade-offs and propose the stronger implementation.
+- If a genuinely non-optional security, platform, legal or technical constraint conflicts with requested behavior, explain the exact constraint and use the smallest restriction that satisfies it rather than silently changing the product.
+- Prefer automation, recovery and reduced manual work when they preserve the Owner's intended control.
+- This rule applies to ChatGPT, Codex, Gemini, DeepSeek, Claude and every future AI engineer working on this repository.
+
+Core principle:
+
+`User intent first. AI improves implementation; AI does not invent product restrictions.`

@@ -615,6 +615,35 @@ internal sealed class InstallCoordinator
             ],
             [0],
             cancellationToken);
+
+        string escapedTaskName =
+            InstallerPaths.UpdaterTaskName.Replace(
+                "'",
+                "''",
+                StringComparison.Ordinal);
+
+        string settingsCommand =
+            "$settings = New-ScheduledTaskSettingsSet " +
+            "-AllowStartIfOnBatteries " +
+            "-DontStopIfGoingOnBatteries " +
+            "-StartWhenAvailable " +
+            "-ExecutionTimeLimit ([TimeSpan]::Zero) " +
+            "-MultipleInstances IgnoreNew; " +
+            $"Set-ScheduledTask -TaskName '{escapedTaskName}' " +
+            "-Settings $settings | Out-Null";
+
+        await RunToolAsync(
+            "powershell.exe",
+            [
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                settingsCommand
+            ],
+            [0],
+            cancellationToken);
     }
 
     private static async Task RegisterLogonTaskAsync(

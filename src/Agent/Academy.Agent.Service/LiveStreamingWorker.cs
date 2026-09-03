@@ -184,8 +184,15 @@ public sealed class LiveStreamingWorker : BackgroundService
                 }
             }
             catch (OperationCanceledException)
+                when (stoppingToken.IsCancellationRequested)
             {
                 break;
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Live streaming control-plane operation was canceled or timed out. Retrying.");
             }
             catch (Exception ex)
             {

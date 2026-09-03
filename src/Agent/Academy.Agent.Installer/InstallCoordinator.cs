@@ -26,7 +26,8 @@ internal sealed class InstallCoordinator
     public async Task InstallAsync(
         bool installTeamsHelper,
         IProgress<string> progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool preserveExistingConfiguration = false)
     {
         EnsureSupportedHost();
 
@@ -36,6 +37,27 @@ internal sealed class InstallCoordinator
         DeploymentConfig deployment =
             package.Deployment;
 
+        string? existingConfigurationJson =
+            null;
+
+        if (preserveExistingConfiguration)
+        {
+            string existingConfigurationPath =
+                Path.Combine(
+                    GetApplicationRoot(),
+                    "agent",
+                    "appsettings.json");
+
+            if (!File.Exists(existingConfigurationPath))
+            {
+                throw new InvalidOperationException(
+                    "Managed update requires an existing Agent configuration.");
+            }
+
+            existingConfigurationJson =
+                File.ReadAllText(
+                    existingConfigurationPath);
+        }
         progress.Report("Checking secure VPS connectivity...");
         _log.Write("INSTALL_CONNECTIVITY_CHECK_STARTED");
 
@@ -114,7 +136,8 @@ internal sealed class InstallCoordinator
 
             AgentConfigurationWriter.Write(
                 agentDirectory,
-                deployment);
+                deployment,
+                existingConfigurationJson);
 
             ConfigureDataPermissions();
             WriteCurrentVersion(

@@ -13,6 +13,11 @@ internal static class Program
         {
             try
             {
+                bool isManagedUpdate =
+                    args.Contains(
+                        "--update",
+                        StringComparer.OrdinalIgnoreCase);
+
                 var coordinator =
                     new InstallCoordinator();
 
@@ -23,7 +28,9 @@ internal static class Program
                     .InstallAsync(
                         installTeamsHelper: true,
                         progress,
-                        CancellationToken.None)
+                        CancellationToken.None,
+                        preserveExistingConfiguration:
+                            isManagedUpdate)
                     .GetAwaiter()
                     .GetResult();
 

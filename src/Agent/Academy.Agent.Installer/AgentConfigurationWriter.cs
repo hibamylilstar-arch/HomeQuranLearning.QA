@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace HomeQuranLearning.ClassroomAgent.Setup;
 
@@ -6,14 +7,75 @@ internal static class AgentConfigurationWriter
 {
     public static void Write(
         string agentDirectory,
-        DeploymentConfig deployment)
+        DeploymentConfig deployment,
+        string? existingConfigurationJson = null)
     {
-
         string ffmpegPath =
             Path.Combine(
                 InstallerPaths.InstallRoot,
                 "tools",
                 "ffmpeg.exe");
+
+        string configPath =
+            Path.Combine(
+                agentDirectory,
+                "appsettings.json");
+
+        if (existingConfigurationJson is not null)
+        {
+            JsonObject existing =
+                ParseExistingConfiguration(
+                    existingConfigurationJson);
+
+            JsonObject recording =
+                RequireObject(
+                    existing,
+                    "Recording");
+
+            JsonObject cloud =
+                RequireObject(
+                    existing,
+                    "Cloud");
+
+            JsonObject liveStreaming =
+                RequireObject(
+                    existing,
+                    "LiveStreaming");
+
+            // Preserve device/runtime choices such as Recording.Enabled,
+            // recording destination, frame rate and LiveStreaming.Enabled.
+            // Only deployment-owned values are refreshed during an update.
+            recording["FfmpegPath"] =
+                ffmpegPath;
+
+            cloud["BaseUrl"] =
+                deployment.ApiBaseUrl.TrimEnd('/');
+
+            cloud["AgentVersion"] =
+                deployment.Version;
+
+            cloud["ApiKey"] =
+                string.Empty;
+
+            cloud["ApiKeyProtectedFile"] =
+                InstallerPaths.SecretPath;
+
+            liveStreaming["IngestBaseUrl"] =
+                deployment.LiveIngestBaseUrl.TrimEnd('/');
+
+            liveStreaming["FfmpegPath"] =
+                ffmpegPath;
+
+            File.WriteAllText(
+                configPath,
+                existing.ToJsonString(
+                    new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    }));
+
+            return;
+        }
 
         var config = new
         {
@@ -64,11 +126,6 @@ internal static class AgentConfigurationWriter
             }
         };
 
-        string configPath =
-            Path.Combine(
-                agentDirectory,
-                "appsettings.json");
-
         File.WriteAllText(
             configPath,
             JsonSerializer.Serialize(
@@ -77,5 +134,38 @@ internal static class AgentConfigurationWriter
                 {
                     WriteIndented = true
                 }));
+    }
+
+    private static JsonObject ParseExistingConfiguration(
+        string json)
+    {
+        try
+        {
+            JsonNode? node =
+                JsonNode.Parse(json);
+
+            return node as JsonObject
+                ?? throw new InvalidDataException(
+                    "Existing Agent configuration root must be a JSON object.");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException(
+                "Existing Agent configuration is invalid JSON.",
+                ex);
+        }
+    }
+
+    private static JsonObject RequireObject(
+        JsonObject root,
+        string propertyName)
+    {
+        if (root[propertyName] is not JsonObject value)
+        {
+            throw new InvalidDataException(
+                $"Existing Agent configuration is missing required section '{propertyName}'.");
+        }
+
+        return value;
     }
 }

@@ -5,7 +5,6 @@ $ErrorActionPreference = "Stop"
 $dataRoot = "C:\ProgramData\AcademyAgent"
 $installRoot = "C:\Program Files\Home Quran Learning\Classroom Agent"
 $currentPath = Join-Path $installRoot "current.json"
-$readinessPath = Join-Path $dataRoot "update-readiness.json"
 $devicePath = Join-Path $dataRoot "device.json"
 $secretPath = Join-Path $dataRoot "Secrets\agent-api-key.bin"
 $updateRoot = Join-Path $dataRoot "Updates"
@@ -43,25 +42,12 @@ try {
     }
 
     if(-not (Test-Path $currentPath)){ return }
-    if(-not (Test-Path $readinessPath)){ return }
     if(-not (Test-Path $devicePath)){ return }
     if(-not (Test-Path $secretPath)){ return }
 
     $current = Get-Content $currentPath -Raw | ConvertFrom-Json
-    $readiness = Get-Content $readinessPath -Raw | ConvertFrom-Json
     $device = Get-Content $devicePath -Raw | ConvertFrom-Json
 
-    if($readiness.safeToUpdate -ne $true){
-        Write-UpdaterLog "UPDATE_SKIPPED_NOT_SAFE"
-        return
-    }
-
-    $checkedAt = [DateTimeOffset]$readiness.checkedAtUtc
-
-    if(([DateTimeOffset]::UtcNow - $checkedAt).TotalSeconds -gt 30){
-        Write-UpdaterLog "UPDATE_SKIPPED_READINESS_STALE"
-        return
-    }
 
     $apiBaseUrl = [string]$current.apiBaseUrl
 
@@ -165,26 +151,12 @@ try {
         }
     }
 
-    # Final safety check immediately before installation.
-    $readiness = Get-Content $readinessPath -Raw | ConvertFrom-Json
-
-    if($readiness.safeToUpdate -ne $true){
-        Write-UpdaterLog "UPDATE_ABORTED_CLASS_BECAME_ACTIVE"
-        return
-    }
-
-    $checkedAt = [DateTimeOffset]$readiness.checkedAtUtc
-
-    if(([DateTimeOffset]::UtcNow - $checkedAt).TotalSeconds -gt 15){
-        Write-UpdaterLog "UPDATE_ABORTED_READINESS_STALE"
-        return
-    }
 
     Write-UpdaterLog ("UPDATE_START Release=" + $releaseId)
 
     $process = Start-Process `
         -FilePath $packagePath `
-        -ArgumentList "--silent" `
+        -ArgumentList "--silent --update" `
         -PassThru `
         -Wait
 

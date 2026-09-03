@@ -90,7 +90,7 @@ export default function DevicesPage() {
       const result = await requestAgentUpdate(device.id);
 
       setNotice(
-        `${result.displayName}: Agent ${result.version} update queued.`
+        `${result.displayName}: Agent ${result.version} update requested. Monitoring will reconnect briefly.`
       );
 
       await loadDevices();
@@ -304,7 +304,7 @@ export default function DevicesPage() {
                           >
                             {updatingId === device.id
                               ? "Queuing..."
-                              : "Update Agent"}
+                              : "Update Now"}
                           </button>
 
                           {device.pendingAgentUpdateVersion && (

@@ -183,7 +183,7 @@ public sealed class DashboardQueryService
                 AgentUpdateRequestedAtUtc =
                     x.AgentUpdateRequestedAtUtc,
                 AgentVersion = x.AgentVersion,
-                Status = x.Status.ToString(),
+                Status = DevicePresencePolicy.GetEffectiveStatus(x.Status, x.LastSeenUtc, DateTimeOffset.UtcNow).ToString(),
                 LastSeenUtc = x.LastSeenUtc
             })
             .ToList();

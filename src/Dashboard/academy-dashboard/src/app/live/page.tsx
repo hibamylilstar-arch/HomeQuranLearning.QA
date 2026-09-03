@@ -7,7 +7,6 @@ import type { DeviceListItem, SessionListItem } from "@/types";
 
 type FeedAccess = { url: string; token: string };
 
-const METADATA_REFRESH_MS = 12_000;
 const ONLINE_WINDOW_MS = 120_000;
 
 function getErrorMessage(error: unknown) {
@@ -315,18 +314,31 @@ export default function LiveMonitoringPage() {
       void loadMetadata(true);
     }, 0);
 
-    const timer = window.setInterval(() => {
-      void loadMetadata(false);
-    }, METADATA_REFRESH_MS);
-
     return () => {
       window.clearTimeout(initialTimer);
-      window.clearInterval(timer);
     };
   }, [loadMetadata]);
 
   const onlineDevices = useMemo(
-    () => devices.filter(isRecentlyOnline),
+    () =>
+      devices
+        .filter(isRecentlyOnline)
+        .sort((left, right) => {
+          const leftName =
+            left.recordingDisplayName || left.deviceName;
+
+          const rightName =
+            right.recordingDisplayName || right.deviceName;
+
+          return leftName.localeCompare(
+            rightName,
+            undefined,
+            {
+              numeric: true,
+              sensitivity: "base",
+            }
+          );
+        }),
     [devices]
   );
 
@@ -338,7 +350,7 @@ export default function LiveMonitoringPage() {
             Live Classroom Devices
           </h2>
           <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Live video stays connected • class metadata refreshes every 12 seconds
+            Live video stays connected • refresh class metadata manually when needed
           </p>
         </div>
 
@@ -354,7 +366,7 @@ export default function LiveMonitoringPage() {
       {error ? (
         <div className="rounded-xl border border-amber-900/60 bg-amber-950/30 p-4">
           <p className="text-sm text-amber-200">
-            Background metadata refresh failed: {error}. Existing live feeds remain connected.
+            Metadata refresh failed: {error}. Existing live feeds remain connected.
           </p>
         </div>
       ) : null}

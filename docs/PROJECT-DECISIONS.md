@@ -159,3 +159,22 @@ Status: accepted 2026-09-03.
   capture chain.
 - Recording, upload recovery and QA must not block, stall or restart Live
   Monitoring.
+
+## DEV-001 - Owner-first evidence-driven validation
+
+Status: accepted 2026-09-03.
+
+- The project is in active development/trial; the Owner device is the primary physical/runtime canary for new Agent behavior before teacher-laptop rollout.
+- Local development remains the normal place to inspect and change source; the Owner device is used when the requirement depends on real Windows, Teams/Zoom, audio routing, installed-Agent behavior, VPS connectivity or another physical/runtime boundary.
+- Engineers must inspect the exact affected source/runtime/path/service before changing it. Do not guess facts that can be directly inspected.
+- Debug difficult runtime problems boundary-by-boundary: inspect, isolate, directly probe, prove, then move to the next unproven boundary.
+- Make the smallest source fix that addresses the proven root cause and run targeted verification appropriate to that boundary.
+- When physical behavior is involved, the change is not behaviorally proven until it works on the Owner device in the real intended scenario.
+- A conclusively proven boundary becomes the baseline. Do not re-prove it unless later changes could invalidate that proof or contradictory evidence appears.
+- Extra worktrees, staging directories, duplicate installers, probes and verification layers require a concrete engineering reason; they are not default ceremony.
+- Teacher laptops are rollout targets after Owner validation, even if they are already registered in the system.
+- After Owner confirmation, build from the verified commit, deploy only affected VPS components, publish the Agent release through the existing release store, then use per-device Owner-controlled remote updates.
+- An unproven Agent change must not be pushed fleet-wide merely because remote update capability exists.
+- This decision governs all AI engineers and development assistants working on this repository.
+
+Sequence: exact inspection -> evidence -> smallest fix -> targeted verification -> Owner physical confirmation -> controlled VPS/release rollout -> teacher laptops.

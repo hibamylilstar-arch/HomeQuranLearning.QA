@@ -156,3 +156,33 @@ Do not invent approval gates for ordinary fixes, documentation, targeted tests, 
 ## Classroom media priority
 
 - Classroom media priority is audio first. Teacher and student speech must receive the lowest practical latency and continuous delivery; video quality is secondary. Normal live monitoring and Agent recordings target approximately 240p at low frame rate/bitrate to reduce teacher-laptop CPU, network bandwidth and storage/VPS load.
+
+## 11. Owner-first evidence-driven development
+
+HomeQuranLearning.QA is still in active development/trial. The Owner device is the primary physical/runtime canary for Agent behavior before teacher-laptop rollout.
+
+For runtime-affecting work, AI engineers must:
+
+1. Inspect the exact affected source, machine, runtime, path, process, service or data boundary.
+2. Never guess facts that can be inspected directly.
+3. Reproduce or isolate the actual failing boundary and test that boundary directly.
+4. Make the smallest production-quality source fix.
+5. Run only targeted verification that can meaningfully validate the change.
+6. Validate physical/runtime behavior on the Owner device in the real intended scenario when applicable.
+7. Confirm the result behaves exactly as the Owner requested.
+8. If it fails, continue from the next unproven boundary; do not reopen already-proven boundaries without contradictory evidence.
+9. After conclusive Owner-device proof, treat that behavior as the baseline unless a later change could invalidate it.
+10. Only after Owner confirmation should the approved release be deployed and rolled out to teacher laptops.
+
+Mandatory engineering principles:
+
+- Use the evidence-driven sequence: inspect -> isolate -> direct probe -> prove boundary -> next boundary -> root cause -> source fix -> Owner physical validation -> controlled rollout.
+- The successful classroom-audio debugging sequence is the model for difficult runtime investigation.
+- Do not create extra worktrees, staging directories, probe layers, duplicate packages or verification gates unless they solve a concrete isolation, safety or reproducibility need.
+- Do not repeat conclusive verification merely for reassurance.
+- Teacher laptops being registered or already used does not turn every development change into a fleet rollout.
+- Do not deploy an unproven Agent change across teacher laptops merely because remote update capability exists.
+- After Owner confirmation, build from the verified commit, update only VPS services that actually changed, publish through the existing release mechanism, then use per-device Owner-controlled remote updates.
+- Inspect exact installed paths, runtime configuration and live service state before acting; do not rely on assumed or historical layouts when the current machine can answer directly.
+- Verification exists to establish correctness, not to create ceremony. More verification layers are not automatically better engineering.
+- This rule applies to ChatGPT, Codex, Gemini, DeepSeek, Claude and any other AI engineer working on this repository.

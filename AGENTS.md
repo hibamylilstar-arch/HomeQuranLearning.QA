@@ -141,7 +141,7 @@ Do not invent approval gates for ordinary fixes, documentation, targeted tests, 
 - Local development must target local API/RTMP infrastructure and must not accidentally send Owner development traffic to the VPS.
 - Local DEV recordings are disposable and recording remains off by default unless a specific test requires recording.
 - Optional same-Wi-Fi testing may use the Owner PC LAN address; another laptop's localhost must never be treated as the Owner PC.
-- The production Owner device is a dormant reusable VPS test device, not the normal development device.
+- The production Owner device is the primary reusable VPS-connected physical/runtime canary when real installed-Agent, Windows, Teams/Zoom, audio-routing or remote-update behavior must be validated; it is not the normal source-development runtime.
 - The user should normally only need to copy/paste the complete command block supplied by the AI into the original terminal.
 
 ## Classroom communication audio invariant

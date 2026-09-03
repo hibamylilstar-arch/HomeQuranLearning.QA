@@ -178,3 +178,21 @@ Status: accepted 2026-09-03.
 - This decision governs all AI engineers and development assistants working on this repository.
 
 Sequence: exact inspection -> evidence -> smallest fix -> targeted verification -> Owner physical confirmation -> controlled VPS/release rollout -> teacher laptops.
+## DEV-002 - Owner active-class remote update baseline
+
+Status: accepted and physically proven 2026-09-03.
+
+- Owner device `DESKTOP-PUFUU3U` was updated during a real active Microsoft Teams class from `1.0.0-0329c70810cc-b1a-ts1` to `1.0.0-c4cebb5546e8-ownerupdate1`.
+- The installed legacy updater was first isolated as the only incompatible boundary: it still referenced `update-readiness.json` and invoked the installer with plain `--silent`.
+- Only the updater script boundary was bootstrapped to the verified `c4cebb5` implementation before the physical update test; Agent, FFmpeg, Teams and recording runtime were not changed by that bootstrap.
+- The dashboard Owner-controlled `Update Now` request correctly queued release `ownerupdate-c4cebb5546e8-1`.
+- Package delivery was directly proven: authenticated manifest enabled the expected release, package endpoint returned HTTP 200 with `356237966` bytes, and body transfer succeeded.
+- The managed update completed with `UPDATE_SUCCESS`; scheduled-task result was `0`.
+- Microsoft Teams stayed connected throughout the update and the pre-update Teams processes survived.
+- Only managed Agent components restarted as intended: Agent service, Teams helper and managed FFmpeg.
+- Existing runtime configuration was preserved: Recording remained disabled, Recording output remained `C:\ProgramData\AcademyAgent\Recordings-LiveOnlyTimestampTrial`, and Live Streaming remained enabled.
+- After the managed restart, Live video reconnected and both teacher microphone audio and remote/student playback audio were physically confirmed working from a second device.
+- This behavior is now the accepted Owner-device baseline. Do not re-prove this boundary unless later code changes could invalidate it or contradictory runtime evidence appears.
+- Teacher-laptop rollout may use this proven release path only when the target laptop's installed updater is compatible with managed `--silent --update` semantics. Legacy updater state must not be assumed.
+
+Baseline sequence: dashboard `Update Now` -> authenticated manifest/package -> SHA verification -> managed installer update -> Agent/helper/FFmpeg restart -> Teams survives -> Live reconnects -> classroom audio resumes.

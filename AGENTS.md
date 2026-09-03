@@ -5,7 +5,9 @@ Use the minimum investigation, verification and process needed for the actual ch
 
 ## 1. Authority and continuation
 
-- Current Git source, current runtime evidence and the top CURRENT ACTIVE STATE in docs/PROJECT-STATE.md are authoritative.
+- `docs/architecture/classroom-monitoring-product-contract.md` is the highest authority for intended classroom-monitoring product behavior.
+- Current Git source, current runtime evidence and the top CURRENT ACTIVE STATE in docs/PROJECT-STATE.md are authoritative for implementation/runtime state.
+- If source, tests, historical docs or earlier decisions conflict with the Product Contract, treat the conflicting implementation as technical debt rather than silently redefining the product.
 - Chat history is supporting context only.
 - A new AI/session must continue from the latest verified state instead of restarting old investigations.
 - Read older historical project-state sections only when they are directly relevant to the current task.
@@ -98,11 +100,11 @@ Do not invent approval gates for ordinary fixes, documentation, targeted tests, 
 
 - Managed classroom Agents communicate outbound for normal production operation.
 - Durable Agent DeviceId is the machine identity; editable friendly laptop names are user-facing labels; Windows computer names are not durable targeting identity.
-- Teacher audio must use the verified genuine USB headset/microphone path and must not fall back to internal/Realtek microphone capture.
-- Missing or ambiguous verified USB teacher microphone fails closed for teacher-input capture without unnecessarily stopping permitted recording/live video.
+- Classroom audio must follow the teacher communication application's effective microphone and playback/render endpoints. USB, Bluetooth, wired and internal/Realtek endpoints are all valid when they are the routes actually used by Teams/Zoom.
+- Do not capture unrelated microphones or playback endpoints. If an effective communication route is temporarily unavailable, report the route as unavailable and recover automatically when the communication application exposes a valid route.
 - Preserve the proven live/recording media path unless an actual defect requires a scoped change.
 - Dashboard live feeds remain muted by default and only one selected feed should be audible at a time.
-- Owner-controlled Agent updates target the selected durable device and the communication microphone is the final install safety gate.
+- Owner-controlled Agent updates target the selected durable device. Audio transport type must not be an installation or update gate.
 - Do not reopen already proven updater/live/audio investigations without new evidence of a regression.
 
 ## 9. Owner Control Panel
@@ -142,10 +144,15 @@ Do not invent approval gates for ordinary fixes, documentation, targeted tests, 
 - The production Owner device is a dormant reusable VPS test device, not the normal development device.
 - The user should normally only need to copy/paste the complete command block supplied by the AI into the original terminal.
 
-## Classroom USB headset invariant
+## Classroom communication audio invariant
 
-- Classroom USB audio is brand/model independent: Logitech, HP, Jabra, generic and other standard USB headsets must be detected from verified physical USB ancestry, never from manufacturer/name hard-coding. When a teacher disconnects one USB headset and connects another verified headset with playback + microphone endpoints, Agent audio must automatically recover onto the new headset without reinstalling the Agent. Realtek/internal audio fallback remains forbidden.
-
+- The Agent captures the effective microphone/input endpoint and effective playback/render endpoint used by the teacher's Teams/Zoom communication route.
+- Device transport and brand are irrelevant: USB, Bluetooth, wired and internal/Realtek are valid when actually used by the communication application.
+- Do not capture unrelated active microphones or speakers.
+- If Teams/Zoom uses Windows Default or Default Communications, resolve the effective endpoint behind that selection.
+- Route changes during a call must recover automatically without reinstall.
+- There is no separate student-device endpoint to discover; remote/student speech is the audio arriving on the teacher's communication playback route.
+- Read `docs/architecture/classroom-monitoring-product-contract.md` before changing classroom audio, attendance, recording or QA behavior.
 ## Classroom media priority
 
 - Classroom media priority is audio first. Teacher and student speech must receive the lowest practical latency and continuous delivery; video quality is secondary. Normal live monitoring and Agent recordings target approximately 240p at low frame rate/bitrate to reduce teacher-laptop CPU, network bandwidth and storage/VPS load.

@@ -98,3 +98,64 @@ Status: accepted 2026-08-29; supersedes PILOT-001 where the earlier pilot networ
 - The first laptop remains a deployment canary for production verification, not a permanent product-capacity restriction.
 - After initial installation, routine Agent upgrades and bug-fix releases must move toward centrally controlled VPS-driven update delivery without requiring manual reinstall on every laptop.
 - Per-device revocable credentials supersede the shared fleet credential as the long-term production authentication model.
+## AUDIO-001 — Effective communication routes
+
+Status: accepted 2026-09-03; supersedes all earlier USB-only classroom-audio requirements.
+
+- The teacher laptop is the classroom-audio point of observation.
+- Teacher speech comes from the microphone/input endpoint effectively used by
+  Teams/Zoom or the supported communication application.
+- Remote/student speech comes from loopback of the playback/render endpoint
+  effectively used by that communication application.
+- USB, Bluetooth, wired and internal/Realtek endpoints are equally valid when
+  they are the actual effective communication routes.
+- The Agent must not additionally capture unrelated microphones or speakers.
+- If the application uses Windows Default or Default Communications, resolve
+  the effective endpoint behind that selection.
+- Route changes during a call must recover automatically.
+- The two sources form one canonical classroom conversation for Live,
+  Recording and QA.
+
+Detailed authority:
+`docs/architecture/classroom-monitoring-product-contract.md`.
+
+## ATT-002 — LessonShared is automatic attendance truth
+
+Status: accepted 2026-09-03; supersedes ATT-001 and earlier multi-evidence attendance semantics where they conflict.
+
+- A valid `LessonShared` event belonging to the correct scheduled
+  session/student and valid class window marks both Teacher and Student
+  `Present`.
+- Generic audio activity, student-audio meters, communication-process
+  detection, greeting detection, call attempts and speaker inference do not
+  independently determine automatic attendance.
+- Existing validation that ties `LessonShared` to the correct scheduled
+  student/session must remain intact.
+- Operational communication/process signals may temporarily remain for
+  diagnostics during migration, but they are not attendance truth.
+
+## QA-002 — Mixed classroom conversation is the QA source
+
+Status: accepted 2026-09-03; supersedes QA-001 only where QA-001 requires a separately attributable verified-USB teacher track.
+
+- QA/STT consumes the approved classroom conversation source.
+- The source is teacher effective microphone plus teacher effective
+  communication playback.
+- Speaker identification and diarization are not core dependencies.
+- QA may flag policy-relevant classroom conversation without first proving
+  which speaker said it.
+- Existing contextual multilingual analysis, evidence context, auditability
+  and human-review mechanisms may remain where useful.
+- USB provenance must not be a prerequisite for QA coverage.
+
+## REC-001 — Capture once, fan out
+
+Status: accepted 2026-09-03.
+
+- Physical classroom audio is captured once.
+- The canonical classroom source fans out independently to Live, Recording and
+  QA/STT.
+- Recording must migrate away from its duplicate physical system/microphone
+  capture chain.
+- Recording, upload recovery and QA must not block, stall or restart Live
+  Monitoring.

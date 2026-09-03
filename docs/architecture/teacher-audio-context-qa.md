@@ -1,5 +1,18 @@
 # Teacher Audio Provenance and Context-Aware Multilingual QA
 
+> **SUPERSEDED BY CLASSROOM MONITORING PRODUCT CONTRACT — 2026-09-03**
+>
+> This document is retained as historical implementation evidence.
+> Its verified-USB teacher-only audio provenance requirement is no longer the
+> authoritative product model.
+>
+> Current authority:
+> `docs/architecture/classroom-monitoring-product-contract.md`
+>
+> QA now consumes the approved classroom conversation source: the teacher's
+> effective communication microphone plus the teacher's effective communication
+> playback. Speaker attribution is not a core QA dependency.
+
 ## Status
 
 7A-5A is released at `a67ff8a` under the approved high-risk scope and 7A-5B

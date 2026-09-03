@@ -36,8 +36,12 @@ public sealed class ClassroomAudioCaptureCoordinator :
         ClassroomAudioHub hub)
         : this(
             hub,
-            static () => new AudioCaptureService(),
-            static () => new MicrophoneCaptureService())
+            static () =>
+                new CommunicationEndpointCaptureService(
+                    CommunicationCaptureRole.Render),
+            static () =>
+                new CommunicationEndpointCaptureService(
+                    CommunicationCaptureRole.Microphone))
     {
     }
 
@@ -165,9 +169,10 @@ public sealed class ClassroomAudioCaptureCoordinator :
     /// <summary>
     /// Opens or closes the single teacher-microphone capture owner.
     ///
-    /// Communication-session detection will control this method in a later
-    /// lifecycle step. It is deliberately explicit here for deterministic
-    /// ownership and testing.
+    /// The shared runtime keeps this owner alive for its lease lifetime.
+    /// The capture service itself follows the effective communication
+    /// microphone endpoint and publishes silence through the canonical hub
+    /// whenever no valid communication route is currently available.
     /// </summary>
     public void SetTeacherCaptureEnabled(
         bool enabled)

@@ -6,9 +6,10 @@ namespace Academy.Agent.Tests;
 public sealed class ClassroomAudioRuntimeTests
 {
     [Fact]
-    public void FirstLease_StartsSystemCapture_AndFinalLeaseStopsIt()
+    public void FirstLease_StartsBothPhysicalCaptures_AndFinalLeaseStopsThem()
     {
-        var fixture = new RuntimeFixture();
+        var fixture =
+            new RuntimeFixture();
 
         using ClassroomAudioRuntime runtime =
             fixture.CreateRuntime();
@@ -22,6 +23,18 @@ public sealed class ClassroomAudioRuntimeTests
 
         Assert.Equal(
             1,
+            fixture.Teacher.StartCount);
+
+        Assert.True(
+            fixture.Coordinator
+                .IsSystemCaptureActive);
+
+        Assert.True(
+            fixture.Coordinator
+                .IsTeacherCaptureActive);
+
+        Assert.Equal(
+            1,
             runtime.ActiveLeaseCount);
 
         lease.Dispose();
@@ -31,14 +44,19 @@ public sealed class ClassroomAudioRuntimeTests
             fixture.System.StopCount);
 
         Assert.Equal(
+            1,
+            fixture.Teacher.StopCount);
+
+        Assert.Equal(
             0,
             runtime.ActiveLeaseCount);
     }
 
     [Fact]
-    public void MultipleLeases_ShareOnePhysicalSystemCapture()
+    public void MultipleLeases_ShareOnePhysicalCapturePair()
     {
-        var fixture = new RuntimeFixture();
+        var fixture =
+            new RuntimeFixture();
 
         using ClassroomAudioRuntime runtime =
             fixture.CreateRuntime();
@@ -54,6 +72,10 @@ public sealed class ClassroomAudioRuntimeTests
             fixture.System.StartCount);
 
         Assert.Equal(
+            1,
+            fixture.Teacher.StartCount);
+
+        Assert.Equal(
             2,
             runtime.ActiveLeaseCount);
 
@@ -62,6 +84,10 @@ public sealed class ClassroomAudioRuntimeTests
         Assert.Equal(
             0,
             fixture.System.StopCount);
+
+        Assert.Equal(
+            0,
+            fixture.Teacher.StopCount);
 
         Assert.Equal(
             1,
@@ -74,6 +100,10 @@ public sealed class ClassroomAudioRuntimeTests
             fixture.System.StopCount);
 
         Assert.Equal(
+            1,
+            fixture.Teacher.StopCount);
+
+        Assert.Equal(
             0,
             runtime.ActiveLeaseCount);
     }
@@ -81,7 +111,8 @@ public sealed class ClassroomAudioRuntimeTests
     [Fact]
     public void Scheduler_AdvancesCanonicalTwentyMillisecondTimeline()
     {
-        var fixture = new RuntimeFixture();
+        var fixture =
+            new RuntimeFixture();
 
         using ClassroomAudioRuntime runtime =
             fixture.CreateRuntime();
@@ -94,7 +125,8 @@ public sealed class ClassroomAudioRuntimeTests
         using ClassroomAudioRuntimeLease lease =
             runtime.Acquire();
 
-        fixture.TickSource.Signal(3);
+        fixture.TickSource.Signal(
+            3);
 
         Assert.True(
             SpinWait.SpinUntil(
@@ -144,11 +176,10 @@ public sealed class ClassroomAudioRuntimeTests
     }
 
     [Fact]
-    public void CommunicationLifecycle_StartsAndStopsOneTeacherCapture()
+    public void TimelineTicks_DoNotGateOrRestartTeacherCapture()
     {
-        var fixture = new RuntimeFixture();
-
-        fixture.Detector.InUse = true;
+        var fixture =
+            new RuntimeFixture();
 
         using ClassroomAudioRuntime runtime =
             fixture.CreateRuntime();
@@ -156,29 +187,72 @@ public sealed class ClassroomAudioRuntimeTests
         using ClassroomAudioRuntimeLease lease =
             runtime.Acquire();
 
+        Assert.Equal(
+            1,
+            fixture.Teacher.StartCount);
+
+        fixture.TickSource.Signal(
+            100);
+
         Assert.True(
             SpinWait.SpinUntil(
                 () =>
-                    fixture.Teacher.StartCount >= 1,
+                    fixture.Hub
+                        .NextSequenceNumber >= 100,
                 TimeSpan.FromSeconds(2)));
 
         Assert.Equal(
             1,
             fixture.Teacher.StartCount);
 
-        fixture.Detector.InUse = false;
-
-        fixture.TickSource.Signal(13);
+        Assert.Equal(
+            0,
+            fixture.Teacher.StopCount);
 
         Assert.True(
-            SpinWait.SpinUntil(
-                () =>
-                    fixture.Teacher.StopCount >= 1,
-                TimeSpan.FromSeconds(2)));
+            fixture.Coordinator
+                .IsTeacherCaptureActive);
+    }
+
+    [Fact]
+    public void TeacherCaptureStartFailure_CleansUpSystemAndDoesNotAcquireLease()
+    {
+        var fixture =
+            new RuntimeFixture();
+
+        fixture.Teacher
+            .FailStartAttempts =
+                1;
+
+        using ClassroomAudioRuntime runtime =
+            fixture.CreateRuntime();
+
+        Assert.Throws<InvalidOperationException>(
+            runtime.Acquire);
+
+        Assert.Equal(
+            1,
+            fixture.System.StartCount);
+
+        Assert.Equal(
+            1,
+            fixture.System.StopCount);
+
+        Assert.Equal(
+            1,
+            fixture.Teacher.StartCount);
 
         Assert.Equal(
             1,
             fixture.Teacher.StopCount);
+
+        Assert.Equal(
+            0,
+            runtime.ActiveLeaseCount);
+
+        Assert.False(
+            fixture.Coordinator
+                .IsSystemCaptureActive);
 
         Assert.False(
             fixture.Coordinator
@@ -186,67 +260,10 @@ public sealed class ClassroomAudioRuntimeTests
     }
 
     [Fact]
-    public void FailedTeacherStart_RetriesNoFasterThanCanonicalOneSecond()
-    {
-        var fixture = new RuntimeFixture();
-
-        fixture.Detector.InUse = true;
-        fixture.Teacher.FailStartAttempts = 1;
-
-        using ClassroomAudioRuntime runtime =
-            fixture.CreateRuntime();
-
-        using ClassroomAudioRuntimeLease lease =
-            runtime.Acquire();
-
-        Assert.True(
-            SpinWait.SpinUntil(
-                () =>
-                    fixture.Teacher.StartCount >= 1,
-                TimeSpan.FromSeconds(2)));
-
-        Assert.Equal(
-            1,
-            fixture.Teacher.StartCount);
-
-        // Communication lifecycle checks occur every 13 frames.
-        // At sequences 13, 26, and 39 the one-second retry boundary
-        // (50 frames) has not yet been reached.
-        fixture.TickSource.Signal(39);
-
-        Assert.True(
-            SpinWait.SpinUntil(
-                () =>
-                    fixture.Hub.NextSequenceNumber >= 39,
-                TimeSpan.FromSeconds(2)));
-
-        Assert.Equal(
-            1,
-            fixture.Teacher.StartCount);
-
-        // The next communication check occurs at sequence 52,
-        // which is beyond the 50-frame / one-second retry boundary.
-        fixture.TickSource.Signal(13);
-
-        Assert.True(
-            SpinWait.SpinUntil(
-                () =>
-                    fixture.Teacher.StartCount >= 2,
-                TimeSpan.FromSeconds(2)));
-
-        Assert.Equal(
-            2,
-            fixture.Teacher.StartCount);
-
-        Assert.True(
-            fixture.Coordinator
-                .IsTeacherCaptureActive);
-    }
-
-    [Fact]
     public void Dispose_RejectsFutureLeaseAcquisition()
     {
-        var fixture = new RuntimeFixture();
+        var fixture =
+            new RuntimeFixture();
 
         ClassroomAudioRuntime runtime =
             fixture.CreateRuntime();
@@ -269,50 +286,45 @@ public sealed class ClassroomAudioRuntimeTests
                         () => Teacher);
         }
 
-        public ClassroomAudioHub Hub { get; } =
+        public ClassroomAudioHub Hub
+        {
+            get;
+        } =
             new();
 
-        public FakeAudioCaptureService System { get; } =
+        public FakeAudioCaptureService System
+        {
+            get;
+        } =
             new();
 
-        public FakeAudioCaptureService Teacher { get; } =
+        public FakeAudioCaptureService Teacher
+        {
+            get;
+        } =
             new();
 
-        public DetectorState Detector { get; } =
-            new();
-
-        public ManualTickSource TickSource { get; } =
+        public ManualTickSource TickSource
+        {
+            get;
+        } =
             new();
 
         public ClassroomAudioCaptureCoordinator
-            Coordinator { get; }
+            Coordinator
+        {
+            get;
+        }
 
-        public ClassroomAudioRuntime CreateRuntime()
+        public ClassroomAudioRuntime
+            CreateRuntime()
         {
             return
                 ClassroomAudioRuntime
                     .CreateForTesting(
                         Hub,
                         Coordinator,
-                        () => Detector.InUse,
                         () => TickSource);
-        }
-    }
-
-    private sealed class DetectorState
-    {
-        private int _inUse;
-
-        public bool InUse
-        {
-            get =>
-                Volatile.Read(
-                    ref _inUse) != 0;
-
-            set =>
-                Volatile.Write(
-                    ref _inUse,
-                    value ? 1 : 0);
         }
     }
 
@@ -355,22 +367,32 @@ public sealed class ClassroomAudioRuntimeTests
 
         public void Dispose()
         {
-            _ticks.Writer.TryComplete();
+            _ticks.Writer
+                .TryComplete();
         }
     }
 
     private sealed class FakeAudioCaptureService :
         IAudioCaptureService
     {
-        public event EventHandler<AudioDataAvailableEventArgs>?
+        public event EventHandler<
+            AudioDataAvailableEventArgs>?
             DataAvailable;
 
         public event EventHandler?
             RecordingStopped;
 
-        public int StartCount { get; private set; }
+        public int StartCount
+        {
+            get;
+            private set;
+        }
 
-        public int StopCount { get; private set; }
+        public int StopCount
+        {
+            get;
+            private set;
+        }
 
         public int FailStartAttempts
         {
@@ -402,8 +424,11 @@ public sealed class ClassroomAudioRuntimeTests
                 this,
                 new AudioDataAvailableEventArgs
                 {
-                    Buffer = pcm,
-                    BytesRecorded = pcm.Length
+                    Buffer =
+                        pcm,
+
+                    BytesRecorded =
+                        pcm.Length
                 });
         }
 

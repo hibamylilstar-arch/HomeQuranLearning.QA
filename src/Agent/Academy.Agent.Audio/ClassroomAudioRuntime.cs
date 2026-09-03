@@ -3,32 +3,30 @@ namespace Academy.Agent.Audio;
 /// <summary>
 /// Shared lifecycle for canonical classroom audio.
 ///
-/// The first consumer lease starts one physical system-loopback capture and
-/// one canonical 20 ms timeline. The teacher microphone is opened only while
-/// a supported communication session is detected. Additional consumers share
-/// the same physical captures and timeline. The final lease stops everything.
+/// The first consumer lease starts exactly one effective communication render
+/// capture owner, one effective communication microphone capture owner and one
+/// canonical 20 ms timeline.
 ///
-/// No current Live or Recording worker uses this runtime yet.
+/// The physical capture owners continuously follow the communication
+/// application's active Windows audio endpoints. Additional consumers reuse the
+/// same capture owners and timeline. The final lease stops everything.
+///
+/// Attendance/process state does not gate classroom microphone capture.
 /// </summary>
 public sealed class ClassroomAudioRuntime :
     IDisposable
 {
-    private const int
-        TeacherUsageCheckEveryFrames = 13;
+    private readonly object
+        _lifecycleSync =
+            new();
 
-    private const int
-        TeacherStartRetryFrames = 50;
-
-    private readonly object _lifecycleSync = new();
-    private readonly object _sync = new();
+    private readonly object _sync =
+        new();
 
     private readonly ClassroomAudioHub _hub;
 
     private readonly ClassroomAudioCaptureCoordinator
         _captureCoordinator;
-
-    private readonly Func<bool>
-        _communicationMicrophoneInUse;
 
     private readonly Func<IClassroomAudioTickSource>
         _tickSourceFactory;
@@ -41,21 +39,17 @@ public sealed class ClassroomAudioRuntime :
 
     private int _activeLeaseCount;
 
-    private long _nextTeacherStartSequence;
-
     private Exception? _lastFault;
 
     private bool _disposed;
 
     public ClassroomAudioRuntime(
         ClassroomAudioHub hub,
-        ClassroomAudioCaptureCoordinator captureCoordinator)
+        ClassroomAudioCaptureCoordinator
+            captureCoordinator)
         : this(
             hub,
             captureCoordinator,
-            static () =>
-                CommunicationMicrophoneUsageDetector
-                    .IsCommunicationMicrophoneInUse(),
             () =>
                 new PeriodicClassroomAudioTickSource(
                     hub.FrameDuration))
@@ -64,24 +58,25 @@ public sealed class ClassroomAudioRuntime :
 
     private ClassroomAudioRuntime(
         ClassroomAudioHub hub,
-        ClassroomAudioCaptureCoordinator captureCoordinator,
-        Func<bool> communicationMicrophoneInUse,
-        Func<IClassroomAudioTickSource> tickSourceFactory)
+        ClassroomAudioCaptureCoordinator
+            captureCoordinator,
+        Func<IClassroomAudioTickSource>
+            tickSourceFactory)
     {
-        ArgumentNullException.ThrowIfNull(hub);
-        ArgumentNullException.ThrowIfNull(captureCoordinator);
         ArgumentNullException.ThrowIfNull(
-            communicationMicrophoneInUse);
+            hub);
+
+        ArgumentNullException.ThrowIfNull(
+            captureCoordinator);
+
         ArgumentNullException.ThrowIfNull(
             tickSourceFactory);
 
-        _hub = hub;
+        _hub =
+            hub;
 
         _captureCoordinator =
             captureCoordinator;
-
-        _communicationMicrophoneInUse =
-            communicationMicrophoneInUse;
 
         _tickSourceFactory =
             tickSourceFactory;
@@ -90,15 +85,15 @@ public sealed class ClassroomAudioRuntime :
     public static ClassroomAudioRuntime
         CreateForTesting(
             ClassroomAudioHub hub,
-            ClassroomAudioCaptureCoordinator captureCoordinator,
-            Func<bool> communicationMicrophoneInUse,
-            Func<IClassroomAudioTickSource> tickSourceFactory)
+            ClassroomAudioCaptureCoordinator
+                captureCoordinator,
+            Func<IClassroomAudioTickSource>
+                tickSourceFactory)
     {
         return
             new ClassroomAudioRuntime(
                 hub,
                 captureCoordinator,
-                communicationMicrophoneInUse,
                 tickSourceFactory);
     }
 
@@ -108,7 +103,8 @@ public sealed class ClassroomAudioRuntime :
         {
             lock (_sync)
             {
-                return _activeLeaseCount;
+                return
+                    _activeLeaseCount;
             }
         }
     }
@@ -132,19 +128,14 @@ public sealed class ClassroomAudioRuntime :
         {
             lock (_sync)
             {
-                return _lastFault;
+                return
+                    _lastFault;
             }
         }
     }
 
-    /// <summary>
-    /// Acquire shared classroom audio.
-    ///
-    /// First lease starts the physical system capture and scheduler.
-    /// Later leases reuse the same runtime without creating new capture
-    /// instances.
-    /// </summary>
-    public ClassroomAudioRuntimeLease Acquire()
+    public ClassroomAudioRuntimeLease
+        Acquire()
     {
         lock (_lifecycleSync)
         {
@@ -162,10 +153,22 @@ public sealed class ClassroomAudioRuntime :
                 }
             }
 
-            // Physical Start intentionally occurs outside the runtime state
-            // lock because the capture service may synchronously publish PCM.
-            _captureCoordinator
-                .StartSystemCapture();
+            try
+            {
+                _captureCoordinator
+                    .StartSystemCapture();
+
+                _captureCoordinator
+                    .SetTeacherCaptureEnabled(
+                        true);
+            }
+            catch
+            {
+                _captureCoordinator
+                    .StopAll();
+
+                throw;
+            }
 
             var cts =
                 new CancellationTokenSource();
@@ -174,14 +177,14 @@ public sealed class ClassroomAudioRuntime :
             {
                 ThrowIfDisposed();
 
-                _activeLeaseCount = 1;
+                _activeLeaseCount =
+                    1;
 
-                _nextTeacherStartSequence =
-                    _hub.NextSequenceNumber;
+                _lastFault =
+                    null;
 
-                _lastFault = null;
-
-                _runCts = cts;
+                _runCts =
+                    cts;
             }
 
             Task runTask =
@@ -207,11 +210,9 @@ public sealed class ClassroomAudioRuntime :
     {
         lock (_lifecycleSync)
         {
-            CancellationTokenSource?
-                cts;
+            CancellationTokenSource? cts;
 
-            Task?
-                runTask;
+            Task? runTask;
 
             lock (_sync)
             {
@@ -220,8 +221,11 @@ public sealed class ClassroomAudioRuntime :
                     return;
                 }
 
-                _disposed = true;
-                _activeLeaseCount = 0;
+                _disposed =
+                    true;
+
+                _activeLeaseCount =
+                    0;
 
                 cts =
                     _runCts;
@@ -229,15 +233,19 @@ public sealed class ClassroomAudioRuntime :
                 runTask =
                     _runTask;
 
-                _runCts = null;
-                _runTask = null;
+                _runCts =
+                    null;
+
+                _runTask =
+                    null;
             }
 
             StopRuntime(
                 cts,
                 runTask);
 
-            _captureCoordinator.StopAll();
+            _captureCoordinator
+                .StopAll();
         }
     }
 
@@ -252,11 +260,6 @@ public sealed class ClassroomAudioRuntime :
                     ?? throw new InvalidOperationException(
                         "Classroom audio tick source factory returned null.");
 
-            EvaluateTeacherLifecycle(
-                _hub.NextSequenceNumber);
-
-            int framesSinceTeacherCheck = 0;
-
             while (await tickSource
                 .WaitForNextTickAsync(
                     cancellationToken))
@@ -265,95 +268,21 @@ public sealed class ClassroomAudioRuntime :
                     .ThrowIfCancellationRequested();
 
                 _hub.AdvanceOneFrame();
-
-                framesSinceTeacherCheck++;
-
-                if (framesSinceTeacherCheck >=
-                    TeacherUsageCheckEveryFrames)
-                {
-                    framesSinceTeacherCheck = 0;
-
-                    EvaluateTeacherLifecycle(
-                        _hub.NextSequenceNumber);
-                }
             }
         }
         catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
+            when (
+                cancellationToken
+                    .IsCancellationRequested)
         {
         }
         catch (Exception ex)
         {
             lock (_sync)
             {
-                _lastFault = ex;
+                _lastFault =
+                    ex;
             }
-        }
-    }
-
-    private void EvaluateTeacherLifecycle(
-        long currentSequence)
-    {
-        bool microphoneInUse;
-
-        try
-        {
-            microphoneInUse =
-                _communicationMicrophoneInUse();
-        }
-        catch
-        {
-            // Detector failure must not tear down a currently active
-            // teacher microphone. Preserve the previous capture state and
-            // try again on the next lifecycle check.
-            return;
-        }
-
-        if (!microphoneInUse)
-        {
-            if (_captureCoordinator
-                .IsTeacherCaptureActive)
-            {
-                _captureCoordinator
-                    .SetTeacherCaptureEnabled(
-                        false);
-            }
-
-            _nextTeacherStartSequence =
-                currentSequence;
-
-            return;
-        }
-
-        if (_captureCoordinator
-            .IsTeacherCaptureActive)
-        {
-            return;
-        }
-
-        if (currentSequence <
-            _nextTeacherStartSequence)
-        {
-            return;
-        }
-
-        try
-        {
-            _captureCoordinator
-                .SetTeacherCaptureEnabled(
-                    true);
-        }
-        catch
-        {
-            // Missing/disconnected microphone is retried from the canonical
-            // timeline rather than on every 260 ms communication check.
-        }
-        finally
-        {
-            _nextTeacherStartSequence =
-                AddFramesSaturated(
-                    currentSequence,
-                    TeacherStartRetryFrames);
         }
     }
 
@@ -361,11 +290,11 @@ public sealed class ClassroomAudioRuntime :
     {
         lock (_lifecycleSync)
         {
-            CancellationTokenSource?
-                cts = null;
+            CancellationTokenSource? cts =
+                null;
 
-            Task?
-                runTask = null;
+            Task? runTask =
+                null;
 
             lock (_sync)
             {
@@ -387,15 +316,19 @@ public sealed class ClassroomAudioRuntime :
                 runTask =
                     _runTask;
 
-                _runCts = null;
-                _runTask = null;
+                _runCts =
+                    null;
+
+                _runTask =
+                    null;
             }
 
             StopRuntime(
                 cts,
                 runTask);
 
-            _captureCoordinator.StopAll();
+            _captureCoordinator
+                .StopAll();
         }
     }
 
@@ -418,7 +351,8 @@ public sealed class ClassroomAudioRuntime :
         {
             try
             {
-                runTask.GetAwaiter()
+                runTask
+                    .GetAwaiter()
                     .GetResult();
             }
             catch (OperationCanceledException)
@@ -427,20 +361,6 @@ public sealed class ClassroomAudioRuntime :
         }
 
         cts?.Dispose();
-    }
-
-    private static long AddFramesSaturated(
-        long sequence,
-        int frames)
-    {
-        if (sequence >
-            long.MaxValue - frames)
-        {
-            return long.MaxValue;
-        }
-
-        return
-            sequence + frames;
     }
 
     private void ThrowIfDisposed()

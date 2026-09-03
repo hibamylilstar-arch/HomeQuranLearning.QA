@@ -196,3 +196,30 @@ Status: accepted and physically proven 2026-09-03.
 - Teacher-laptop rollout may use this proven release path only when the target laptop's installed updater is compatible with managed `--silent --update` semantics. Legacy updater state must not be assumed.
 
 Baseline sequence: dashboard `Update Now` -> authenticated manifest/package -> SHA verification -> managed installer update -> Agent/helper/FFmpeg restart -> Teams survives -> Live reconnects -> classroom audio resumes.
+## DEV-003 - Verified Agent release and selective fleet rollout
+
+Status: accepted 2026-09-04; extends DEV-001 and DEV-002.
+
+- Owner-first validation is a canary and quality-control requirement, not an Owner-only product or deployment restriction.
+- Each new installed-Agent bug fix or feature is built as one versioned generic reusable Agent release after source-level verification.
+- When real installed/runtime behavior is involved, that version is first physically validated on the Owner device.
+- After Owner confirmation, the exact verified package bytes, version and SHA are the approved artifact for rollout of that Agent version.
+- The same approved package is reused for Laptop 5, Laptop 8, Qaisar Laptop and any other selected compatible academy laptop. Do not rebuild the same Agent version separately per laptop.
+- Device targeting belongs in release/update metadata such as `targetDeviceIds`; it must not make the installer binary Owner-specific or laptop-specific.
+- To roll an already-verified release to another laptop, reuse the immutable package and change only the required per-device rollout metadata.
+- The normal post-canary path for an already-compatible Agent is Owner/Admin selection in the dashboard followed by `Update Now`.
+- Rollout remains selective and Owner-controlled. Publishing a release does not authorize an automatic fleet-wide update.
+- Routine Agent fixes/features must not require manual installer execution on every teacher laptop.
+- Manual installation/bootstrap is reserved for fresh installs, diagnosed incompatible legacy updater state, updater failure or another concrete recovery requirement.
+- New Agent source changes require a new version/release; they must never silently replace the bytes behind an already-approved immutable release ID/version.
+- Backend/dashboard-only changes do not require an Agent rebuild when installed Agent binaries are unaffected.
+- Temporary Owner-only packages, duplicate per-device builds and artificial rollout barriers are prohibited unless a specific technical incompatibility makes them necessary.
+- This rollout contract applies to ChatGPT, Codex, Gemini, DeepSeek, Claude and any future AI engineer working on HomeQuranLearning.QA.
+
+Permanent sequence:
+
+source change -> targeted verification -> Owner physical canary -> immutable reusable Agent release -> Owner-selected per-device `Update Now` rollout.
+
+Operational meaning:
+
+Owner proves the version once. The same verified version can then be sent, without rebuilding it, to any selected compatible academy laptop at the Owner's discretion.

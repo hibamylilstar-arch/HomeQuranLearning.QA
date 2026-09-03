@@ -186,3 +186,27 @@ Mandatory engineering principles:
 - Inspect exact installed paths, runtime configuration and live service state before acting; do not rely on assumed or historical layouts when the current machine can answer directly.
 - Verification exists to establish correctness, not to create ceremony. More verification layers are not automatically better engineering.
 - This rule applies to ChatGPT, Codex, Gemini, DeepSeek, Claude and any other AI engineer working on this repository.
+## 12. Verified Agent release and selective rollout
+
+The normal Agent delivery model is Owner-canary first, then reuse of the exact verified release on selected academy laptops.
+
+Mandatory rules:
+
+- An Agent source change that affects installed runtime behavior gets one new versioned reusable Agent release after source verification.
+- Validate that new Agent version on the production Owner device first when physical/runtime proof is required.
+- After Owner physical confirmation, the exact verified installer/package bytes, version and SHA become the approved release artifact for that change.
+- Do not rebuild a separate installer for Laptop 5, Laptop 8, Qaisar Laptop or any other teacher laptop when deploying the same verified Agent version.
+- The Agent installer/package must remain generic and reusable across authorized academy laptops. Do not hard-code Owner-only capability restrictions into the installer.
+- Manifest `targetDeviceIds` or equivalent targeting is rollout metadata only. It controls which devices may receive a release; it must not make the installer itself device-bound.
+- Expanding rollout to another laptop should reuse the same verified package and hash and change only the necessary per-device rollout/update metadata.
+- The Owner/Admin-controlled dashboard `Update Now` path is the normal post-canary delivery mechanism for already-compatible installed Agents.
+- The Owner chooses which laptops receive an approved release and when. Do not force an automatic fleet-wide rollout merely because a release exists.
+- A teacher laptop should not require a manual installer run for every routine bug fix or feature update.
+- Manual installer/bootstrap is an exception for a fresh installation, an incompatible legacy updater, a broken updater, or an explicitly diagnosed recovery boundary.
+- A future Agent code change requires a new versioned release, but once that version is Owner-verified, the same release is reused for every selected target laptop.
+- Backend/dashboard-only changes that do not modify Agent binaries do not require an Agent release.
+- Do not introduce temporary Owner-only packages, per-laptop rebuilds, artificial staging barriers or duplicate release artifacts unless a concrete technical incompatibility requires them.
+- Preserve release immutability: a release ID/version must not silently point to different package bytes. Use a new version/release for changed Agent code.
+- Future AI engineers must preserve this model: source fix -> targeted verification -> Owner canary -> immutable reusable release -> selective dashboard rollout.
+
+In short: Owner verification is the quality gate, not a permanent deployment restriction. Once an Agent version is proven on Owner, that exact verified release is the normal artifact used to update any other selected compatible academy laptop.

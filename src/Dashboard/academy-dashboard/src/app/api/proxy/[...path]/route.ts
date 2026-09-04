@@ -26,6 +26,14 @@ export async function PATCH(
   return proxy(path, request, "PATCH");
 }
 
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { path } = await params;
+  return proxy(path, request, "PUT");
+}
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ path: string[] }> }

@@ -373,12 +373,6 @@ export default function DevicesPage() {
                         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                           Laptop Name
                         </div>
-
-                        {!canEditLaptopName && (
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">
-                            Owner managed
-                          </span>
-                        )}
                       </div>
 
                       {editing ? (

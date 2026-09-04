@@ -300,14 +300,14 @@ export default function Sidebar({
         }
       >
         <div className="flex h-[76px] shrink-0 items-center gap-3 border-b border-slate-800/80 px-4">
-          <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl ring-1 ring-white/10 shadow-lg shadow-black/20">
+          <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-slate-900 ring-2 ring-slate-800 shadow-lg shadow-black/25">
             <Image
               src="/branding/homequranlearning-logo.jpg"
               alt="Home Quran Learning"
               width={64}
               height={64}
               priority
-              className="h-full w-full scale-[1.1] object-cover"
+              className="h-full w-full scale-[1.3] object-cover object-center"
             />
           </div>
 

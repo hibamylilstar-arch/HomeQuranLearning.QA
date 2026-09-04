@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getSessions,
   getTeachers,
@@ -135,6 +135,45 @@ export default function SessionsPage() {
   const [reviewSaving, setReviewSaving] =
     useState(false);
 
+  const evidenceSectionRef =
+    useRef<HTMLElement | null>(null);
+
+  const reviewSectionRef =
+    useRef<HTMLFormElement | null>(null);
+
+  useEffect(() => {
+    if (!evidenceSession) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      evidenceSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [evidenceSession]);
+
+  useEffect(() => {
+    if (!selectedSession) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      reviewSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [selectedSession]);
   const canCreateSession =
     user?.role === "Owner" ||
     user?.role === "Admin";
@@ -658,7 +697,7 @@ export default function SessionsPage() {
           </h3>
         </div>
 
-        <div className="responsive-data-cards sessions-data-cards">
+        <div className="responsive-data-cards sessions-data-cards custom-scrollbar">
           <table className="min-w-[980px] divide-y divide-slate-200 text-xs">
             <thead className="bg-slate-50/75 text-left font-semibold uppercase tracking-wider text-slate-500">
               <tr>
@@ -670,7 +709,7 @@ export default function SessionsPage() {
                 <th className="px-4 py-3">Teacher Attendance</th>
                 <th className="px-4 py-3">Student Attendance</th>
                 <th className="px-4 py-3">Review</th>
-                <th className="px-4 py-3">Action</th>
+                <th className="px-4 py-3 md:sticky md:right-0 md:z-20 md:bg-slate-50 md:shadow-[-10px_0_18px_-16px_rgba(15,23,42,0.45)]">Action</th>
               </tr>
             </thead>
 
@@ -694,7 +733,7 @@ export default function SessionsPage() {
                   return (
                     <tr
                       key={session.id}
-                      className="transition-colors hover:bg-slate-50/65"
+                      className="group transition-colors hover:bg-slate-50/65"
                     >
                       <td className="px-4 py-4 font-medium text-slate-900">
                         {session.teacherFullName}
@@ -765,12 +804,12 @@ export default function SessionsPage() {
                         </div>
                       </td>
 
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 md:sticky md:right-0 md:z-10 md:bg-white md:shadow-[-10px_0_18px_-16px_rgba(15,23,42,0.45)] md:transition-colors md:group-hover:bg-slate-50">
                         <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => void toggleSessionEvents(session)}
-                            className="whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-700 transition-colors hover:bg-slate-50"
+                            className="relative z-20 inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-xl border border-slate-300 bg-white px-3.5 text-[10px] font-bold uppercase tracking-wider text-slate-700 shadow-sm transition-all hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1 active:translate-y-0 active:scale-[0.98]"
                           >
                             {evidenceSession?.id === session.id
                               ? "Hide Evidence"
@@ -783,7 +822,7 @@ export default function SessionsPage() {
                               onClick={() =>
                                 openAttendanceReview(session)
                               }
-                              className="whitespace-nowrap rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700 transition-colors hover:bg-indigo-100"
+                              className="relative z-20 inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700 shadow-sm transition-all hover:-translate-y-px hover:border-indigo-300 hover:bg-indigo-100 hover:shadow focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1 active:translate-y-0 active:scale-[0.98]"
                             >
                               {session.attendanceReviewStatus === "Reviewed"
                                 ? "Edit Review"
@@ -806,7 +845,7 @@ export default function SessionsPage() {
       </div>
 
       {evidenceSession && (
-        <section className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <section ref={evidenceSectionRef} className="scroll-mt-24 min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex flex-col gap-1 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h3 className="text-sm font-semibold text-slate-900">
@@ -883,8 +922,9 @@ export default function SessionsPage() {
 
       {selectedSession && (
         <form
+          ref={reviewSectionRef}
           onSubmit={handleAttendanceReview}
-          className="min-w-0 space-y-5 rounded-xl border border-indigo-200 bg-white p-4 shadow-sm sm:p-6"
+          className="scroll-mt-24 min-w-0 space-y-5 rounded-xl border border-indigo-200 bg-white p-4 shadow-sm sm:p-6"
         >
           <div className="flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
             <div>

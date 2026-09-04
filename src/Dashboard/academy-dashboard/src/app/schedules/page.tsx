@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   useEffect,
@@ -348,7 +348,7 @@ export default function SchedulesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <div>
         <h2 className="text-xl font-bold tracking-tight text-slate-900">
           Schedules Management
@@ -515,7 +515,7 @@ export default function SchedulesPage() {
                   (schedule) => (
                     <div
                       key={schedule.id}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm"
+                      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:border-indigo-200 hover:shadow-md"
                     >
                       <div className="text-xs font-semibold text-slate-900">
                         {schedule.studentFullName}
@@ -534,6 +534,26 @@ export default function SchedulesPage() {
 
                       <div className="text-[11px] text-slate-500">
                         {scheduleDeviceName(schedule)}
+                      </div>
+                      <div className="mt-3 border-t border-slate-100 pt-3">
+                        <div className="mb-2 flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-emerald-700">
+                            Weekly recurring
+                          </span>
+                        </div>
+
+                        <ManagementActionButtons
+                          onEdit={() =>
+                            openEdit(schedule)
+                          }
+                          onDelete={() => {
+                            setError("");
+                            setDeletingSchedule(
+                              schedule
+                            );
+                          }}
+                        />
                       </div>
                     </div>
                   )
@@ -626,9 +646,12 @@ export default function SchedulesPage() {
           <h3 className="text-sm font-semibold text-slate-800">
             Active Schedules ({schedules.length})
           </h3>
+          <p className="mt-1 text-[11px] text-slate-500">
+            Weekly recurring classes remain active until you edit or delete them.
+          </p>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="management-mobile-cards schedules-management-cards overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-xs">
             <thead className="bg-slate-50/75 text-left font-semibold uppercase tracking-wider text-slate-500">
               <tr>

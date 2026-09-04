@@ -495,6 +495,16 @@ app.MapPost("/api/agent/recordings/{recordingId:guid}/upload", async (
         return Results.Unauthorized();
     }
 
+    var maxRequestBodySizeFeature =
+        request.HttpContext.Features.Get<
+            Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+
+    if (maxRequestBodySizeFeature is not null &&
+        !maxRequestBodySizeFeature.IsReadOnly)
+    {
+        maxRequestBodySizeFeature.MaxRequestBodySize =
+            128L * 1024L * 1024L;
+    }
     if (!request.HasFormContentType)
     {
         return Results.BadRequest("Expected multipart/form-data.");

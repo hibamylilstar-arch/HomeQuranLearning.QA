@@ -79,6 +79,7 @@ services:
       RecordingRetention__Enabled: "false"
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       AgentApiKey: ${AGENT_API_KEY}
+      ArchiveRegistrarApiKey: ${ARCHIVE_REGISTRAR_API_KEY}
       WorkerApiKey: ${WORKER_API_KEY}
       Storage__Endpoint: minio:9000
       Storage__AccessKey: ${MINIO_ROOT_USER}

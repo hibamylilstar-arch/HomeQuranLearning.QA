@@ -12,6 +12,9 @@ public sealed class SessionDto
     public string CourseName { get; init; } = string.Empty;
     public Guid DeviceId { get; init; }
     public string DeviceName { get; init; } = string.Empty;
+    public string LaptopName { get; init; } = string.Empty;
+    public IReadOnlyList<DeviceTeacherInfoDto> UsualTeachers { get; init; } =
+        Array.Empty<DeviceTeacherInfoDto>();
     public DateTimeOffset StartedAtUtc { get; init; }
     public DateTimeOffset? EndedAtUtc { get; init; }
     public string Status { get; init; } = string.Empty;

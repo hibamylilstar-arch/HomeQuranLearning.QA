@@ -11,6 +11,7 @@ public sealed class DashboardQueryService
     private readonly IQaAlertRepository _qaAlertRepository;
     private readonly IQaCandidateRepository _qaCandidateRepository;
     private readonly IDeviceRepository _deviceRepository;
+    private readonly IDeviceTeacherAssignmentRepository _deviceTeacherAssignmentRepository;
     private readonly IManagerTeacherAssignmentRepository _assignmentRepository;
     private readonly ISessionRepository _sessionRepository;
     private readonly ISessionEventRepository _sessionEventRepository;
@@ -33,6 +34,7 @@ public sealed class DashboardQueryService
         IQaAlertRepository qaAlertRepository,
         IQaCandidateRepository qaCandidateRepository,
         IDeviceRepository deviceRepository,
+        IDeviceTeacherAssignmentRepository deviceTeacherAssignmentRepository,
         IManagerTeacherAssignmentRepository assignmentRepository,
         ISessionRepository sessionRepository,
         ISessionEventRepository sessionEventRepository)
@@ -41,6 +43,7 @@ public sealed class DashboardQueryService
         _qaAlertRepository = qaAlertRepository;
         _qaCandidateRepository = qaCandidateRepository;
         _deviceRepository = deviceRepository;
+        _deviceTeacherAssignmentRepository = deviceTeacherAssignmentRepository;
         _assignmentRepository = assignmentRepository;
         _sessionRepository = sessionRepository;
         _sessionEventRepository = sessionEventRepository;
@@ -169,6 +172,10 @@ public sealed class DashboardQueryService
             return Array.Empty<DeviceListItem>();
         }
 
+        var usualTeachersByDevice =
+            await GetUsualTeachersByDeviceAsync(
+                cancellationToken);
+
         return devices
             .OrderByDescending(x => x.LastSeenUtc)
             .Select(x => new DeviceListItem
@@ -178,6 +185,10 @@ public sealed class DashboardQueryService
                 DeviceName = x.DeviceName,
                 RecordingDisplayName =
                     x.RecordingDisplayName,
+                UsualTeachers =
+                    GetUsualTeachers(
+                        usualTeachersByDevice,
+                        x.Id),
                 PendingAgentUpdateVersion =
                     x.PendingAgentUpdateVersion,
                 AgentUpdateRequestedAtUtc =
@@ -216,6 +227,10 @@ public sealed class DashboardQueryService
             return Array.Empty<SessionDto>();
         }
 
+        var usualTeachersByDevice =
+            await GetUsualTeachersByDeviceAsync(
+                cancellationToken);
+
         return sessions
             .OrderByDescending(
                 x => x.StartedAtUtc)
@@ -240,6 +255,16 @@ public sealed class DashboardQueryService
                     DeviceName =
                         x.Device?.DeviceName
                         ?? string.Empty,
+                    LaptopName =
+                        !string.IsNullOrWhiteSpace(
+                            x.Device?.RecordingDisplayName)
+                            ? x.Device!.RecordingDisplayName!
+                            : x.Device?.DeviceName
+                              ?? string.Empty,
+                    UsualTeachers =
+                        GetUsualTeachers(
+                            usualTeachersByDevice,
+                            x.DeviceId),
                     StartedAtUtc =
                         x.StartedAtUtc,
                     EndedAtUtc =
@@ -502,6 +527,45 @@ public sealed class DashboardQueryService
         return true;
     }
 
+    private async Task<IReadOnlyDictionary<Guid, IReadOnlyList<DeviceTeacherInfoDto>>>
+        GetUsualTeachersByDeviceAsync(
+            CancellationToken cancellationToken)
+    {
+        IReadOnlyList<DeviceTeacherAssignment> assignments =
+            await _deviceTeacherAssignmentRepository
+                .GetAllWithTeachersAsync(
+                    cancellationToken);
+
+        return assignments
+            .GroupBy(x => x.DeviceId)
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                    (IReadOnlyList<DeviceTeacherInfoDto>)group
+                        .Where(x => x.Teacher is not null)
+                        .Select(x =>
+                            new DeviceTeacherInfoDto
+                            {
+                                TeacherId = x.TeacherId,
+                                TeacherFullName =
+                                    x.Teacher!.FullName
+                            })
+                        .OrderBy(x => x.TeacherFullName)
+                        .ToList());
+    }
+
+    private static IReadOnlyList<DeviceTeacherInfoDto>
+        GetUsualTeachers(
+            IReadOnlyDictionary<Guid, IReadOnlyList<DeviceTeacherInfoDto>>
+                lookup,
+            Guid deviceId)
+    {
+        return lookup.TryGetValue(
+            deviceId,
+            out IReadOnlyList<DeviceTeacherInfoDto>? teachers)
+                ? teachers
+                : Array.Empty<DeviceTeacherInfoDto>();
+    }
     private async Task<HashSet<Guid>> GetAssignedTeacherIdsAsync(
         Guid managerUserId,
         CancellationToken cancellationToken)

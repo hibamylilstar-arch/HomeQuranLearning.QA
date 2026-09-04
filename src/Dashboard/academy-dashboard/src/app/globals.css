@@ -140,12 +140,13 @@ svg {
   .sessions-data-cards td:nth-child(1)::before { content: "Teacher"; }
   .sessions-data-cards td:nth-child(2)::before { content: "Student"; }
   .sessions-data-cards td:nth-child(3)::before { content: "Course"; }
-  .sessions-data-cards td:nth-child(4)::before { content: "Started"; }
-  .sessions-data-cards td:nth-child(5)::before { content: "Session"; }
-  .sessions-data-cards td:nth-child(6)::before { content: "Teacher Attendance"; }
-  .sessions-data-cards td:nth-child(7)::before { content: "Student Attendance"; }
-  .sessions-data-cards td:nth-child(8)::before { content: "Review"; }
-  .sessions-data-cards td:nth-child(9)::before { content: "Actions"; }
+  .sessions-data-cards td:nth-child(4)::before { content: "Laptop"; }
+  .sessions-data-cards td:nth-child(5)::before { content: "Started"; }
+  .sessions-data-cards td:nth-child(6)::before { content: "Session"; }
+  .sessions-data-cards td:nth-child(7)::before { content: "Teacher Attendance"; }
+  .sessions-data-cards td:nth-child(8)::before { content: "Student Attendance"; }
+  .sessions-data-cards td:nth-child(9)::before { content: "Review"; }
+  .sessions-data-cards td:nth-child(10)::before { content: "Actions"; }
 
   .sessions-data-cards td:nth-child(1),
   .attendance-report-cards td:nth-child(1),
@@ -157,19 +158,19 @@ svg {
     pointer-events: none;
   }
 
-  .sessions-data-cards td:nth-child(9) {
+  .sessions-data-cards td:nth-child(10) {
     padding: 0.9rem;
     background: rgb(248 250 252);
   }
 
-  .sessions-data-cards td:nth-child(9)::before {
+  .sessions-data-cards td:nth-child(10)::before {
     position: static;
     display: block;
     width: auto;
     margin-bottom: 0.65rem;
   }
 
-  .sessions-data-cards td:nth-child(9) > div {
+  .sessions-data-cards td:nth-child(10) > div {
     display: grid;
     width: 100%;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -177,7 +178,7 @@ svg {
     align-items: stretch;
   }
 
-  .sessions-data-cards td:nth-child(9) button {
+  .sessions-data-cards td:nth-child(10) button {
     position: relative;
     z-index: 20;
     width: 100%;

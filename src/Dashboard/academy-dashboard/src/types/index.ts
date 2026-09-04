@@ -1,8 +1,14 @@
+export interface DeviceTeacherInfo {
+  teacherId: string;
+  teacherFullName: string;
+}
+
 export interface DeviceListItem {
   id: string;
   deviceId: string;
   deviceName: string;
   recordingDisplayName: string | null;
+  usualTeachers: DeviceTeacherInfo[];
   pendingAgentUpdateVersion: string | null;
   agentUpdateRequestedAtUtc: string | null;
   agentVersion: string;
@@ -111,6 +117,8 @@ export interface SessionListItem {
   courseName: string;
   deviceId: string;
   deviceName: string;
+  laptopName: string;
+  usualTeachers: DeviceTeacherInfo[];
   startedAtUtc: string;
   endedAtUtc?: string | null;
   status: string;

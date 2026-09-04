@@ -1,5 +1,6 @@
 import type {
   DeviceListItem,
+  DeviceTeacherInfo,
   RecordingListItem,
   QaRuleListItem,
   QaAlertListItem,
@@ -96,6 +97,10 @@ function mutationSuccessMessage(
     tail === "recording-display-name"
   ) {
     return "Recording display name updated successfully.";
+  }
+
+  if (tail === "usual-teachers") {
+    return "Usual teachers updated successfully.";
   }
 
   if (tail === "attendance-review") {
@@ -736,6 +741,20 @@ export async function updateRecordingDisplayName(
   );
 }
 
+export async function setDeviceUsualTeachers(
+  deviceId: string,
+  teacherIds: string[]
+): Promise<DeviceTeacherInfo[]> {
+  return proxyFetch<DeviceTeacherInfo[]>(
+    ["devices", deviceId, "usual-teachers"],
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        teacherIds,
+      }),
+    }
+  );
+}
 export async function requestAgentUpdate(
   deviceId: string
 ): Promise<{

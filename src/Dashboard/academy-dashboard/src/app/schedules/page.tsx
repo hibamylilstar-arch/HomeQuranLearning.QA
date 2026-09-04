@@ -64,6 +64,40 @@ function deviceLabel(device: DeviceListItem) {
   );
 }
 
+function usualTeachersText(
+  device: DeviceListItem | undefined
+) {
+  return (device?.usualTeachers ?? [])
+    .map(
+      (teacher) =>
+        teacher.teacherFullName
+    )
+    .join(", ");
+}
+
+function DeviceTeachersHint({
+  device,
+}: {
+  device: DeviceListItem | undefined;
+}) {
+  if (!device) {
+    return null;
+  }
+
+  const names =
+    usualTeachersText(device);
+
+  return (
+    <p className="mt-1.5 min-h-4 text-[10px] leading-4 text-slate-400">
+      <span className="font-bold uppercase tracking-wider">
+        Usually:
+      </span>{" "}
+      {names ||
+        "No usual teachers assigned"}
+    </p>
+  );
+}
+
 export default function SchedulesPage() {
   const [schedules, setSchedules] =
     useState<ScheduleListItem[]>([]);
@@ -183,6 +217,26 @@ export default function SchedulesPage() {
             )
           : [],
       [schedules, teacherId]
+    );
+
+  const selectedDevice =
+    useMemo(
+      () =>
+        devices.find(
+          (device) =>
+            device.id === deviceId
+        ),
+      [devices, deviceId]
+    );
+
+  const editSelectedDevice =
+    useMemo(
+      () =>
+        devices.find(
+          (device) =>
+            device.id === editDeviceId
+        ),
+      [devices, editDeviceId]
     );
 
   function scheduleDeviceName(
@@ -490,6 +544,10 @@ export default function SchedulesPage() {
                 </option>
               ))}
             </select>
+
+            <DeviceTeachersHint
+              device={selectedDevice}
+            />
           </div>
         </div>
 
@@ -693,8 +751,22 @@ export default function SchedulesPage() {
                       {schedule.courseName}
                     </td>
 
-                    <td className="whitespace-nowrap px-5 py-4 font-medium sm:px-6">
-                      {scheduleDeviceName(schedule)}
+                    <td className="px-5 py-4 font-medium sm:px-6">
+                      <div className="whitespace-nowrap">
+                        {scheduleDeviceName(schedule)}
+                      </div>
+
+                      <div className="mt-1 max-w-48 text-[10px] font-normal leading-4 text-slate-400">
+                        Usually:{" "}
+                        {usualTeachersText(
+                          devices.find(
+                            (device) =>
+                              device.id ===
+                              schedule.deviceId
+                          )
+                        ) ||
+                          "Not assigned"}
+                      </div>
                     </td>
 
                     <td className="whitespace-nowrap px-5 py-4 font-semibold text-indigo-700 sm:px-6">
@@ -844,6 +916,10 @@ export default function SchedulesPage() {
                     </option>
                   ))}
                 </select>
+
+                <DeviceTeachersHint
+                  device={editSelectedDevice}
+                />
               </div>
             </div>
 

@@ -32,6 +32,7 @@ builder.Services.AddScoped<TranscriptSegmentService>();
 builder.Services.AddScoped<AdminUserService>();
 builder.Services.AddScoped<TeacherService>();
 builder.Services.AddScoped<ManagerAssignmentService>();
+builder.Services.AddScoped<DeviceTeacherAssignmentService>();
 builder.Services.AddScoped<DashboardQueryService>();
 builder.Services.AddScoped<StudentService>();
 builder.Services.AddScoped<CourseService>();
@@ -728,6 +729,51 @@ app.MapPost("/api/admin/devices/{deviceId:guid}/agent-update", async (
         });
 }).RequireAuthorization(OwnerOnlyPolicy);
 
+app.MapPut("/api/admin/devices/{deviceId:guid}/usual-teachers", async (
+    ClaimsPrincipal user,
+    Guid deviceId,
+    SetDeviceTeachersRequest body,
+    DashboardQueryService dashboardQueryService,
+    DeviceTeacherAssignmentService assignmentService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) =
+        GetUserInfo(user);
+
+    if (userId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    IReadOnlyList<DeviceListItem> visibleDevices =
+        await dashboardQueryService.GetVisibleDevicesAsync(
+            userId,
+            role,
+            cancellationToken);
+
+    if (!visibleDevices.Any(
+            device => device.Id == deviceId))
+    {
+        return Results.NotFound(
+            new { error = "Device not found." });
+    }
+
+    try
+    {
+        IReadOnlyList<DeviceTeacherInfoDto> teachers =
+            await assignmentService.ReplaceTeachersAsync(
+                deviceId,
+                body.TeacherIds,
+                cancellationToken);
+
+        return Results.Ok(teachers);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(
+            new { error = ex.Message });
+    }
+}).RequireAuthorization(OwnerOrAdminPolicy);
 app.MapPatch("/api/admin/devices/{deviceId:guid}/recording-display-name", async (
     Guid deviceId,
     UpdateRecordingDisplayNameRequest body,
@@ -781,7 +827,7 @@ app.MapPatch("/api/admin/devices/{deviceId:guid}/recording-display-name", async 
         recordingDisplayName =
             device.RecordingDisplayName
     });
-}).RequireAuthorization(OwnerOrAdminPolicy);
+}).RequireAuthorization(OwnerOnlyPolicy);
 
 app.MapGet("/api/admin/recordings", async (
     ClaimsPrincipal user,

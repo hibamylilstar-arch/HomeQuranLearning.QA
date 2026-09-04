@@ -21,6 +21,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
     public DbSet<ManagerTeacherAssignment> ManagerTeacherAssignments => Set<ManagerTeacherAssignment>();
+    public DbSet<DeviceTeacherAssignment> DeviceTeacherAssignments => Set<DeviceTeacherAssignment>();
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Course> Courses => Set<Course>();
     public DbSet<Schedule> Schedules => Set<Schedule>();
@@ -217,6 +218,29 @@ public sealed class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<DeviceTeacherAssignment>(entity =>
+        {
+            entity.ToTable("device_teacher_assignments");
+            entity.HasKey(x => x.Id);
+
+            entity.HasIndex(
+                x => new
+                {
+                    x.DeviceId,
+                    x.TeacherId
+                })
+                .IsUnique();
+
+            entity.HasOne(x => x.Device)
+                .WithMany()
+                .HasForeignKey(x => x.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Teacher)
+                .WithMany()
+                .HasForeignKey(x => x.TeacherId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
         modelBuilder.Entity<Student>(entity =>
         {
             entity.ToTable("students");

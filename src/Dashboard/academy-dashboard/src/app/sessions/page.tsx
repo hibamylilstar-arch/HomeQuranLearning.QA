@@ -76,6 +76,48 @@ function formatEventType(eventType: string) {
   return eventType.replace(/([a-z])([A-Z])/g, "$1 $2");
 }
 
+function deviceLabel(
+  device: DeviceListItem
+) {
+  return (
+    device.recordingDisplayName?.trim() ||
+    device.deviceName
+  );
+}
+
+function usualTeachersText(
+  device: DeviceListItem | undefined
+) {
+  return (device?.usualTeachers ?? [])
+    .map(
+      (teacher) =>
+        teacher.teacherFullName
+    )
+    .join(", ");
+}
+
+function SessionDeviceHint({
+  device,
+}: {
+  device: DeviceListItem | undefined;
+}) {
+  if (!device) {
+    return null;
+  }
+
+  const names =
+    usualTeachersText(device);
+
+  return (
+    <p className="mt-1.5 min-h-4 text-[10px] leading-4 text-slate-400">
+      <span className="font-bold uppercase tracking-wider">
+        Usually:
+      </span>{" "}
+      {names ||
+        "No usual teachers assigned"}
+    </p>
+  );
+}
 export default function SessionsPage() {
   const { user, loading: authLoading } = useAuth();
 
@@ -178,6 +220,15 @@ export default function SessionsPage() {
     user?.role === "Owner" ||
     user?.role === "Admin";
 
+  const selectedDevice =
+    useMemo(
+      () =>
+        devices.find(
+          (device) =>
+            device.id === deviceId
+        ),
+      [devices, deviceId]
+    );
   const filteredSessions = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
@@ -188,8 +239,17 @@ export default function SessionsPage() {
           session.teacherFullName,
           session.studentFullName,
           session.courseName,
+          session.laptopName,
           session.deviceName,
-        ].some((value) => value.toLowerCase().includes(query));
+          ...(session.usualTeachers ?? []).map(
+            (teacher) =>
+              teacher.teacherFullName
+          ),
+        ].some((value) =>
+          value
+            .toLowerCase()
+            .includes(query)
+        );
 
       const matchesStatus =
         statusFilter === "ALL" ||
@@ -529,26 +589,36 @@ export default function SessionsPage() {
 
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600">
-                Device
+                Laptop
               </label>
 
               <select
                 value={deviceId}
-                onChange={(e) => setDeviceId(e.target.value)}
+                onChange={(e) =>
+                  setDeviceId(
+                    e.target.value
+                  )
+                }
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 required
               >
-                <option value="">-- Choose Device --</option>
+                <option value="">
+                  -- Choose Laptop --
+                </option>
 
                 {devices.map((device) => (
                   <option
                     key={device.id}
                     value={device.id}
                   >
-                    {device.deviceName}
+                    {deviceLabel(device)}
                   </option>
                 ))}
               </select>
+
+              <SessionDeviceHint
+                device={selectedDevice}
+              />
             </div>
 
             <div>
@@ -624,7 +694,7 @@ export default function SessionsPage() {
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Teacher, student, course..."
+              placeholder="Teacher, student, course, laptop..."
               className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
@@ -698,12 +768,13 @@ export default function SessionsPage() {
         </div>
 
         <div className="responsive-data-cards sessions-data-cards custom-scrollbar">
-          <table className="min-w-[980px] divide-y divide-slate-200 text-xs">
+          <table className="min-w-[1080px] divide-y divide-slate-200 text-xs">
             <thead className="bg-slate-50/75 text-left font-semibold uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-4 py-3">Teacher</th>
                 <th className="px-4 py-3">Student</th>
                 <th className="px-4 py-3">Course</th>
+                <th className="px-4 py-3">Laptop</th>
                 <th className="px-4 py-3">Started</th>
                 <th className="px-4 py-3">Session</th>
                 <th className="px-4 py-3">Teacher Attendance</th>
@@ -717,7 +788,7 @@ export default function SessionsPage() {
               {filteredSessions.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     className="px-6 py-8 text-center text-slate-400"
                   >
                     {sessions.length === 0
@@ -745,6 +816,24 @@ export default function SessionsPage() {
 
                       <td className="px-4 py-4 text-slate-600">
                         {session.courseName}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <div className="whitespace-nowrap font-semibold text-indigo-700">
+                          {session.laptopName ||
+                            session.deviceName}
+                        </div>
+
+                        <div className="mt-1 max-w-48 text-[10px] leading-4 text-slate-400">
+                          Usually:{" "}
+                          {(session.usualTeachers ?? [])
+                            .map(
+                              (teacher) =>
+                                teacher.teacherFullName
+                            )
+                            .join(", ") ||
+                            "Not assigned"}
+                        </div>
                       </td>
 
                       <td className="whitespace-nowrap px-4 py-4 text-slate-500">

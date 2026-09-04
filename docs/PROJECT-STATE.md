@@ -1,3 +1,597 @@
+<!-- HQL_CURRENT_HANDOFF_BEGIN -->
+# CURRENT HANDOFF CHECKPOINT — 2026-09-05
+
+> **NEW AI / DEVELOPER: READ THIS SECTION FIRST.**
+>
+> This is the authoritative continuation checkpoint from the previous ChatGPT engineering session.
+> Do not restart architecture discovery, do not undo validated work, and do not invent new product restrictions.
+> First inspect `git status`, `git log -1`, `AGENTS.md`, and `docs/PROJECT-STATE.md`, then continue from the exact state below.
+
+## 1. Collaboration / execution contract
+
+- User is the product owner.
+- Assistant acts as senior developer.
+- User normally executes exact PowerShell commands and returns output.
+- Give one bounded step at a time unless user explicitly asks for all steps.
+- Commands must be ready to paste with full paths.
+- Default local shell is Windows PowerShell 5.1 unless explicitly invoking `pwsh`.
+- Do not ask user to manually edit source files.
+- Inspect -> smallest change -> build/test -> diff -> commit/push -> runtime proof.
+- Do not claim PASS without evidence.
+- On unexpected output, stop and diagnose instead of stacking workarounds.
+- Do not silently invent restrictions, rollout gates, expiry rules, battery bans, Owner-only behavior, or architecture layers.
+- Product behavior is Owner-decided. AI improves implementation quality but does not override product intent.
+- Routine integrity protections such as validation, hashes, atomic writes, corruption prevention, and secret protection are automatic.
+- Never expose Agent API keys, signing secrets, stream keys, private keys, production passwords, or other credentials.
+
+## 2. Repository / branch
+
+Local repository:
+
+`C:\Dev\HomeQuranLearning.QA`
+
+GitHub repository:
+
+`hibamylilstar-arch/HomeQuranLearning.QA`
+
+Working branch:
+
+`codex/local-development-mode`
+
+Baseline before the current Usual Teachers feature:
+
+`a8645363b127905c7702ea7a7477ce93e5c9b65e`
+
+That baseline is also the currently proven/deployed VPS application baseline before the new Usual Teachers work.
+
+This one-shot handoff command is intended to commit and push the completed Usual Teachers feature plus this documentation. After it runs, inspect:
+
+`git log -1 --oneline`
+
+and:
+
+`git status --short`
+
+The expected commit message is:
+
+`feat: add laptop usual teacher assignments`
+
+If that commit exists and the worktree is clean, the feature is saved in GitHub but is still NOT deployed to VPS yet.
+
+## 3. Current feature completed locally: Laptop Name + Usual Teachers
+
+The user identified a product-model problem: admins were putting teacher names into Laptop Name because they needed to remember who normally uses each academy laptop.
+
+Final product model:
+
+### Laptop identity
+
+Laptop Name is the stable friendly asset identity, examples:
+
+- Laptop 5
+- Laptop 7
+- Laptop 8
+
+The actual Windows computer name such as `DESKTOP-71RJV67` remains a separate technical identity for troubleshooting.
+
+### Usual Teachers
+
+A laptop can have multiple usual teachers, and a teacher may use multiple laptops.
+
+Therefore this is implemented as a proper many-to-many relationship:
+
+`Device <-> Teacher`
+
+through:
+
+`DeviceTeacherAssignment`
+
+Usual Teachers are informational only.
+
+They MUST NOT:
+
+- automatically change the actual class teacher
+- block substitute teachers
+- create assignment warnings/gates
+- control attendance
+- rewrite historical Session teacher data
+- restrict Schedule/Session creation
+
+The Teacher selected on the actual Schedule/Session remains authoritative.
+
+## 4. Backend implementation completed and audited
+
+New entity:
+
+`src/Backend/Academy.Domain/Entities/DeviceTeacherAssignment.cs`
+
+New application/infrastructure components include:
+
+- `IDeviceTeacherAssignmentRepository`
+- `DeviceTeacherAssignmentRepository`
+- `DeviceTeacherAssignmentService`
+- `DeviceTeacherInfoDto`
+- `SetDeviceTeachersRequest`
+
+Database table:
+
+`device_teacher_assignments`
+
+Important database semantics:
+
+- DeviceId FK
+- TeacherId FK
+- unique `(DeviceId, TeacherId)` index
+- cascade cleanup on device/teacher removal
+- duplicate Teacher IDs are de-duplicated
+- every selected Teacher ID is validated
+- empty selection is supported to clear all Usual Teachers
+
+EF migration:
+
+`20260904212848_AddDeviceTeacherAssignments`
+
+The migration was generated successfully and audited.
+
+Validated:
+
+- additive-only migration
+- creates `device_teacher_assignments`
+- no destructive Up operations
+- unique DeviceId/TeacherId index
+- snapshot updated
+- generated SQL contains CREATE TABLE and CREATE UNIQUE INDEX
+
+IMPORTANT:
+
+The migration has NOT been manually applied to the local database or VPS as part of this session yet.
+
+Local PostgreSQL at `localhost:5433` was unavailable during one migration-list check, but EF still successfully discovered:
+
+`20260904212848_AddDeviceTeacherAssignments`
+
+Do not start redesigning the migration because of that old local connection warning.
+
+## 5. API behavior
+
+New endpoint:
+
+`PUT /api/admin/devices/{deviceId}/usual-teachers`
+
+Authorization:
+
+Owner + Admin.
+
+It also checks device visibility through the existing dashboard device visibility boundary before allowing modification, so an Admin cannot guess the ID of an Owner-hidden device and modify it directly.
+
+Validated:
+
+`USUAL_TEACHERS_OWNER_ADMIN=PASS`
+
+`ADMIN_HIDDEN_DEVICE_GUARD=PASS`
+
+Laptop Name endpoint:
+
+`PATCH /api/admin/devices/{deviceId}/recording-display-name`
+
+During final audit, an existing mismatch was discovered: backend allowed Owner/Admin while the intended UI/business rule was Owner-only.
+
+That was corrected.
+
+Final rule:
+
+**Laptop Name backend = Owner-only.**
+
+Validated:
+
+`LAPTOP_NAME_OWNER_ONLY=PASS`
+
+Do not change this back without explicit Owner decision.
+
+## 6. Dashboard implementation completed
+
+Dashboard TypeScript contracts now expose:
+
+`DeviceTeacherInfo`
+
+Device:
+
+`usualTeachers: DeviceTeacherInfo[]`
+
+Session:
+
+`laptopName: string`
+
+`usualTeachers: DeviceTeacherInfo[]`
+
+### Devices page
+
+Devices page now separates:
+
+- Actual Device
+- Laptop Name
+- Usual Teachers
+- Status
+- Agent
+- Last Seen
+- Owner Agent update action
+
+Laptop Name edit:
+
+Owner only.
+
+Usual Teachers management:
+
+Owner + Admin.
+
+Usual Teachers editor uses existing Teacher records by ID, not free text.
+
+Multiple teachers can be selected.
+
+Selected teachers display as chips/tags.
+
+Teacher renames therefore automatically flow through by ID.
+
+### Schedules
+
+Schedules continue to select laptops independently from teachers.
+
+Laptop selector uses friendly Laptop Name.
+
+Usual Teachers are shown as subtle informational context:
+
+`Usually: Umar, Huzaifa, Anees`
+
+No validation or restriction is attached to this text.
+
+Existing weekly recurrence behavior remains unchanged:
+
+Schedules remain active weekly until edited/deleted.
+
+### Sessions
+
+Session creation changed from technical `Device` wording to:
+
+`Laptop`
+
+Selector displays friendly Laptop Name instead of `DESKTOP-...`.
+
+Session DTO preserves:
+
+- real technical `DeviceName`
+- friendly `LaptopName`
+- current informational `UsualTeachers`
+
+Recorded Sessions table now displays Laptop information.
+
+Search includes:
+
+- teacher
+- student
+- course
+- Laptop Name
+- technical Device Name
+- Usual Teacher names
+
+Mobile Sessions table was shifted correctly from 9 to 10 columns:
+
+1. Teacher
+2. Student
+3. Course
+4. Laptop
+5. Started
+6. Session
+7. Teacher Attendance
+8. Student Attendance
+9. Review
+10. Actions
+
+Validated:
+
+`SESSION_MOBILE_LAPTOP_LABEL=PASS`
+
+`SESSION_MOBILE_REVIEW_LABEL=PASS`
+
+`SESSION_MOBILE_ACTION_COLUMN_10=PASS`
+
+## 7. Validation already completed — do not repeat without reason
+
+Full feature audits passed.
+
+Backend:
+
+- `BACKEND_BUILD=PASS`
+- many-to-many model PASS
+- duplicate mapping guard PASS
+- teacher existence validation PASS
+- clear-all assignments PASS
+- friendly Laptop projection PASS
+- Usual Teachers projection PASS
+- Owner-only Laptop Name backend PASS
+- Owner/Admin Usual Teachers PASS
+- hidden-device backend guard PASS
+
+Dashboard:
+
+- `DASHBOARD_LINT_ZERO_WARNINGS=PASS`
+- `DASHBOARD_BUILD=PASS`
+- Devices Usual Teachers UI PASS
+- Schedule Laptop info PASS
+- Session friendly Laptop UI PASS
+- Session Usual Teachers info PASS
+- Session mobile alignment PASS
+- API TypeScript contract PASS
+
+Git:
+
+- exact feature file scope PASS
+- `git diff --check` PASS
+
+Migration:
+
+- additive-only PASS
+- unique mapping PASS
+- snapshot PASS
+- SQL generation PASS
+
+There is one known unrelated/pre-existing backend compiler warning:
+
+`CS8321 TryGetSessionIdFromRoomName is declared but never used`
+
+Do not derail this feature to clean that warning unless requested.
+
+## 8. Files belonging to the completed feature
+
+Backend:
+
+- `src/Backend/Academy.Api/Program.cs`
+- `src/Backend/Academy.Application/Abstractions/IDeviceTeacherAssignmentRepository.cs`
+- `src/Backend/Academy.Application/Contracts/DeviceListItem.cs`
+- `src/Backend/Academy.Application/Contracts/DeviceTeacherInfoDto.cs`
+- `src/Backend/Academy.Application/Contracts/SessionDto.cs`
+- `src/Backend/Academy.Application/Contracts/SetDeviceTeachersRequest.cs`
+- `src/Backend/Academy.Application/Services/DashboardQueryService.cs`
+- `src/Backend/Academy.Application/Services/DeviceTeacherAssignmentService.cs`
+- `src/Backend/Academy.Domain/Entities/DeviceTeacherAssignment.cs`
+- `src/Backend/Academy.Infrastructure/DependencyInjection/InfrastructureServiceRegistration.cs`
+- `src/Backend/Academy.Infrastructure/Migrations/20260904212848_AddDeviceTeacherAssignments.cs`
+- `src/Backend/Academy.Infrastructure/Migrations/20260904212848_AddDeviceTeacherAssignments.Designer.cs`
+- `src/Backend/Academy.Infrastructure/Migrations/AppDbContextModelSnapshot.cs`
+- `src/Backend/Academy.Infrastructure/Persistence/AppDbContext.cs`
+- `src/Backend/Academy.Infrastructure/Repositories/DeviceTeacherAssignmentRepository.cs`
+
+Dashboard:
+
+- `src/Dashboard/academy-dashboard/src/app/devices/page.tsx`
+- `src/Dashboard/academy-dashboard/src/app/globals.css`
+- `src/Dashboard/academy-dashboard/src/app/schedules/page.tsx`
+- `src/Dashboard/academy-dashboard/src/app/sessions/page.tsx`
+- `src/Dashboard/academy-dashboard/src/lib/api.ts`
+- `src/Dashboard/academy-dashboard/src/types/index.ts`
+
+No Agent source, recording subsystem, attendance subsystem, or Docker infrastructure was intentionally changed for this feature.
+
+## 9. VPS / deployment state
+
+VPS:
+
+`158.220.90.195`
+
+Application root:
+
+`/opt/homequranlearning`
+
+Production compose files MUST be used together:
+
+`infrastructure/docker/docker-compose.prod.yml`
+
+and:
+
+`infrastructure/docker/docker-compose.relay-production.yml`
+
+Use the existing production env file.
+
+Important custom Caddy file must remain unchanged.
+
+Expected tracked custom Caddy SHA:
+
+`280dfe2cf855e4be0029c36fe992ae4505dd393f50b25717aa25761447338ac1`
+
+Do not recreate/restart unrelated containers.
+
+Current deployed application baseline before this feature:
+
+`a8645363b127905c7702ea7a7477ce93e5c9b65e`
+
+The Usual Teachers feature is NOT considered VPS deployed merely because this handoff command commits/pushes it.
+
+## 10. Exact NEXT engineering task
+
+After opening the new AI/chat:
+
+1. Read `AGENTS.md`.
+2. Read `docs/PROJECT-STATE.md`.
+3. Run/read:
+   - `git status --short`
+   - `git log -1 --oneline`
+   - local/remote branch SHA
+4. If commit `feat: add laptop usual teacher assignments` exists and worktree is clean, do NOT rewrite the feature.
+5. Perform a targeted VPS deployment of ONLY:
+   - API
+   - Dashboard
+6. Use BOTH production compose files plus production env.
+7. Preserve custom Caddy.
+8. Do not restart LiveKit, Ingress, MediaMTX, recording workers, MinIO, PostgreSQL, Redis, Agent infrastructure, or other unrelated services unless actual evidence requires it.
+9. API startup should apply the new EF migration through the normal existing application migration mechanism.
+10. Prove migration/table availability after deployment.
+11. Runtime-check:
+    - API health
+    - Dashboard login
+    - `/devices`
+    - `/schedules`
+    - `/sessions`
+    - `/icon.png`
+12. Verify unauthenticated Usual Teachers endpoint is protected.
+13. Prefer an authenticated Owner/Admin UI test for saving multiple Usual Teachers when safe credentials/session are available.
+14. Verify Laptop Name remains Owner-only.
+15. Confirm API/dashboard restart counts and that non-target container IDs remained untouched.
+
+Do not jump to unrelated roadmap work until this feature is deployed/runtime-certified or the Owner explicitly changes priority.
+
+## 11. Existing proven runtime architecture — preserve
+
+Stack:
+
+- ASP.NET Core .NET 10
+- PostgreSQL
+- Redis
+- MinIO
+- Next.js / TypeScript
+- Windows .NET Agent
+- FFmpeg
+- NAudio / WASAPI
+- LiveKit
+- LiveKit Ingress
+- MediaMTX
+
+Live path:
+
+Windows Agent H264/AAC RTMP
+-> MediaMTX
+-> LiveKit Ingress
+-> LiveKit
+-> Dashboard WebRTC
+
+Known-good live monitoring baseline is already validated.
+
+Audio roughly 1–2 seconds.
+
+Video roughly 4–5 seconds.
+
+Teacher cursor/student-reading context alignment accepted.
+
+Locked status:
+
+`LIVE_AUDIO_LATENCY=ACCEPTABLE`
+
+`LIVE_VIDEO_LATENCY=ACCEPTABLE`
+
+`AUDIO_VIDEO_CONTEXT_SYNC=PASS`
+
+Do not optimize this path again without a demonstrated regression.
+
+Zoom dashboard-side stutter investigation is paused. Actual Zoom call audio on Laptop5 was normal; issue was dashboard monitor-side. Do not restart that investigation unless Owner returns to it.
+
+## 12. Agent release / rollout safety
+
+Immutable generic Agent release remains:
+
+Version:
+
+`1.0.0-b043352365aa-resume1`
+
+Release ID:
+
+`resume-b043352365aa-1`
+
+SHA256:
+
+`872DDB40281A73DADE36FCA336C5A10EC1D70B994771B7605723CD82DE7CC5E1`
+
+Do not overwrite or rebuild this release unless Agent source changes and Owner explicitly proceeds with a new release.
+
+Owner durable device ID:
+
+`82f9b22d-2d5b-46b2-b372-ef864219e383`
+
+Known teacher durable IDs:
+
+Laptop8:
+
+`67e170d4-47b3-42d7-8833-61a0d9886154`
+
+Qaisar:
+
+`cf30f945-2048-4cc2-84bc-91907aa5904b`
+
+Laptop5:
+
+`8fa05fc9-c72c-494c-a2d0-ff622e7ead77`
+
+Do not start a broad Agent rollout during the Usual Teachers deployment.
+
+## 13. Recording infrastructure state
+
+Recording infrastructure was repaired and is currently considered healthy.
+
+Permanent fixes already exist for:
+
+- archive registrar API key injection
+- direct Agent uploads over old 30 MB Kestrel default cap
+- 128 MiB per-request upload allowance
+
+Do not redeploy/re-debug recording infrastructure as part of Usual Teachers work.
+
+Owner local Agent config previously proved:
+
+`Recording.Enabled=False`
+
+Owner current recording pipeline is therefore server/archive side.
+
+A separate future task remains:
+
+**Owner VPS old recording cleanup to free storage.**
+
+Do not mix that destructive cleanup into the Usual Teachers deployment.
+
+When that cleanup is eventually resumed, restrict it to the exact Owner durable-device prefixes and preserve DB deletion semantics.
+
+## 14. Existing dashboard baseline before this feature
+
+Prior deployed dashboard baseline already included:
+
+- commercial responsive layout
+- branded modal/dialog feedback
+- mobile Teacher/Student/Course action fixes
+- Schedule edit/delete mobile cards
+- Session Evidence/Review clickable fixes
+- QA Rule Delete only
+- round transparent academy favicon
+- Owner recording delete UI
+- weekly Schedule semantics
+
+User visually confirmed the prior dashboard state as correct.
+
+Do not regress those behaviors.
+
+## 15. Production philosophy
+
+Do not move to a final public-production posture until the local product concept is sufficiently complete and stable according to Owner priorities.
+
+The VPS is currently used as the shared staging/pilot/release backend.
+
+Targeted deployments are allowed as part of validating completed features.
+
+Never interpret “not final production yet” as a reason to avoid necessary VPS validation.
+
+## 16. If the one-shot commit/push below did not complete
+
+The source and these handoff documents are still the authoritative local state.
+
+Do NOT reset, checkout, clean, or discard the worktree.
+
+Inspect:
+
+`git status --short`
+
+If feature files are still modified/untracked, preserve them.
+
+Re-run build/audit only if needed, then commit the existing feature instead of reimplementing it.
+
+If GitHub push failed only because of network/authentication, do not redo source changes; push the existing local commit when connectivity is available.
+
+<!-- HQL_CURRENT_HANDOFF_END -->
+
 <!-- CURRENT-ACTIVE-STATE:START -->
 # CURRENT ACTIVE STATE — 2026-09-02
 

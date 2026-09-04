@@ -445,4 +445,85 @@ button {
   .schedules-management-cards tbody td:nth-child(7) button {
     min-height: 2.75rem;
   }
+  /* Commercial full-width management actions */
+  .teachers-management-cards td:nth-child(2),
+  .students-management-cards td:nth-child(3),
+  .courses-management-cards td:nth-child(3) {
+    padding: 0.9rem;
+    background: rgb(248 250 252);
+  }
+
+  .teachers-management-cards td:nth-child(2)::before,
+  .students-management-cards td:nth-child(3)::before,
+  .courses-management-cards td:nth-child(3)::before {
+    position: static;
+    display: block;
+    width: auto;
+    margin-bottom: 0.65rem;
+  }
+
+  .teachers-management-cards td:nth-child(2) > div,
+  .students-management-cards td:nth-child(3) > div,
+  .courses-management-cards td:nth-child(3) > div {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .teachers-management-cards td:nth-child(2) button,
+  .students-management-cards td:nth-child(3) button,
+  .courses-management-cards td:nth-child(3) button {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.75rem;
+    white-space: nowrap;
+  }
+
+  .teachers-management-cards td:nth-child(2) button span,
+  .students-management-cards td:nth-child(3) button span,
+  .courses-management-cards td:nth-child(3) button span {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  /* QA Rules mobile cards */
+  .qa-rules-management-cards td:nth-child(1)::before {
+    content: "Keyword";
+  }
+
+  .qa-rules-management-cards td:nth-child(2)::before {
+    content: "Severity";
+  }
+
+  .qa-rules-management-cards td:nth-child(3)::before {
+    content: "Status";
+  }
+
+  .qa-rules-management-cards td:nth-child(4)::before {
+    content: "Actions";
+  }
+
+  .qa-rules-management-cards td:nth-child(4) {
+    padding: 0.9rem;
+    background: rgb(248 250 252);
+  }
+
+  .qa-rules-management-cards td:nth-child(4)::before {
+    position: static;
+    display: block;
+    width: auto;
+    margin-bottom: 0.65rem;
+  }
+
+  .qa-rules-management-cards td:nth-child(4) > div {
+    width: 100%;
+  }
+
+  .qa-rules-management-cards td:nth-child(4) button {
+    width: 100%;
+    min-height: 2.75rem;
+    white-space: nowrap;
+  }
 }

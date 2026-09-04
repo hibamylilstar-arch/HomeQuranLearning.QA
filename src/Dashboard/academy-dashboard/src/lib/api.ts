@@ -333,6 +333,16 @@ export async function getQaRules(): Promise<QaRuleListItem[]> {
   return proxyFetch<QaRuleListItem[]>(["qa-rules"]);
 }
 
+export async function deleteQaRule(
+  ruleId: string
+): Promise<void> {
+  await proxyFetch<void>(
+    ["qa-rules", ruleId],
+    {
+      method: "DELETE",
+    }
+  );
+}
 export async function getQaAlerts(): Promise<QaAlertListItem[]> {
   return proxyFetch<QaAlertListItem[]>(["qa-alerts"]);
 }

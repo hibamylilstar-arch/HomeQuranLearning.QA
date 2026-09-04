@@ -1021,6 +1021,25 @@ app.MapPost("/api/admin/qa-rules", async (
     return Results.Ok(rule);
 }).RequireAuthorization(OwnerOrAdminPolicy);
 
+app.MapDelete("/api/admin/qa-rules/{id:guid}", async (
+    Guid id,
+    QaRuleService ruleService,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        await ruleService.DeleteRuleAsync(
+            id,
+            cancellationToken);
+
+        return Results.NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(
+            new { message = ex.Message });
+    }
+}).RequireAuthorization(OwnerOrAdminPolicy);
 app.MapGet("/api/admin/qa-alerts", async (
     ClaimsPrincipal user,
     HttpRequest request,

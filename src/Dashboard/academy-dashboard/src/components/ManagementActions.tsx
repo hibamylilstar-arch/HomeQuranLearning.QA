@@ -121,6 +121,29 @@ export function ManagementActionButtons({
   );
 }
 
+export function ManagementDeleteButton({
+  onDelete,
+  disabled = false,
+}: {
+  onDelete: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onDelete}
+      disabled={disabled}
+      title="Delete record"
+      aria-label="Delete record"
+      className="inline-flex min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-rose-200 bg-white px-4 text-xs font-semibold text-rose-600 shadow-sm transition-all duration-200 hover:-translate-y-px hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[6rem]"
+    >
+      <TrashIcon />
+      <span className="whitespace-nowrap">
+        Delete
+      </span>
+    </button>
+  );
+}
 export function ManagementModal({
   open,
   title,

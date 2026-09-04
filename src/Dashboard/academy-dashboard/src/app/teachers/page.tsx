@@ -199,7 +199,7 @@ export default function TeachersPage() {
           </h3>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="management-mobile-cards teachers-management-cards overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-xs">
             <thead className="bg-slate-50/75 text-left font-semibold uppercase tracking-wider text-slate-500">
               <tr>

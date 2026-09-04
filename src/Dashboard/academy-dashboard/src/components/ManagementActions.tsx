@@ -9,7 +9,7 @@ function PencilIcon() {
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"
-      className="h-3.5 w-3.5"
+      className="h-4 w-4"
       aria-hidden="true"
     >
       <path
@@ -33,7 +33,7 @@ function TrashIcon() {
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"
-      className="h-3.5 w-3.5"
+      className="h-4 w-4"
       aria-hidden="true"
     >
       <path
@@ -93,17 +93,17 @@ export function ManagementActionButtons({
   disabled?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-end gap-2">
+    <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:justify-end">
       <button
         type="button"
         onClick={onEdit}
         disabled={disabled}
         title="Edit record"
         aria-label="Edit record"
-        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 text-xs font-semibold text-indigo-700 shadow-sm transition-all hover:border-indigo-300 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-px hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[6rem]"
       >
         <PencilIcon />
-        <span className="hidden sm:inline">Edit</span>
+        <span>Edit</span>
       </button>
 
       <button
@@ -112,10 +112,10 @@ export function ManagementActionButtons({
         disabled={disabled}
         title="Delete record"
         aria-label="Delete record"
-        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 text-xs font-semibold text-rose-700 shadow-sm transition-all hover:border-rose-300 hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-4 text-xs font-semibold text-rose-600 shadow-sm transition-all duration-200 hover:-translate-y-px hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[6rem]"
       >
         <TrashIcon />
-        <span className="hidden sm:inline">Delete</span>
+        <span>Delete</span>
       </button>
     </div>
   );

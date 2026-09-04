@@ -224,7 +224,7 @@ export default function CoursesPage() {
           </h3>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="management-mobile-cards courses-management-cards overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-xs">
             <thead className="bg-slate-50/75 text-left font-semibold uppercase tracking-wider text-slate-500">
               <tr>

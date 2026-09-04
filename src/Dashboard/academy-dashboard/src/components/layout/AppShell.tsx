@@ -37,7 +37,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Header setMobileOpen={setMobileOpen} />
-        <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-6 lg:p-8">
+        <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-slate-50 p-4 sm:p-6 lg:p-8">
           <div className="mx-auto min-w-0 w-full max-w-[1600px]">
             {children}
           </div>

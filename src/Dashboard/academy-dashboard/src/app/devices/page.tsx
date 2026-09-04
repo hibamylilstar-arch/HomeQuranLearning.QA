@@ -148,7 +148,7 @@ export default function DevicesPage() {
           <button
             type="button"
             onClick={loadDevices}
-            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+            className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 hover:shadow"
           >
             Refresh
           </button>
@@ -213,7 +213,7 @@ export default function DevicesPage() {
                             onClick={() =>
                               saveRecordingName(device)
                             }
-                            className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                            className="inline-flex min-h-10 items-center justify-center rounded-xl bg-slate-900 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
                           >
                             Save
                           </button>
@@ -224,7 +224,7 @@ export default function DevicesPage() {
                               setEditingId(null);
                               setEditName("");
                             }}
-                            className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-600"
+                            className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50"
                           >
                             Cancel
                           </button>
@@ -245,7 +245,7 @@ export default function DevicesPage() {
                                   device.recordingDisplayName ?? ""
                                 );
                               }}
-                              className="mt-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                              className="mt-2 inline-flex min-h-10 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 px-3.5 text-xs font-semibold text-indigo-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-100"
                             >
                               {device.recordingDisplayName
                                 ? "Edit name"
@@ -300,7 +300,7 @@ export default function DevicesPage() {
                             onClick={() =>
                               queueAgentUpdate(device)
                             }
-                            className="mt-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                            className="mt-1 inline-flex min-h-10 items-center justify-center rounded-xl bg-indigo-600 px-4 text-xs font-semibold text-white shadow-sm transition-all hover:-translate-y-px hover:bg-indigo-500 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {updatingId === device.id
                               ? "Queuing..."

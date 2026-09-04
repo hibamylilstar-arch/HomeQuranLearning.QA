@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { getUsers, createUser, setUserStatus, resetUserPassword, deleteUser } from "@/lib/api";
 import type { UserListItem } from "@/types";
+import {
+  confirmDashboardAction,
+  promptDashboardValue,
+} from "@/components/DashboardDialogs";
 import { useAuth } from "@/components/AuthProvider";
 
 export default function UsersPage() {
@@ -56,10 +60,65 @@ export default function UsersPage() {
 
   async function changeStatus(user: UserListItem) { try { setError(""); await setUserStatus(user.id, !user.isActive); await loadUsers(); } catch (err) { setError(err instanceof Error ? err.message : "Unable to update account"); } }
 
-  async function resetPassword(user: UserListItem) { const password = window.prompt(`New password for ${user.fullName}:`); if (!password) return; try { setError(""); await resetUserPassword(user.id, password); window.alert("Password updated."); } catch (err) { setError(err instanceof Error ? err.message : "Unable to reset password"); } }
+  async function resetPassword(
+    user: UserListItem
+  ) {
+    const password =
+      await promptDashboardValue({
+        title: "Reset Password",
+        message: `Set a new dashboard password for ${user.fullName}.`,
+        label: "New Password",
+        placeholder: "Enter secure password",
+        inputType: "password",
+        confirmLabel: "Reset Password",
+      });
 
-  async function removeUser(user: UserListItem) { if (!window.confirm(`Delete ${user.fullName}? If preserved history references this account, deletion will be blocked.`)) return; try { setError(""); await deleteUser(user.id); await loadUsers(); } catch (err) { setError(err instanceof Error ? err.message : "Unable to delete account"); } }
+    if (!password) {
+      return;
+    }
 
+    try {
+      setError("");
+
+      await resetUserPassword(
+        user.id,
+        password
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to reset password"
+      );
+    }
+  }
+  async function removeUser(
+    user: UserListItem
+  ) {
+    const confirmed =
+      await confirmDashboardAction({
+        title: "Delete User Account",
+        message: `Delete ${user.fullName}? Historical references remain protected and the server will block unsafe deletion.`,
+        confirmLabel: "Delete User",
+        tone: "danger",
+      });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setError("");
+
+      await deleteUser(user.id);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to delete account"
+      );
+    }
+  }
   const visibleUsers =
     currentUser?.role === "Admin"
       ? users.filter((item) => item.role !== "Owner")
@@ -162,7 +221,7 @@ export default function UsersPage() {
         <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
           <h3 className="text-sm font-semibold text-slate-800">Registered Users ({visibleUsers.length})</h3>
         </div>
-        <div className="overflow-x-auto">
+        <div className="management-mobile-cards users-management-cards overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-xs">
             <thead className="bg-slate-50/75 text-left uppercase text-slate-500 font-semibold tracking-wider">
               <tr>
@@ -200,10 +259,16 @@ export default function UsersPage() {
                           Protected
                         </span>
                       ) : isOwner ? (
-                        <div className="flex flex-wrap gap-2">
+                        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
                           <button
                             type="button"
                             onClick={() => void changeStatus(user)}
+                            className={
+                              "inline-flex min-h-11 items-center justify-center rounded-xl border px-3.5 text-xs font-semibold shadow-sm transition-all hover:-translate-y-px hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 active:translate-y-0 " +
+                              (user.isActive
+                                ? "border-amber-200 bg-white text-amber-700 hover:bg-amber-50 focus:ring-amber-500"
+                                : "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 focus:ring-emerald-500")
+                            }
                           >
                             {user.isActive ? "Disable" : "Enable"}
                           </button>
@@ -211,6 +276,7 @@ export default function UsersPage() {
                           <button
                             type="button"
                             onClick={() => void resetPassword(user)}
+                            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:-translate-y-px hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:translate-y-0"
                           >
                             Reset Password
                           </button>
@@ -218,6 +284,7 @@ export default function UsersPage() {
                           <button
                             type="button"
                             onClick={() => void removeUser(user)}
+                            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-rose-200 bg-white px-3.5 text-xs font-semibold text-rose-600 shadow-sm transition-all hover:-translate-y-px hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 active:translate-y-0"
                           >
                             Delete
                           </button>
@@ -230,6 +297,7 @@ export default function UsersPage() {
                         <button
                           type="button"
                           onClick={() => void resetPassword(user)}
+                          className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                         >
                           Reset Password
                         </button>

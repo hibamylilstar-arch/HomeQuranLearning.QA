@@ -16,65 +16,311 @@ import type {
   DailyAttendanceReport,
 } from "@/types";
 
+type ActionFeedbackKind =
+  | "working"
+  | "success"
+  | "error";
+
+const actionFeedbackEvent =
+  "academy:action-feedback";
+
+const actionFeedbackStorageKey =
+  "academy:action-feedback";
+
+function emitActionFeedback(
+  kind: ActionFeedbackKind,
+  message: string
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(
+      actionFeedbackEvent,
+      {
+        detail: {
+          kind,
+          message,
+        },
+      }
+    )
+  );
+}
+
+function isDashboardMutation(
+  pathSegments: string[],
+  method: string
+) {
+  if (
+    method === "GET" ||
+    method === "HEAD"
+  ) {
+    return false;
+  }
+
+  // LiveKit token creation is an operational
+  // read/action, not dashboard data mutation.
+  if (
+    pathSegments[0] === "livekit" &&
+    pathSegments[1] === "token"
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function mutationSuccessMessage(
+  pathSegments: string[],
+  method: string
+) {
+  const tail =
+    pathSegments[
+      pathSegments.length - 1
+    ];
+
+  if (tail === "preserve") {
+    return "Recording preserved successfully.";
+  }
+
+  if (tail === "unpreserve") {
+    return "Recording unpreserved successfully.";
+  }
+
+  if (tail === "agent-update") {
+    return "Agent update queued successfully.";
+  }
+
+  if (
+    tail === "recording-display-name"
+  ) {
+    return "Recording display name updated successfully.";
+  }
+
+  if (tail === "attendance-review") {
+    return "Attendance review saved successfully.";
+  }
+
+  if (tail === "reset-password") {
+    return "Password reset successfully.";
+  }
+
+  if (tail === "status") {
+    return "Status updated successfully.";
+  }
+
+  if (tail === "review") {
+    return "Review saved successfully.";
+  }
+
+  if (tail === "batch") {
+    return "Schedules saved successfully.";
+  }
+
+  const labels:
+    Record<string, string> = {
+      users: "User",
+      teachers: "Teacher",
+      students: "Student",
+      courses: "Course",
+      schedules: "Schedule",
+      sessions: "Session",
+      recordings: "Recording",
+      devices: "Device",
+      "manager-assignments":
+        "Manager assignment",
+      "qa-rules": "QA rule",
+      "qa-candidates": "QA review",
+    };
+
+  const subject =
+    labels[pathSegments[0]] ??
+    "Action";
+
+  if (method === "DELETE") {
+    return `${subject} deleted successfully.`;
+  }
+
+  if (method === "PATCH") {
+    return `${subject} updated successfully.`;
+  }
+
+  return `${subject} saved successfully.`;
+}
+
+function apiErrorMessage(
+  responseBody: unknown,
+  status: number
+) {
+  const apiMessage =
+    typeof responseBody === "string"
+      ? responseBody
+      : responseBody &&
+          typeof responseBody ===
+            "object"
+        ? [
+            "error",
+            "message",
+            "title",
+          ]
+            .map(
+              (key) =>
+                (
+                  responseBody as
+                    Record<
+                      string,
+                      unknown
+                    >
+                )[key]
+            )
+            .find(
+              (
+                value
+              ): value is string =>
+                typeof value ===
+                  "string" &&
+                value.trim().length > 0
+            )
+        : undefined;
+
+  if (apiMessage) {
+    return apiMessage;
+  }
+
+  if (status === 401) {
+    return "Your dashboard session has expired. Please sign in again.";
+  }
+
+  if (status === 403) {
+    return "You do not have access to this resource.";
+  }
+
+  return `Request failed: ${status}`;
+}
+
 async function proxyFetch<T>(
   pathSegments: string[],
   init?: RequestInit,
   searchParams?: URLSearchParams
 ): Promise<T> {
-  const queryString = searchParams?.toString();
+  const queryString =
+    searchParams?.toString();
 
-  const res = await fetch(
-    `/api/proxy/${pathSegments.join("/")}${queryString ? `?${queryString}` : ""}`,
-    {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  const method =
+    (init?.method ?? "GET")
+      .toUpperCase();
 
-  const responseText = await res.text();
+  const mutation =
+    isDashboardMutation(
+      pathSegments,
+      method
+    );
+
+  if (mutation) {
+    emitActionFeedback(
+      "working",
+      "Processing action..."
+    );
+  }
+
+  let res: Response;
+
+  try {
+    res = await fetch(
+      `/api/proxy/${pathSegments.join("/")}${queryString ? `?${queryString}` : ""}`,
+      {
+        ...init,
+        credentials: "include",
+        headers: {
+          "Content-Type":
+            "application/json",
+          ...(init?.headers ?? {}),
+        },
+      }
+    );
+  } catch (error) {
+    if (mutation) {
+      emitActionFeedback(
+        "error",
+        error instanceof Error
+          ? error.message
+          : "Network request failed."
+      );
+    }
+
+    throw error;
+  }
+
+  const responseText =
+    await res.text();
+
   let responseBody: unknown = null;
 
   if (responseText) {
     try {
-      responseBody = JSON.parse(responseText);
+      responseBody =
+        JSON.parse(responseText);
     } catch {
       responseBody = responseText;
     }
   }
 
   if (!res.ok) {
-    const apiMessage =
-      typeof responseBody === "string"
-        ? responseBody
-        : responseBody && typeof responseBody === "object"
-          ? ["error", "message", "title"]
-              .map((key) => (responseBody as Record<string, unknown>)[key])
-              .find((value): value is string =>
-                typeof value === "string" && value.trim().length > 0
-              )
-          : undefined;
+    const message =
+      apiErrorMessage(
+        responseBody,
+        res.status
+      );
 
-    if (apiMessage) {
-      throw new Error(apiMessage);
+    if (mutation) {
+      emitActionFeedback(
+        "error",
+        message
+      );
     }
 
-    if (res.status === 401) {
-      throw new Error("Your dashboard session has expired. Please sign in again.");
-    }
+    throw new Error(message);
+  }
 
-    if (res.status === 403) {
-      throw new Error("You do not have access to this resource.");
-    }
+  if (
+    mutation &&
+    typeof window !== "undefined"
+  ) {
+    const message =
+      mutationSuccessMessage(
+        pathSegments,
+        method
+      );
 
-    throw new Error(`Request failed: ${res.status}`);
+    const feedback = {
+      kind: "success",
+      message,
+    };
+
+    window.sessionStorage.setItem(
+      actionFeedbackStorageKey,
+      JSON.stringify(feedback)
+    );
+
+    emitActionFeedback(
+      "success",
+      message
+    );
+
+    // Full reload guarantees that every
+    // client-side list reflects the backend
+    // result, regardless of which page or
+    // role initiated the mutation.
+    window.setTimeout(
+      () =>
+        window.location.reload(),
+      250
+    );
   }
 
   return responseBody as T;
 }
-
 export async function getDevices(): Promise<DeviceListItem[]> {
   return proxyFetch<DeviceListItem[]>(["devices"]);
 }
@@ -455,6 +701,14 @@ export async function unpreserveRecording(
   );
 }
 
+export async function deleteRecording(
+  recordingId: string
+): Promise<{ deleted: boolean }> {
+  return proxyFetch<{ deleted: boolean }>(
+    ["recordings", recordingId],
+    { method: "DELETE" }
+  );
+}
 export async function updateRecordingDisplayName(
   deviceId: string,
   recordingDisplayName: string | null

@@ -4,9 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getRecordings,
   getRecordingDownloadUrl,
+  deleteRecording,
   preserveRecording,
   unpreserveRecording,
 } from "@/lib/api";
+import { useAuth } from "@/components/AuthProvider";
+import { confirmDashboardAction } from "@/components/DashboardDialogs";
 import PlayButton from "./PlayButton";
 import type { RecordingListItem } from "@/types";
 
@@ -44,6 +47,8 @@ function friendlyRecordingFileName(
 }
 
 export default function RecordingsPage() {
+  const { user } = useAuth();
+  const canDelete = user?.role === "Owner";
   const [recordings, setRecordings] =
     useState<RecordingListItem[]>([]);
 
@@ -186,6 +191,38 @@ export default function RecordingsPage() {
     }
   }
 
+  async function handleDelete(
+    recording: RecordingListItem
+  ) {
+    const confirmed =
+      await confirmDashboardAction({
+        title: "Delete Recording",
+        message: `Permanently delete ${friendlyRecordingFileName(recording)} from VPS storage? The media file will be removed and this action cannot be undone.`,
+        confirmLabel: "Delete Recording",
+        tone: "danger",
+      });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setBusyId(recording.id);
+      setError("");
+
+      await deleteRecording(
+        recording.id
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Delete failed"
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -299,6 +336,11 @@ export default function RecordingsPage() {
             const busy =
               busyId === recording.id;
 
+            const canDeleteRecording =
+              canDelete &&
+              status !== "deleted" &&
+              status !== "deleting";
+
             const friendlyName =
               friendlyRecordingFileName(
                 recording
@@ -400,7 +442,14 @@ export default function RecordingsPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div
+                  className={
+                    "mt-4 grid grid-cols-1 gap-2 " +
+                    (canDeleteRecording
+                      ? "sm:grid-cols-4"
+                      : "sm:grid-cols-3")
+                  }
+                >
                   {available ? (
                     <>
                       <PlayButton
@@ -446,6 +495,21 @@ export default function RecordingsPage() {
                     <div className="rounded-lg bg-slate-50 px-4 py-2 text-center text-xs text-slate-400 sm:col-span-3">
                       Recording file is not currently available.
                     </div>
+                  )}
+
+                  {canDeleteRecording && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        handleDelete(
+                          recording
+                        )
+                      }
+                      className="w-full rounded-lg border border-rose-300 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
                   )}
                 </div>
               </div>

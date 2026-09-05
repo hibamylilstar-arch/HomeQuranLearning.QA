@@ -32,6 +32,16 @@ public sealed class SessionRepository : ISessionRepository
             .Include(x => x.Student)
             .Include(x => x.Course)
             .Include(x => x.Device)
+            .Include(
+                x =>
+                    x.Events.Where(
+                        e =>
+                            e.EventType ==
+                                SessionEventType.LessonShared ||
+                            e.EventType ==
+                                SessionEventType.TeacherAudioParticipationObserved ||
+                            e.EventType ==
+                                SessionEventType.RemoteAudioParticipationObserved))
             .ToListAsync(cancellationToken);
     }
 

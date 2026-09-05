@@ -64,16 +64,51 @@ function reviewBadgeClass(status: string) {
   }
 }
 
+const evidenceTitles: Record<string, string> = {
+  TeacherAudioParticipationObserved:
+    "Teacher Participation Confirmed",
+  RemoteAudioParticipationObserved:
+    "Student Participation Confirmed",
+  AttendanceFinalizationCompleted:
+    "Attendance Finalized",
+};
+
 const evidenceDescriptions: Record<string, string> = {
   TeacherGreetingSent: "Teacher evidence: greeting sent",
   CallAttempted: "Teacher evidence: call attempted",
   StudentCallConnected: "Student presence: call connected",
   CallEnded: "Call lifecycle: ended",
-  LessonShared: "Teacher + student evidence: lesson shared",
+  LessonShared: "Lesson delivery evidence received",
+  TeacherAudioParticipationObserved:
+    "Meaningful teacher participation was confirmed during the scheduled class.",
+  RemoteAudioParticipationObserved:
+    "Meaningful student-side participation was confirmed during the scheduled class.",
+  AttendanceFinalizationCompleted:
+    "Automatic attendance evaluation completed after the lesson grace closed.",
 };
 
+const cleanAttendanceEvidenceTypes = new Set([
+  "TeacherAudioParticipationObserved",
+  "RemoteAudioParticipationObserved",
+  "AttendanceFinalizationCompleted",
+]);
+
 function formatEventType(eventType: string) {
-  return eventType.replace(/([a-z])([A-Z])/g, "$1 $2");
+  return (
+    evidenceTitles[eventType] ??
+    eventType.replace(/([a-z])([A-Z])/g, "$1 $2")
+  );
+}
+
+function lessonStatusBadgeClass(status: string) {
+  switch (status) {
+    case "Yes":
+      return "bg-emerald-50 text-emerald-700 border-emerald-100";
+    case "No":
+      return "bg-amber-50 text-amber-700 border-amber-100";
+    default:
+      return "bg-sky-50 text-sky-700 border-sky-100";
+  }
 }
 
 function deviceLabel(
@@ -289,7 +324,7 @@ export default function SessionsPage() {
   );
 
   const hasLessonSopIssue =
-    evidenceSession?.status === "Completed" &&
+    evidenceSession?.lessonSharedStatus === "No" &&
     hasStudentConnectionEvidence &&
     !hasLessonEvidence;
 
@@ -411,6 +446,14 @@ export default function SessionsPage() {
   }
 
   function openAttendanceReview(session: SessionListItem) {
+    if (!session.attendanceReviewAllowed) {
+      setError(
+        "Attendance review is available after the 10-minute lesson grace closes."
+      );
+      setSuccessMessage("");
+      return;
+    }
+
     setSelectedSession(session);
 
     setReviewTeacherStatus(
@@ -777,6 +820,8 @@ export default function SessionsPage() {
                 <th className="px-4 py-3">Laptop</th>
                 <th className="px-4 py-3">Started</th>
                 <th className="px-4 py-3">Session</th>
+                <th className="px-4 py-3">Lesson Shared</th>
+                <th className="px-4 py-3">Participation</th>
                 <th className="px-4 py-3">Teacher Attendance</th>
                 <th className="px-4 py-3">Student Attendance</th>
                 <th className="px-4 py-3">Review</th>
@@ -788,7 +833,7 @@ export default function SessionsPage() {
               {filteredSessions.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={10}
+                    colSpan={12}
                     className="px-6 py-8 text-center text-slate-400"
                   >
                     {sessions.length === 0
@@ -850,6 +895,58 @@ export default function SessionsPage() {
                         <span
                           className={
                             "inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase " +
+                            lessonStatusBadgeClass(
+                              session.lessonSharedStatus
+                            )
+                          }
+                        >
+                          {session.lessonSharedStatus}
+                        </span>
+
+                        {session.lessonSharedStatus === "Pending" && (
+                          <div className="mt-1 whitespace-nowrap text-[10px] text-slate-400">
+                            Grace closes{" "}
+                            {new Date(
+                              session.lessonGraceEndsAtUtc
+                            ).toLocaleTimeString()}
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <div className="space-y-1 whitespace-nowrap text-[10px]">
+                          <div
+                            className={
+                              session.teacherParticipationEvidence
+                                ? "font-semibold text-emerald-700"
+                                : "text-slate-400"
+                            }
+                          >
+                            Teacher:{" "}
+                            {session.teacherParticipationEvidence
+                              ? "Yes"
+                              : "No"}
+                          </div>
+
+                          <div
+                            className={
+                              session.studentParticipationEvidence
+                                ? "font-semibold text-emerald-700"
+                                : "text-slate-400"
+                            }
+                          >
+                            Student:{" "}
+                            {session.studentParticipationEvidence
+                              ? "Yes"
+                              : "No"}
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <span
+                          className={
+                            "inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase " +
                             attendanceBadgeClass(
                               session.teacherAttendanceStatus
                             )
@@ -905,7 +1002,8 @@ export default function SessionsPage() {
                               : "Evidence"}
                           </button>
 
-                          {completed ? (
+                          {completed &&
+                          session.attendanceReviewAllowed ? (
                             <button
                               type="button"
                               onClick={() =>
@@ -917,6 +1015,10 @@ export default function SessionsPage() {
                                 ? "Edit Review"
                                 : "Review"}
                             </button>
+                          ) : completed ? (
+                            <span className="inline-flex min-h-10 items-center whitespace-nowrap rounded-xl border border-sky-100 bg-sky-50 px-3 text-[10px] font-bold uppercase tracking-wider text-sky-700">
+                              Grace pending
+                            </span>
                           ) : (
                             <span className="text-[10px] font-medium uppercase text-slate-400">
                               Complete first
@@ -951,6 +1053,79 @@ export default function SessionsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
               Raw evidence | attendance conclusions shown separately
             </span>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Lesson Shared
+              </p>
+
+              <div className="mt-2">
+                <span
+                  className={
+                    "inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase " +
+                    lessonStatusBadgeClass(
+                      evidenceSession.lessonSharedStatus
+                    )
+                  }
+                >
+                  {evidenceSession.lessonSharedStatus}
+                </span>
+              </div>
+
+              {evidenceSession.lessonSharedStatus === "Pending" && (
+                <p className="mt-2 text-[10px] leading-4 text-slate-500">
+                  Final Yes / No after the 10-minute lesson grace closes.
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Teacher Participation
+              </p>
+
+              <p
+                className={
+                  "mt-2 text-sm font-semibold " +
+                  (evidenceSession.teacherParticipationEvidence
+                    ? "text-emerald-700"
+                    : "text-slate-500")
+                }
+              >
+                {evidenceSession.teacherParticipationEvidence
+                  ? "Yes"
+                  : "No"}
+              </p>
+
+              <p className="mt-1 text-[10px] leading-4 text-slate-500">
+                Meaningful participation during the scheduled class.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Student Participation
+              </p>
+
+              <p
+                className={
+                  "mt-2 text-sm font-semibold " +
+                  (evidenceSession.studentParticipationEvidence
+                    ? "text-emerald-700"
+                    : "text-slate-500")
+                }
+              >
+                {evidenceSession.studentParticipationEvidence
+                  ? "Yes"
+                  : "No"}
+              </p>
+
+              <p className="mt-1 text-[10px] leading-4 text-slate-500">
+                Meaningful participation during the scheduled class.
+              </p>
+            </div>
           </div>
 
           {hasLessonSopIssue && (
@@ -990,13 +1165,16 @@ export default function SessionsPage() {
                         {evidenceDescriptions[event.eventType] ??
                           "Operational session evidence"}
                       </p>
-                      {(event.source || event.details) && (
-                        <p className="mt-1 break-words text-[11px] text-slate-600">
-                          {[event.source, event.details]
-                            .filter(Boolean)
-                            .join(" | ")}
-                        </p>
-                      )}
+                      {!cleanAttendanceEvidenceTypes.has(
+                        event.eventType
+                      ) &&
+                        (event.source || event.details) && (
+                          <p className="mt-1 break-words text-[11px] text-slate-600">
+                            {[event.source, event.details]
+                              .filter(Boolean)
+                              .join(" | ")}
+                          </p>
+                        )}
                     </div>
                     <time className="whitespace-nowrap text-[10px] font-medium text-slate-400">
                       {new Date(event.occurredAtUtc).toLocaleString()}

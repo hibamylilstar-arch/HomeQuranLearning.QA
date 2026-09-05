@@ -27,6 +27,21 @@ public sealed class SessionDto
 
     public string? AttendanceNotes { get; init; }
 
+    public DateTimeOffset ScheduledStartUtc { get; init; }
+
+    public DateTimeOffset ScheduledEndUtc { get; init; }
+
+    public DateTimeOffset LessonGraceEndsAtUtc { get; init; }
+
+    public string LessonSharedStatus { get; init; } =
+        "Pending";
+
+    public bool TeacherParticipationEvidence { get; init; }
+
+    public bool StudentParticipationEvidence { get; init; }
+
+    public bool AttendanceReviewAllowed { get; init; }
+
     public int ActiveSeconds { get; init; }
 
     public int DisconnectCount { get; init; }

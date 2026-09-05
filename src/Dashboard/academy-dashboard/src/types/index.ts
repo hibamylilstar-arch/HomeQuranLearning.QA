@@ -126,6 +126,13 @@ export interface SessionListItem {
   studentAttendanceStatus: string;
   attendanceReviewStatus: string;
   attendanceNotes?: string | null;
+  scheduledStartUtc: string;
+  scheduledEndUtc: string;
+  lessonGraceEndsAtUtc: string;
+  lessonSharedStatus: "Pending" | "Yes" | "No";
+  teacherParticipationEvidence: boolean;
+  studentParticipationEvidence: boolean;
+  attendanceReviewAllowed: boolean;
   activeSeconds: number;
   disconnectCount: number;
   disconnectSeconds: number;

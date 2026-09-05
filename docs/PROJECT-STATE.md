@@ -1,5 +1,73 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_ATTENDANCE_PRESENTATION_C2C_20260905_BEGIN -->
+# ATTENDANCE PRESENTATION - C2C SOURCE PROVEN - 2026-09-05
+
+Previous attendance finalization commit:
+
+`bed49a0d4b63ced199104785979b52a3381881dc`
+
+## Session presentation
+
+Sessions expose:
+
+- LessonSharedStatus
+- TeacherParticipationEvidence
+- StudentParticipationEvidence
+- LessonGraceEndsAtUtc
+- AttendanceReviewAllowed
+
+Lesson Shared main status:
+
+- Pending while the ten-minute lesson grace is open
+- Yes after grace when valid LessonShared exists
+- No after grace when no valid LessonShared exists
+
+LessonShared evidence arriving during grace does not switch the main status to
+Yes early.
+
+## Participation UI
+
+User-facing labels are:
+
+- Teacher Participation
+- Student Participation
+
+Technical audio route names, PCM labels, detector details, and worker internals
+are not shown in normal Sessions UI.
+
+Only explicit in-session TeacherAudioParticipationObserved and
+RemoteAudioParticipationObserved events drive these presentation fields.
+
+Historical StudentAudioDetected is not authoritative.
+
+## Manual review
+
+Completed sessions still inside grace show Grace pending rather than Review.
+
+Backend C2B review timing remains authoritative.
+
+## Runtime
+
+Source/build/test proof only.
+
+No Agent release built.
+No Agent deployment.
+No VPS deployment.
+No database migration.
+No QA change.
+No Live change.
+No Recording change.
+
+## Next
+
+Controlled runtime release and canary preparation.
+
+Real hardware audio-attendance calibration remains required before runtime
+certification.
+
+<!-- HQL_ATTENDANCE_PRESENTATION_C2C_20260905_END -->
+
 <!-- HQL_ATTENDANCE_FINALIZATION_C2B_20260905_BEGIN -->
 # 10-MINUTE ATTENDANCE FINALIZATION - C2B SOURCE PROVEN - 2026-09-05
 

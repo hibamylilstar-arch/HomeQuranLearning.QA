@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Academy.Application.Abstractions;
 using Academy.Application.Contracts;
 using Academy.Application.Services;
@@ -171,6 +171,7 @@ public class DashboardQueryServiceTests
             qaRepo.Object,
             candidateRepo.Object,
             deviceRepo.Object,
+            CreateEmptyDeviceTeacherAssignmentRepository(),
             assignRepo.Object,
             sessionRepo.Object,
             Mock.Of<ISessionEventRepository>());
@@ -237,6 +238,7 @@ public class DashboardQueryServiceTests
             qaRepo.Object,
             candidateRepo.Object,
             deviceRepo.Object,
+            CreateEmptyDeviceTeacherAssignmentRepository(),
             assignRepo.Object,
             sessionRepo.Object,
             Mock.Of<ISessionEventRepository>());
@@ -260,4 +262,19 @@ public class DashboardQueryServiceTests
                 It.IsAny<CancellationToken>()),
             Times.Never);
     }
-}
+
+    private static IDeviceTeacherAssignmentRepository CreateEmptyDeviceTeacherAssignmentRepository()
+    {
+        var repository =
+            new Mock<IDeviceTeacherAssignmentRepository>();
+
+        repository
+            .Setup(x =>
+                x.GetAllWithTeachersAsync(
+                    It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                Array.Empty<
+                    Academy.Domain.Entities.DeviceTeacherAssignment>());
+
+        return repository.Object;
+    }}

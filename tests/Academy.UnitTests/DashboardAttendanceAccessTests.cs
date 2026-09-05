@@ -385,6 +385,7 @@ public sealed class DashboardAttendanceAccessTests
             Mock.Of<IQaAlertRepository>(),
             Mock.Of<IQaCandidateRepository>(),
             Mock.Of<IDeviceRepository>(),
+            CreateEmptyDeviceTeacherAssignmentRepository(),
             assignmentRepository.Object,
             sessionRepository.Object,
             Mock.Of<ISessionEventRepository>());
@@ -495,4 +496,19 @@ public sealed class DashboardAttendanceAccessTests
                 start.AddMinutes(-1)
         };
     }
-}
+
+    private static IDeviceTeacherAssignmentRepository CreateEmptyDeviceTeacherAssignmentRepository()
+    {
+        var repository =
+            new Mock<IDeviceTeacherAssignmentRepository>();
+
+        repository
+            .Setup(x =>
+                x.GetAllWithTeachersAsync(
+                    It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                Array.Empty<
+                    Academy.Domain.Entities.DeviceTeacherAssignment>());
+
+        return repository.Object;
+    }}

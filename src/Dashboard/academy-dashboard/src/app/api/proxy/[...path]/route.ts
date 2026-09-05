@@ -74,6 +74,16 @@ async function proxy(
         : await request.text(),
   });
 
+  if (
+    res.status === 204 ||
+    res.status === 205 ||
+    res.status === 304
+  ) {
+    return new NextResponse(null, {
+      status: res.status,
+    });
+  }
+
   const data = await res.json().catch(() => null);
 
   return NextResponse.json(data ?? {}, { status: res.status });

@@ -5,9 +5,6 @@ namespace Academy.Application.Services;
 
 public sealed class AttendanceReducer
 {
-    private static readonly TimeSpan LateThreshold =
-        TimeSpan.FromMinutes(3);
-
     private static readonly TimeSpan PreClassTeacherReadyWindow =
         TimeSpan.FromMinutes(5);
 
@@ -23,23 +20,6 @@ public sealed class AttendanceReducer
                 .ToList();
 
         ResetDerivedFields(session);
-
-        if (ordered.Count == 0)
-        {
-            session.TeacherAttendanceStatus =
-                AttendanceStatus.Unknown;
-
-            session.StudentAttendanceStatus =
-                AttendanceStatus.Unknown;
-
-            session.AttendanceReviewStatus =
-                AttendanceReviewStatus.Pending;
-
-            session.AttendanceNotes =
-                "No attendance evidence received.";
-
-            return;
-        }
 
         var teacherReady =
             ordered
@@ -93,22 +73,21 @@ public sealed class AttendanceReducer
             session,
             ordered);
 
-        ReduceTeacherAttendance(
-            session,
-            ordered);
+        bool lessonShared =
+            ordered.Any(
+                x =>
+                    x.EventType ==
+                    SessionEventType.LessonShared);
 
-        ReduceStudentAttendance(
+        ReduceAttendance(
             session,
-            ordered);
-
-        ReduceReviewStatus(
-            session,
-            ordered);
+            lessonShared);
 
         session.AttendanceNotes =
             BuildNotes(
                 session,
-                ordered);
+                ordered,
+                lessonShared);
     }
 
     private static void ResetDerivedFields(
@@ -293,191 +272,77 @@ public sealed class AttendanceReducer
                 session.DisconnectSeconds);
     }
 
-    private static void ReduceTeacherAttendance(
+    private static void ReduceAttendance(
         Session session,
-        IReadOnlyList<SessionEvent> events)
+        bool lessonShared)
     {
-        var teacherEvidenceAt =
-            session.TeacherReadyAtUtc
-            ?? session.FirstContactAtUtc
-            ?? session.ActualSessionStartUtc;
-
-        if (teacherEvidenceAt is null)
-        {
-            bool lessonShared =
-                events.Any(
-                    x =>
-                        x.EventType ==
-                        SessionEventType.LessonShared);
-
-            if (lessonShared)
-            {
-                // A lesson sent to the scheduled student's Teams chat is
-                // strong proof that the teacher conducted the class.
-                // The share may happen later in the lesson, so its timestamp
-                // must not be interpreted as the teacher's arrival time.
-                session.TeacherAttendanceStatus =
-                    AttendanceStatus.Present;
-
-                return;
-            }
-
-            if (DateTimeOffset.UtcNow >=
-                session.ScheduledEndUtc)
-            {
-                session.TeacherAttendanceStatus =
-                    AttendanceStatus.Absent;
-            }
-            else
-            {
-                session.TeacherAttendanceStatus =
-                    AttendanceStatus.Unknown;
-            }
-
-            return;
-        }
-
-        var lateness =
-            teacherEvidenceAt.Value -
-            session.ScheduledStartUtc;
-
-        if (lateness <= LateThreshold)
-        {
-            session.TeacherAttendanceStatus =
-                AttendanceStatus.Present;
-        }
-        else
-        {
-            session.TeacherAttendanceStatus =
-                AttendanceStatus.Late;
-        }
-    }
-
-    private static void ReduceStudentAttendance(
-        Session session,
-        IReadOnlyList<SessionEvent> events)
-    {
-        // Student attendance requires explicit participation evidence.
-        //
-        // ActivityStarted remains supported for manually/synthetically
-        // supplied evidence. StudentAudioDetected is emitted only when
-        // non-silent system-output audio is observed while a supported
-        // communication application is active.
-        //
-        // Generic CommunicationDetected, AudioObserved, TeacherGreetingSent
-        // and CallAttempted must never by themselves mark a student present.
-        //
-        // StudentCallConnected is explicit participation and can establish
-        // arrival timing. LessonShared is also strong student class evidence,
-        // but the lesson may be shared later in class, so its timestamp must
-        // not be interpreted as the student's join time.
-        var explicitActivity =
-            events.FirstOrDefault(
-                x =>
-                    x.EventType ==
-                        SessionEventType.ActivityStarted ||
-                    x.EventType ==
-                        SessionEventType.StudentAudioDetected ||
-                    x.EventType ==
-                        SessionEventType.StudentCallConnected);
-
-        if (explicitActivity is not null)
-        {
-            var lateness =
-                explicitActivity.OccurredAtUtc -
-                session.ScheduledStartUtc;
-
-            session.StudentAttendanceStatus =
-                lateness <= LateThreshold
-                    ? AttendanceStatus.Present
-                    : AttendanceStatus.Late;
-
-            return;
-        }
-
-        bool lessonShared =
-            events.Any(
-                x =>
-                    x.EventType ==
-                    SessionEventType.LessonShared);
-
         if (lessonShared)
         {
+            session.TeacherAttendanceStatus =
+                AttendanceStatus.Present;
+
             session.StudentAttendanceStatus =
                 AttendanceStatus.Present;
+
+            session.AttendanceReviewStatus =
+                AttendanceReviewStatus.AutoResolved;
 
             return;
         }
 
-        if (DateTimeOffset.UtcNow >=
-            session.ScheduledEndUtc)
+        if (IsClassFinished(session))
         {
+            session.TeacherAttendanceStatus =
+                AttendanceStatus.NeedsReview;
+
             session.StudentAttendanceStatus =
                 AttendanceStatus.NeedsReview;
         }
         else
         {
+            session.TeacherAttendanceStatus =
+                AttendanceStatus.Unknown;
+
             session.StudentAttendanceStatus =
                 AttendanceStatus.Unknown;
         }
-    }
-
-    private static void ReduceReviewStatus(
-        Session session,
-        IReadOnlyList<SessionEvent> events)
-    {
-        bool technicalIssue =
-            events.Any(
-                x =>
-                    x.EventType ==
-                    SessionEventType.TechnicalIssue);
-
-        bool ambiguousStudent =
-            session.StudentAttendanceStatus ==
-                AttendanceStatus.Unknown ||
-            session.StudentAttendanceStatus ==
-                AttendanceStatus.NeedsReview;
-
-        bool noTeacherEvidence =
-            session.TeacherAttendanceStatus ==
-            AttendanceStatus.Unknown;
-
-        if (technicalIssue ||
-            ambiguousStudent ||
-            noTeacherEvidence)
-        {
-            session.AttendanceReviewStatus =
-                AttendanceReviewStatus.Pending;
-
-            return;
-        }
 
         session.AttendanceReviewStatus =
-            AttendanceReviewStatus.AutoResolved;
+            AttendanceReviewStatus.Pending;
+    }
+
+    private static bool IsClassFinished(
+        Session session)
+    {
+        return
+            session.Status ==
+                SessionStatus.Completed ||
+            DateTimeOffset.UtcNow >=
+                session.ScheduledEndUtc;
     }
 
     private static string BuildNotes(
         Session session,
-        IReadOnlyList<SessionEvent> events)
+        IReadOnlyList<SessionEvent> events,
+        bool lessonShared)
     {
         var notes =
             new List<string>();
 
-        if (session.TeacherAttendanceStatus ==
-            AttendanceStatus.Late &&
-            session.TeacherReadyAtUtc is not null)
+        if (lessonShared)
         {
-            var minutes =
-                Math.Max(
-                    0,
-                    (int)Math.Floor(
-                        (
-                            session.TeacherReadyAtUtc.Value -
-                            session.ScheduledStartUtc
-                        ).TotalMinutes));
-
             notes.Add(
-                $"Teacher late by approximately {minutes} minute(s).");
+                "Attendance auto-resolved from LessonShared evidence; lesson timing is not treated as arrival time.");
+        }
+        else if (IsClassFinished(session))
+        {
+            notes.Add(
+                "No LessonShared evidence received; teacher and student attendance require review.");
+        }
+        else
+        {
+            notes.Add(
+                "Attendance is awaiting LessonShared evidence.");
         }
 
         if (session.DisconnectCount > 0)
@@ -495,31 +360,8 @@ public sealed class AttendanceReducer
                 "Technical issue evidence recorded.");
         }
 
-        if (session.TeacherAttendanceStatus ==
-            AttendanceStatus.Unknown)
-        {
-            notes.Add(
-                "Teacher attendance is still pending sufficient presence evidence.");
-        }
-
-        if (session.StudentAttendanceStatus ==
-            AttendanceStatus.Unknown)
-        {
-            notes.Add(
-                "Student attendance is still pending sufficient participation evidence.");
-        }
-
-        if (session.StudentAttendanceStatus ==
-            AttendanceStatus.NeedsReview)
-        {
-            notes.Add(
-                "Student attendance requires review because current signals do not prove participant presence.");
-        }
-
-        return notes.Count == 0
-            ? "Attendance evidence auto-processed."
-            : string.Join(
-                " ",
-                notes);
+        return string.Join(
+            " ",
+            notes);
     }
 }

@@ -9,7 +9,7 @@ public sealed class AttendanceReducerTests
     private readonly AttendanceReducer _reducer = new();
 
     [Fact]
-    public void Teacher_OnTime_CommunicationEvidence_IsPresent()
+    public void CommunicationEvidence_RecordsOperationalMarkers_ButDoesNotResolveAttendance()
     {
         var start = DateTimeOffset.UtcNow.AddHours(-2);
         var session = CreateCompletedSession(start);
@@ -25,7 +25,7 @@ public sealed class AttendanceReducerTests
         _reducer.Reduce(session, events);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.NeedsReview,
             session.TeacherAttendanceStatus);
 
         Assert.Equal(
@@ -38,7 +38,7 @@ public sealed class AttendanceReducerTests
     }
 
     [Fact]
-    public void Teacher_FiveMinutesLate_IsLate()
+    public void CommunicationTiming_DoesNotCreateAutomaticLateAttendance()
     {
         var start = DateTimeOffset.UtcNow.AddHours(-2);
         var session = CreateCompletedSession(start);
@@ -54,19 +54,19 @@ public sealed class AttendanceReducerTests
         _reducer.Reduce(session, events);
 
         Assert.Equal(
-            AttendanceStatus.Late,
+            AttendanceStatus.NeedsReview,
             session.TeacherAttendanceStatus);
 
         Assert.NotNull(
             session.AttendanceNotes);
 
         Assert.Contains(
-            "Teacher late",
+            "No LessonShared",
             session.AttendanceNotes);
     }
 
     [Fact]
-    public void NoTeacherEvidence_AfterClass_IsAbsent()
+    public void NoLessonAfterClass_DoesNotCreateAutomaticAbsent()
     {
         var start = DateTimeOffset.UtcNow.AddHours(-2);
         var session = CreateCompletedSession(start);
@@ -82,7 +82,7 @@ public sealed class AttendanceReducerTests
         _reducer.Reduce(session, events);
 
         Assert.Equal(
-            AttendanceStatus.Absent,
+            AttendanceStatus.NeedsReview,
             session.TeacherAttendanceStatus);
     }
 
@@ -117,7 +117,7 @@ public sealed class AttendanceReducerTests
     }
 
     [Fact]
-    public void Student_ExplicitActivity_OnTime_IsPresent()
+    public void StudentActivity_DoesNotResolveAttendance()
     {
         var start = DateTimeOffset.UtcNow.AddHours(-2);
         var session = CreateCompletedSession(start);
@@ -143,16 +143,16 @@ public sealed class AttendanceReducerTests
         _reducer.Reduce(session, events);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.NeedsReview,
             session.StudentAttendanceStatus);
 
         Assert.Equal(
-            AttendanceReviewStatus.AutoResolved,
+            AttendanceReviewStatus.Pending,
             session.AttendanceReviewStatus);
     }
 
     [Fact]
-    public void Student_ExplicitActivity_FiveMinutesLate_IsLate()
+    public void StudentActivityTiming_DoesNotCreateAutomaticLate()
     {
         var start = DateTimeOffset.UtcNow.AddHours(-2);
         var session = CreateCompletedSession(start);
@@ -173,7 +173,7 @@ public sealed class AttendanceReducerTests
         _reducer.Reduce(session, events);
 
         Assert.Equal(
-            AttendanceStatus.Late,
+            AttendanceStatus.NeedsReview,
             session.StudentAttendanceStatus);
     }
 
@@ -372,7 +372,7 @@ public sealed class AttendanceReducerTests
     }
 
     [Fact]
-    public void Teacher_ExactlyThreeMinutesLate_IsPresent()
+    public void CommunicationAtThreeMinutes_DoesNotResolveAttendance()
     {
         var start = DateTimeOffset.UtcNow.AddHours(-2);
         var session = CreateCompletedSession(start);
@@ -388,12 +388,12 @@ public sealed class AttendanceReducerTests
         _reducer.Reduce(session, events);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.NeedsReview,
             session.TeacherAttendanceStatus);
     }
 
     [Fact]
-    public void Teacher_JustOverThreeMinutesLate_IsLate()
+    public void CommunicationAfterThreeMinutes_DoesNotResolveAttendance()
     {
         var start = DateTimeOffset.UtcNow.AddHours(-2);
         var session = CreateCompletedSession(start);
@@ -409,12 +409,12 @@ public sealed class AttendanceReducerTests
         _reducer.Reduce(session, events);
 
         Assert.Equal(
-            AttendanceStatus.Late,
+            AttendanceStatus.NeedsReview,
             session.TeacherAttendanceStatus);
     }
 
     [Fact]
-    public void Student_ExactlyThreeMinutesLate_IsPresent()
+    public void StudentActivityAtThreeMinutes_DoesNotResolveAttendance()
     {
         var start = DateTimeOffset.UtcNow.AddHours(-2);
         var session = CreateCompletedSession(start);
@@ -435,12 +435,12 @@ public sealed class AttendanceReducerTests
         _reducer.Reduce(session, events);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.NeedsReview,
             session.StudentAttendanceStatus);
     }
 
     [Fact]
-    public void Student_JustOverThreeMinutesLate_IsLate()
+    public void StudentActivityAfterThreeMinutes_DoesNotResolveAttendance()
     {
         var start = DateTimeOffset.UtcNow.AddHours(-2);
         var session = CreateCompletedSession(start);
@@ -461,12 +461,12 @@ public sealed class AttendanceReducerTests
         _reducer.Reduce(session, events);
 
         Assert.Equal(
-            AttendanceStatus.Late,
+            AttendanceStatus.NeedsReview,
             session.StudentAttendanceStatus);
     }
 
     [Fact]
-    public void Teacher_ReadyExactlyFiveMinutesBeforeStart_IsAccepted()
+    public void TeacherReadyWithinOperationalWindow_IsRecordedButDoesNotResolveAttendance()
     {
         var start = DateTimeOffset.UtcNow.AddHours(-2);
         var session = CreateCompletedSession(start);
@@ -486,12 +486,12 @@ public sealed class AttendanceReducerTests
             session.TeacherReadyAtUtc);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.NeedsReview,
             session.TeacherAttendanceStatus);
     }
 
     [Fact]
-    public void Teacher_ReadyEarlierThanFiveMinuteWindow_IsIgnored()
+    public void TeacherReadyOutsideOperationalWindow_IsIgnoredAndDoesNotResolveAttendance()
     {
         var start = DateTimeOffset.UtcNow.AddHours(-2);
         var session = CreateCompletedSession(start);
@@ -510,11 +510,11 @@ public sealed class AttendanceReducerTests
             session.TeacherReadyAtUtc);
 
         Assert.Equal(
-            AttendanceStatus.Absent,
+            AttendanceStatus.NeedsReview,
             session.TeacherAttendanceStatus);
     }
     [Fact]
-    public void Student_Unknown_DuringLiveClass_KeepsReviewPending()
+    public void LiveClassWithoutLesson_KeepsBothAttendanceUnknownAndPending()
     {
         var start =
             DateTimeOffset.UtcNow.AddMinutes(-5);
@@ -548,7 +548,7 @@ public sealed class AttendanceReducerTests
             events);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.Unknown,
             session.TeacherAttendanceStatus);
 
         Assert.Equal(
@@ -560,11 +560,11 @@ public sealed class AttendanceReducerTests
             session.AttendanceReviewStatus);
 
         Assert.Contains(
-            "Student attendance is still pending",
+            "awaiting LessonShared",
             session.AttendanceNotes ?? string.Empty);
     }
     [Fact]
-    public void StudentAudioDetected_WithinGrace_MarksStudentPresent()
+    public void StudentAudioDetected_DoesNotResolveAttendance()
     {
         var start =
             DateTimeOffset.UtcNow.AddHours(-2);
@@ -590,16 +590,16 @@ public sealed class AttendanceReducerTests
             events);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.NeedsReview,
             session.StudentAttendanceStatus);
 
         Assert.Equal(
-            AttendanceReviewStatus.AutoResolved,
+            AttendanceReviewStatus.Pending,
             session.AttendanceReviewStatus);
     }
 
     [Fact]
-    public void StudentAudioDetected_AfterGrace_MarksStudentLate()
+    public void StudentAudioTiming_DoesNotCreateAutomaticLate()
     {
         var start =
             DateTimeOffset.UtcNow.AddHours(-2);
@@ -625,11 +625,11 @@ public sealed class AttendanceReducerTests
             events);
 
         Assert.Equal(
-            AttendanceStatus.Late,
+            AttendanceStatus.NeedsReview,
             session.StudentAttendanceStatus);
 
         Assert.Equal(
-            AttendanceReviewStatus.AutoResolved,
+            AttendanceReviewStatus.Pending,
             session.AttendanceReviewStatus);
     }
 
@@ -668,7 +668,7 @@ public sealed class AttendanceReducerTests
             session.StudentAttendanceStatus);
     }
     [Fact]
-    public void TeacherGreetingSent_OnTime_ProvesTeacherButNotStudent()
+    public void TeacherGreeting_RecordsOperationalMarkers_ButDoesNotResolveAttendance()
     {
         var start =
             DateTimeOffset.UtcNow.AddHours(-2);
@@ -692,7 +692,7 @@ public sealed class AttendanceReducerTests
             events);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.NeedsReview,
             session.TeacherAttendanceStatus);
 
         Assert.Equal(
@@ -713,7 +713,7 @@ public sealed class AttendanceReducerTests
     }
 
     [Fact]
-    public void CallAttempted_AfterGrace_MarksTeacherLateButNotStudentPresent()
+    public void CallAttempted_DoesNotResolveAttendance()
     {
         var start =
             DateTimeOffset.UtcNow.AddHours(-2);
@@ -734,7 +734,7 @@ public sealed class AttendanceReducerTests
             events);
 
         Assert.Equal(
-            AttendanceStatus.Late,
+            AttendanceStatus.NeedsReview,
             session.TeacherAttendanceStatus);
 
         Assert.Equal(
@@ -785,7 +785,7 @@ public sealed class AttendanceReducerTests
             session.AttendanceReviewStatus);
     }
     [Fact]
-    public void StudentCallConnected_WithinGrace_MarksStudentPresent()
+    public void StudentCallConnected_DoesNotResolveAttendance()
     {
         var start =
             DateTimeOffset.UtcNow.AddHours(-2);
@@ -809,11 +809,11 @@ public sealed class AttendanceReducerTests
             events);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.NeedsReview,
             session.TeacherAttendanceStatus);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.NeedsReview,
             session.StudentAttendanceStatus);
 
         Assert.Equal(
@@ -821,12 +821,12 @@ public sealed class AttendanceReducerTests
             session.FirstContactAtUtc);
 
         Assert.Equal(
-            AttendanceReviewStatus.AutoResolved,
+            AttendanceReviewStatus.Pending,
             session.AttendanceReviewStatus);
     }
 
     [Fact]
-    public void StudentCallConnected_AfterGrace_MarksStudentLate()
+    public void StudentCallTiming_DoesNotCreateAutomaticLate()
     {
         var start =
             DateTimeOffset.UtcNow.AddHours(-2);
@@ -852,20 +852,20 @@ public sealed class AttendanceReducerTests
             events);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.NeedsReview,
             session.TeacherAttendanceStatus);
 
         Assert.Equal(
-            AttendanceStatus.Late,
+            AttendanceStatus.NeedsReview,
             session.StudentAttendanceStatus);
 
         Assert.Equal(
-            AttendanceReviewStatus.AutoResolved,
+            AttendanceReviewStatus.Pending,
             session.AttendanceReviewStatus);
     }
 
     [Fact]
-    public void TeamsCallLifecycle_CalculatesConnectedActiveSeconds()
+    public void TeamsCallLifecycle_CalculatesActiveSeconds_WithoutResolvingAttendance()
     {
         var start =
             DateTimeOffset.UtcNow.AddHours(-2);
@@ -896,11 +896,11 @@ public sealed class AttendanceReducerTests
             events);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.NeedsReview,
             session.TeacherAttendanceStatus);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.NeedsReview,
             session.StudentAttendanceStatus);
 
         Assert.Equal(
@@ -908,12 +908,12 @@ public sealed class AttendanceReducerTests
             session.ActiveSeconds);
 
         Assert.Equal(
-            AttendanceReviewStatus.AutoResolved,
+            AttendanceReviewStatus.Pending,
             session.AttendanceReviewStatus);
     }
 
     [Fact]
-    public void CallEnded_Alone_DoesNotProveAttendance()
+    public void CallEnded_Alone_LeavesAttendanceForReview()
     {
         var start =
             DateTimeOffset.UtcNow.AddHours(-2);
@@ -934,7 +934,7 @@ public sealed class AttendanceReducerTests
             events);
 
         Assert.Equal(
-            AttendanceStatus.Absent,
+            AttendanceStatus.NeedsReview,
             session.TeacherAttendanceStatus);
 
         Assert.Equal(
@@ -949,6 +949,131 @@ public sealed class AttendanceReducerTests
             AttendanceReviewStatus.Pending,
             session.AttendanceReviewStatus);
     }
+    [Fact]
+    public void NoEvents_AfterClass_RequiresReviewForBoth()
+    {
+        var start =
+            DateTimeOffset.UtcNow.AddHours(-2);
+
+        var session =
+            CreateCompletedSession(
+                start);
+
+        _reducer.Reduce(
+            session,
+            Array.Empty<SessionEvent>());
+
+        Assert.Equal(
+            AttendanceStatus.NeedsReview,
+            session.TeacherAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceStatus.NeedsReview,
+            session.StudentAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceReviewStatus.Pending,
+            session.AttendanceReviewStatus);
+
+        Assert.Contains(
+            "No LessonShared",
+            session.AttendanceNotes ??
+            string.Empty);
+    }
+
+    [Fact]
+    public void LessonShared_OneHourAfterClass_StillProvesPresent()
+    {
+        var start =
+            DateTimeOffset.UtcNow.AddHours(-3);
+
+        var session =
+            CreateCompletedSession(
+                start);
+
+        var lessonAt =
+            session.ScheduledEndUtc
+                .AddHours(1);
+
+        var events =
+            new[]
+            {
+                Event(
+                    session,
+                    SessionEventType.LessonShared,
+                    lessonAt)
+            };
+
+        _reducer.Reduce(
+            session,
+            events);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.TeacherAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.StudentAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceReviewStatus.AutoResolved,
+            session.AttendanceReviewStatus);
+
+        Assert.DoesNotContain(
+            "late",
+            (
+                session.AttendanceNotes ??
+                string.Empty
+            ).ToLowerInvariant());
+    }
+
+    [Fact]
+    public void LessonShared_WithTechnicalIssue_StillResolvesAttendance()
+    {
+        var start =
+            DateTimeOffset.UtcNow.AddHours(-2);
+
+        var session =
+            CreateCompletedSession(
+                start);
+
+        var events =
+            new[]
+            {
+                Event(
+                    session,
+                    SessionEventType.TechnicalIssue,
+                    start.AddMinutes(10)),
+
+                Event(
+                    session,
+                    SessionEventType.LessonShared,
+                    start.AddMinutes(25))
+            };
+
+        _reducer.Reduce(
+            session,
+            events);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.TeacherAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceStatus.Present,
+            session.StudentAttendanceStatus);
+
+        Assert.Equal(
+            AttendanceReviewStatus.AutoResolved,
+            session.AttendanceReviewStatus);
+
+        Assert.Contains(
+            "Technical issue",
+            session.AttendanceNotes ??
+            string.Empty);
+    }
+
     private static Session CreateCompletedSession(
         DateTimeOffset start)
     {

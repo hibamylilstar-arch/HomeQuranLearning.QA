@@ -8,10 +8,34 @@ public sealed class AttendanceReducer
     private static readonly TimeSpan PreClassTeacherReadyWindow =
         TimeSpan.FromMinutes(5);
 
+    private static readonly TimeSpan LessonGrace =
+        TimeSpan.FromMinutes(10);
+
     public void Reduce(
         Session session,
-        IReadOnlyList<SessionEvent> events)
+        IReadOnlyList<SessionEvent> events,
+        DateTimeOffset? evaluatedAtUtc = null)
     {
+        ArgumentNullException.ThrowIfNull(
+            session);
+
+        ArgumentNullException.ThrowIfNull(
+            events);
+
+        // A human-reviewed result is authoritative.
+        // Later/retried automated evidence must never overwrite it.
+        if (
+            session.AttendanceReviewStatus ==
+                AttendanceReviewStatus.Reviewed
+        )
+        {
+            return;
+        }
+
+        DateTimeOffset nowUtc =
+            evaluatedAtUtc ??
+            DateTimeOffset.UtcNow;
+
         var ordered =
             events
                 .OrderBy(x => x.OccurredAtUtc)
@@ -19,19 +43,26 @@ public sealed class AttendanceReducer
                 .ThenBy(x => x.Id)
                 .ToList();
 
-        ResetDerivedFields(session);
+        ResetDerivedFields(
+            session);
 
         var teacherReady =
             ordered
                 .Where(IsTeacherReadinessEvidence)
-                .Select(x => (DateTimeOffset?)x.OccurredAtUtc)
+                .Select(
+                    x =>
+                        (DateTimeOffset?)
+                        x.OccurredAtUtc)
                 .FirstOrDefault();
 
-        if (teacherReady is not null &&
+        if (
+            teacherReady is not null &&
             teacherReady.Value >=
-                session.ScheduledStartUtc - PreClassTeacherReadyWindow &&
+                session.ScheduledStartUtc -
+                PreClassTeacherReadyWindow &&
             teacherReady.Value <=
-                session.ScheduledEndUtc)
+                session.ScheduledEndUtc
+        )
         {
             session.TeacherReadyAtUtc =
                 teacherReady;
@@ -40,7 +71,10 @@ public sealed class AttendanceReducer
         var firstContact =
             ordered
                 .Where(IsContactEvidence)
-                .Select(x => (DateTimeOffset?)x.OccurredAtUtc)
+                .Select(
+                    x =>
+                        (DateTimeOffset?)
+                        x.OccurredAtUtc)
                 .FirstOrDefault();
 
         if (firstContact is not null)
@@ -58,49 +92,94 @@ public sealed class AttendanceReducer
         {
             session.ActualSessionStartUtc =
                 activityEvents
-                    .Min(x => x.OccurredAtUtc);
+                    .Min(
+                        x =>
+                            x.OccurredAtUtc);
 
             session.ActualSessionEndUtc =
                 activityEvents
-                    .Max(x => x.OccurredAtUtc);
+                    .Max(
+                        x =>
+                            x.OccurredAtUtc);
         }
 
         ReduceDisconnects(
             session,
-            ordered);
+            ordered,
+            nowUtc);
 
         ReduceActiveSeconds(
             session,
-            ordered);
+            ordered,
+            nowUtc);
 
         bool lessonShared =
             ordered.Any(
-                x =>
-                    x.EventType ==
-                    SessionEventType.LessonShared);
+                e =>
+                    IsValidLessonShared(
+                        session,
+                        e));
+
+        bool teacherAudioParticipation =
+            ordered.Any(
+                e =>
+                    e.EventType ==
+                        SessionEventType
+                            .TeacherAudioParticipationObserved &&
+                    IsInsideScheduledSession(
+                        session,
+                        e.OccurredAtUtc));
+
+        bool remoteAudioParticipation =
+            ordered.Any(
+                e =>
+                    e.EventType ==
+                        SessionEventType
+                            .RemoteAudioParticipationObserved &&
+                    IsInsideScheduledSession(
+                        session,
+                        e.OccurredAtUtc));
 
         ReduceAttendance(
             session,
-            lessonShared);
+            lessonShared,
+            teacherAudioParticipation,
+            remoteAudioParticipation,
+            nowUtc);
 
         session.AttendanceNotes =
             BuildNotes(
                 session,
                 ordered,
-                lessonShared);
+                lessonShared,
+                teacherAudioParticipation,
+                remoteAudioParticipation,
+                nowUtc);
     }
 
     private static void ResetDerivedFields(
         Session session)
     {
-        session.TeacherReadyAtUtc = null;
-        session.FirstContactAtUtc = null;
-        session.ActualSessionStartUtc = null;
-        session.ActualSessionEndUtc = null;
+        session.TeacherReadyAtUtc =
+            null;
 
-        session.ActiveSeconds = 0;
-        session.DisconnectCount = 0;
-        session.DisconnectSeconds = 0;
+        session.FirstContactAtUtc =
+            null;
+
+        session.ActualSessionStartUtc =
+            null;
+
+        session.ActualSessionEndUtc =
+            null;
+
+        session.ActiveSeconds =
+            0;
+
+        session.DisconnectCount =
+            0;
+
+        session.DisconnectSeconds =
+            0;
 
         session.TeacherAttendanceStatus =
             AttendanceStatus.Unknown;
@@ -111,7 +190,8 @@ public sealed class AttendanceReducer
         session.AttendanceReviewStatus =
             AttendanceReviewStatus.Pending;
 
-        session.AttendanceNotes = null;
+        session.AttendanceNotes =
+            null;
     }
 
     private static bool IsTeacherReadinessEvidence(
@@ -119,13 +199,26 @@ public sealed class AttendanceReducer
     {
         return e.EventType switch
         {
-            SessionEventType.TeacherReady => true,
-            SessionEventType.ContactAttempt => true,
-            SessionEventType.CommunicationDetected => true,
-            SessionEventType.TeacherGreetingSent => true,
-            SessionEventType.CallAttempted => true,
-            SessionEventType.StudentCallConnected => true,
-            _ => false
+            SessionEventType.TeacherReady =>
+                true,
+
+            SessionEventType.ContactAttempt =>
+                true,
+
+            SessionEventType.CommunicationDetected =>
+                true,
+
+            SessionEventType.TeacherGreetingSent =>
+                true,
+
+            SessionEventType.CallAttempted =>
+                true,
+
+            SessionEventType.StudentCallConnected =>
+                true,
+
+            _ =>
+                false
         };
     }
 
@@ -134,12 +227,23 @@ public sealed class AttendanceReducer
     {
         return e.EventType switch
         {
-            SessionEventType.ContactAttempt => true,
-            SessionEventType.CommunicationDetected => true,
-            SessionEventType.TeacherGreetingSent => true,
-            SessionEventType.CallAttempted => true,
-            SessionEventType.StudentCallConnected => true,
-            _ => false
+            SessionEventType.ContactAttempt =>
+                true,
+
+            SessionEventType.CommunicationDetected =>
+                true,
+
+            SessionEventType.TeacherGreetingSent =>
+                true,
+
+            SessionEventType.CallAttempted =>
+                true,
+
+            SessionEventType.StudentCallConnected =>
+                true,
+
+            _ =>
+                false
         };
     }
 
@@ -148,24 +252,94 @@ public sealed class AttendanceReducer
     {
         return e.EventType switch
         {
-            SessionEventType.ActivityStarted => true,
-            SessionEventType.ActivityStopped => true,
-            SessionEventType.CommunicationDetected => true,
-            SessionEventType.CommunicationStopped => true,
-            SessionEventType.AudioObserved => true,
-            _ => false
+            SessionEventType.ActivityStarted =>
+                true,
+
+            SessionEventType.ActivityStopped =>
+                true,
+
+            SessionEventType.CommunicationDetected =>
+                true,
+
+            SessionEventType.CommunicationStopped =>
+                true,
+
+            SessionEventType.AudioObserved =>
+                true,
+
+            SessionEventType.TeacherAudioParticipationObserved =>
+                true,
+
+            SessionEventType.RemoteAudioParticipationObserved =>
+                true,
+
+            _ =>
+                false
         };
+    }
+
+    private static bool IsInsideScheduledSession(
+        Session session,
+        DateTimeOffset timestampUtc)
+    {
+        return
+            timestampUtc >=
+                session.ScheduledStartUtc &&
+            timestampUtc <=
+                session.ScheduledEndUtc;
+    }
+
+    private static bool IsValidLessonShared(
+        Session session,
+        SessionEvent e)
+    {
+        if (
+            e.EventType !=
+                SessionEventType.LessonShared
+        )
+        {
+            return false;
+        }
+
+        DateTimeOffset earliest =
+            session.ScheduledStartUtc
+                .AddMinutes(-5);
+
+        DateTimeOffset latest =
+            session.ScheduledEndUtc +
+            LessonGrace;
+
+        return
+            e.OccurredAtUtc >=
+                earliest &&
+            e.OccurredAtUtc <=
+                latest;
+    }
+
+    private static bool IsLessonGraceExpired(
+        Session session,
+        DateTimeOffset nowUtc)
+    {
+        return
+            nowUtc >=
+                session.ScheduledEndUtc +
+                LessonGrace;
     }
 
     private static void ReduceDisconnects(
         Session session,
-        IReadOnlyList<SessionEvent> events)
+        IReadOnlyList<SessionEvent> events,
+        DateTimeOffset nowUtc)
     {
-        DateTimeOffset? disconnectedAt = null;
+        DateTimeOffset? disconnectedAt =
+            null;
 
         foreach (var e in events)
         {
-            if (e.EventType == SessionEventType.Disconnected)
+            if (
+                e.EventType ==
+                    SessionEventType.Disconnected
+            )
             {
                 if (disconnectedAt is null)
                 {
@@ -178,8 +352,11 @@ public sealed class AttendanceReducer
                 continue;
             }
 
-            if (e.EventType == SessionEventType.Reconnected &&
-                disconnectedAt is not null)
+            if (
+                e.EventType ==
+                    SessionEventType.Reconnected &&
+                disconnectedAt is not null
+            )
             {
                 var duration =
                     e.OccurredAtUtc -
@@ -192,15 +369,17 @@ public sealed class AttendanceReducer
                             duration.TotalSeconds);
                 }
 
-                disconnectedAt = null;
+                disconnectedAt =
+                    null;
             }
         }
 
         if (disconnectedAt is not null)
         {
-            var effectiveEnd =
-                DateTimeOffset.UtcNow < session.ScheduledEndUtc
-                    ? DateTimeOffset.UtcNow
+            DateTimeOffset effectiveEnd =
+                nowUtc <
+                    session.ScheduledEndUtc
+                    ? nowUtc
                     : session.ScheduledEndUtc;
 
             var duration =
@@ -218,49 +397,70 @@ public sealed class AttendanceReducer
 
     private static void ReduceActiveSeconds(
         Session session,
-        IReadOnlyList<SessionEvent> events)
+        IReadOnlyList<SessionEvent> events,
+        DateTimeOffset nowUtc)
     {
         var startEvents =
             events
-                .Where(x =>
-                    x.EventType == SessionEventType.ActivityStarted ||
-                    x.EventType == SessionEventType.CommunicationDetected ||
-                    x.EventType == SessionEventType.StudentCallConnected)
+                .Where(
+                    x =>
+                        x.EventType ==
+                            SessionEventType.ActivityStarted ||
+                        x.EventType ==
+                            SessionEventType.CommunicationDetected ||
+                        x.EventType ==
+                            SessionEventType.StudentCallConnected)
                 .ToList();
 
         var stopEvents =
             events
-                .Where(x =>
-                    x.EventType == SessionEventType.ActivityStopped ||
-                    x.EventType == SessionEventType.CommunicationStopped ||
-                    x.EventType == SessionEventType.CallEnded)
+                .Where(
+                    x =>
+                        x.EventType ==
+                            SessionEventType.ActivityStopped ||
+                        x.EventType ==
+                            SessionEventType.CommunicationStopped ||
+                        x.EventType ==
+                            SessionEventType.CallEnded)
                 .ToList();
 
         if (startEvents.Count == 0)
         {
-            session.ActiveSeconds = 0;
+            session.ActiveSeconds =
+                0;
+
             return;
         }
 
         var start =
-            startEvents.First().OccurredAtUtc;
+            startEvents
+                .First()
+                .OccurredAtUtc;
 
         var end =
             stopEvents
-                .Where(x =>
-                    x.OccurredAtUtc >= start)
-                .Select(x =>
-                    (DateTimeOffset?)x.OccurredAtUtc)
+                .Where(
+                    x =>
+                        x.OccurredAtUtc >=
+                        start)
+                .Select(
+                    x =>
+                        (DateTimeOffset?)
+                        x.OccurredAtUtc)
                 .LastOrDefault()
-            ?? (
-                DateTimeOffset.UtcNow < session.ScheduledEndUtc
-                    ? DateTimeOffset.UtcNow
+            ??
+            (
+                nowUtc <
+                    session.ScheduledEndUtc
+                    ? nowUtc
                     : session.ScheduledEndUtc
             );
 
         if (end <= start)
         {
-            session.ActiveSeconds = 0;
+            session.ActiveSeconds =
+                0;
+
             return;
         }
 
@@ -268,14 +468,42 @@ public sealed class AttendanceReducer
             Math.Max(
                 0,
                 (int)Math.Round(
-                    (end - start).TotalSeconds) -
+                    (
+                        end -
+                        start
+                    ).TotalSeconds) -
                 session.DisconnectSeconds);
     }
 
     private static void ReduceAttendance(
         Session session,
-        bool lessonShared)
+        bool lessonShared,
+        bool teacherAudioParticipation,
+        bool remoteAudioParticipation,
+        DateTimeOffset nowUtc)
     {
+        // Attendance remains deliberately unresolved for the complete
+        // ten-minute lesson grace, even if lesson/audio evidence has
+        // already arrived.
+        if (
+            !IsLessonGraceExpired(
+                session,
+                nowUtc)
+        )
+        {
+            session.TeacherAttendanceStatus =
+                AttendanceStatus.Unknown;
+
+            session.StudentAttendanceStatus =
+                AttendanceStatus.Unknown;
+
+            session.AttendanceReviewStatus =
+                AttendanceReviewStatus.Pending;
+
+            return;
+        }
+
+        // LessonShared is the strongest proof after grace expiry.
         if (lessonShared)
         {
             session.TeacherAttendanceStatus =
@@ -290,59 +518,63 @@ public sealed class AttendanceReducer
             return;
         }
 
-        if (IsClassFinished(session))
-        {
-            session.TeacherAttendanceStatus =
-                AttendanceStatus.NeedsReview;
+        session.TeacherAttendanceStatus =
+            teacherAudioParticipation
+                ? AttendanceStatus.Present
+                : AttendanceStatus.NeedsReview;
 
-            session.StudentAttendanceStatus =
-                AttendanceStatus.NeedsReview;
-        }
-        else
-        {
-            session.TeacherAttendanceStatus =
-                AttendanceStatus.Unknown;
-
-            session.StudentAttendanceStatus =
-                AttendanceStatus.Unknown;
-        }
+        session.StudentAttendanceStatus =
+            remoteAudioParticipation
+                ? AttendanceStatus.Present
+                : AttendanceStatus.NeedsReview;
 
         session.AttendanceReviewStatus =
-            AttendanceReviewStatus.Pending;
-    }
-
-    private static bool IsClassFinished(
-        Session session)
-    {
-        return
-            session.Status ==
-                SessionStatus.Completed ||
-            DateTimeOffset.UtcNow >=
-                session.ScheduledEndUtc;
+            teacherAudioParticipation &&
+            remoteAudioParticipation
+                ? AttendanceReviewStatus.AutoResolved
+                : AttendanceReviewStatus.Pending;
     }
 
     private static string BuildNotes(
         Session session,
         IReadOnlyList<SessionEvent> events,
-        bool lessonShared)
+        bool lessonShared,
+        bool teacherAudioParticipation,
+        bool remoteAudioParticipation,
+        DateTimeOffset nowUtc)
     {
         var notes =
             new List<string>();
 
-        if (lessonShared)
+        if (
+            !IsLessonGraceExpired(
+                session,
+                nowUtc)
+        )
         {
-            notes.Add(
-                "Attendance auto-resolved from LessonShared evidence; lesson timing is not treated as arrival time.");
+            if (lessonShared)
+            {
+                notes.Add(
+                    "Lesson Shared: Yes. Attendance remains pending until the 10-minute lesson grace expires.");
+            }
+            else
+            {
+                notes.Add(
+                    "Lesson Shared: Pending. Attendance is awaiting LessonShared during the 10-minute grace.");
+            }
         }
-        else if (IsClassFinished(session))
+        else if (lessonShared)
         {
             notes.Add(
-                "No LessonShared evidence received; teacher and student attendance require review.");
+                "Lesson Shared: Yes. Attendance auto-resolved from valid LessonShared evidence; lesson timing is not treated as arrival time.");
         }
         else
         {
             notes.Add(
-                "Attendance is awaiting LessonShared evidence.");
+                "Lesson Shared: No. No LessonShared evidence was received within the 10-minute grace.");
+
+            notes.Add(
+                $"Teacher audio participation: {(teacherAudioParticipation ? "Yes" : "No")}. Remote audio participation: {(remoteAudioParticipation ? "Yes" : "No")}.");
         }
 
         if (session.DisconnectCount > 0)
@@ -351,10 +583,12 @@ public sealed class AttendanceReducer
                 $"Disconnects: {session.DisconnectCount}, total {session.DisconnectSeconds}s.");
         }
 
-        if (events.Any(
+        if (
+            events.Any(
                 x =>
                     x.EventType ==
-                    SessionEventType.TechnicalIssue))
+                        SessionEventType.TechnicalIssue)
+        )
         {
             notes.Add(
                 "Technical issue evidence recorded.");

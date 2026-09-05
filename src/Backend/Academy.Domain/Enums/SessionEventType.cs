@@ -41,5 +41,9 @@ public enum SessionEventType
     // Maximum one event per route/session from the shared canonical
     // classroom audio consumer. These do not create a second capture chain.
     TeacherAudioParticipationObserved = 24,
-    RemoteAudioParticipationObserved = 25
+    RemoteAudioParticipationObserved = 25,
+
+    // Durable backend marker written once when the ten-minute lesson grace
+    // has expired and automatic attendance evaluation has been performed.
+    AttendanceFinalizationCompleted = 26
 }

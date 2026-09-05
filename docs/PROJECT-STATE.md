@@ -1,5 +1,113 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_ATTENDANCE_FINALIZATION_C2B_20260905_BEGIN -->
+# 10-MINUTE ATTENDANCE FINALIZATION - C2B SOURCE PROVEN - 2026-09-05
+
+Previous shared-audio evidence source commit:
+
+`837edfd4405f6e2afcc00da0ebd35983a7cec2ca`
+
+## Lifecycle
+
+ScheduledEndUtc is the hard end of previous-session audio/activity attribution.
+
+At ScheduledEndUtc:
+
+- Session may become Completed.
+- Attendance remains Unknown/Pending.
+- LessonShared grace continues separately for exactly ten minutes.
+- The next scheduled session may start normally.
+- No previous-session microphone/render activity continues into grace.
+
+Automatic attendance is not finalized before:
+
+`ScheduledEndUtc + 10 minutes`
+
+## Grace expiry
+
+Valid LessonShared inside the accepted window:
+
+- Teacher = Present
+- Student = Present
+- Review = AutoResolved
+
+Without valid LessonShared:
+
+- TeacherAudioParticipationObserved => Teacher Present
+- no teacher proof => Teacher NeedsReview
+- RemoteAudioParticipationObserved => Student Present
+- no remote proof => Student NeedsReview
+- both audio proofs => both Present + AutoResolved
+- missing/partial proof => Review remains Pending
+
+There is no automatic Absent path.
+
+There is no automatic Late path.
+
+Historical StudentAudioDetected remains non-authoritative.
+
+## Evidence windows
+
+Teacher/remote audio participation is authoritative only from:
+
+`ScheduledStartUtc -> ScheduledEndUtc`
+
+LessonShared is accepted only from:
+
+`ScheduledStartUtc - 5 minutes`
+
+through:
+
+`ScheduledEndUtc + 10 minutes`
+
+A later lesson does not automatically resolve attendance.
+
+## Durable finalization
+
+Backend-only event:
+
+`AttendanceFinalizationCompleted`
+
+is written after the ten-minute grace evaluation.
+
+Its session-scoped idempotency key prevents the scheduler from repeatedly
+finalizing the same Pending human-review session every minute.
+
+Agents cannot submit this backend-only marker.
+
+## Human review
+
+AttendanceReviewStatus.Reviewed remains authoritative.
+
+Automated evidence does not overwrite a manually reviewed attendance decision.
+
+Manual review is blocked until the ten-minute lesson grace has expired.
+
+## Runtime
+
+Source/build/test proof only.
+
+No new Agent release built.
+
+No Agent deployment.
+
+No VPS deployment.
+
+No schema migration.
+
+Dashboard unchanged in C2B.
+
+## Next
+
+C2C:
+
+- expose Lesson Shared = Pending / Yes / No in Session DTO/dashboard;
+- expose teacher-side and remote-side participation evidence cleanly;
+- make review UI reflect the ten-minute pending state;
+- prepare controlled C1 + C2A + C2B runtime canary.
+
+<!-- HQL_ATTENDANCE_FINALIZATION_C2B_20260905_END -->
+
 <!-- HQL_SHARED_AUDIO_ATTENDANCE_EVIDENCE_20260905_BEGIN -->
 # SHARED AUDIO ATTENDANCE EVIDENCE - C2A SOURCE PROVEN - 2026-09-05
 

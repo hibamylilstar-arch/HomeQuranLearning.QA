@@ -1,4 +1,4 @@
-﻿using Academy.Domain.Entities;
+using Academy.Domain.Entities;
 
 namespace Academy.Application.Abstractions;
 
@@ -27,6 +27,10 @@ public interface ISessionRepository
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Session>> GetLiveSessionsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Session>> GetSessionsReadyForAttendanceFinalizationAsync(
+        DateTimeOffset scheduledEndCutoffUtc,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Session>> GetClassWindowSessionsForDeviceAsync(

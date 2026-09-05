@@ -302,9 +302,16 @@ public sealed class SessionSchedulerWorker : BackgroundService
                             session.Id,
                             ct);
 
-                attendanceReducer.Reduce(
-                    session,
-                    sessionEvents);
+                if (
+                    session.AttendanceReviewStatus !=
+                        AttendanceReviewStatus.Reviewed
+                )
+                {
+                    attendanceReducer.Reduce(
+                        session,
+                        sessionEvents,
+                        nowUtc);
+                }
 
                 session.UpdatedAtUtc =
                     nowUtc;
@@ -312,6 +319,92 @@ public sealed class SessionSchedulerWorker : BackgroundService
                 sessionRepo.Update(
                     session);
             }
+        }
+
+        await uow.SaveChangesAsync(ct);
+
+        DateTimeOffset attendanceFinalizationCutoff =
+            nowUtc.AddMinutes(-10);
+
+        IReadOnlyList<Session>
+            sessionsReadyForAttendanceFinalization =
+                await sessionRepo
+                    .GetSessionsReadyForAttendanceFinalizationAsync(
+                        attendanceFinalizationCutoff,
+                        ct);
+
+        foreach (
+            Session session in
+            sessionsReadyForAttendanceFinalization)
+        {
+            // A manually reviewed result is authoritative even if the query
+            // raced with a human review in another request.
+            if (
+                session.AttendanceReviewStatus ==
+                    AttendanceReviewStatus.Reviewed
+            )
+            {
+                continue;
+            }
+
+            IReadOnlyList<SessionEvent> sessionEvents =
+                await sessionEventRepo
+                    .GetForSessionAsync(
+                        session.Id,
+                        ct);
+
+            attendanceReducer.Reduce(
+                session,
+                sessionEvents,
+                nowUtc);
+
+            session.UpdatedAtUtc =
+                nowUtc;
+
+            sessionRepo.Update(
+                session);
+
+            var marker =
+                new SessionEvent
+                {
+                    Id =
+                        Guid.NewGuid(),
+
+                    SessionId =
+                        session.Id,
+
+                    EventType =
+                        SessionEventType
+                            .AttendanceFinalizationCompleted,
+
+                    OccurredAtUtc =
+                        session.ScheduledEndUtc
+                            .AddMinutes(10),
+
+                    Source =
+                        "SessionScheduler",
+
+                    Details =
+                        "Ten-minute LessonShared grace expired; automatic attendance evaluation completed.",
+
+                    IdempotencyKey =
+                        $"attendance-finalization:{session.Id:D}:v1",
+
+                    CreatedAtUtc =
+                        nowUtc
+                };
+
+            await sessionEventRepo
+                .AddAsync(
+                    marker,
+                    ct);
+
+            _logger.LogInformation(
+                "Attendance finalized after lesson grace. SessionId={SessionId}, TeacherAttendance={TeacherAttendance}, StudentAttendance={StudentAttendance}, ReviewStatus={ReviewStatus}",
+                session.Id,
+                session.TeacherAttendanceStatus,
+                session.StudentAttendanceStatus,
+                session.AttendanceReviewStatus);
         }
 
         await uow.SaveChangesAsync(ct);

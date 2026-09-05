@@ -240,6 +240,71 @@ public sealed class AttendanceReviewServiceTests
     }
 
     [Fact]
+    public async Task ReviewAttendance_CompletedSessionInsideGrace_IsRejected()
+    {
+        var session =
+            CreateSession(
+                SessionStatus.Completed);
+
+        session.ScheduledEndUtc =
+            DateTimeOffset.UtcNow
+                .AddMinutes(-5);
+
+        session.EndedAtUtc =
+            session.ScheduledEndUtc;
+
+        var sessionRepository =
+            new Mock<ISessionRepository>();
+
+        sessionRepository
+            .Setup(x =>
+                x.GetByIdAsync(
+                    session.Id,
+                    It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                session);
+
+        var unitOfWork =
+            new Mock<IUnitOfWork>();
+
+        var service =
+            CreateService(
+                sessionRepository,
+                unitOfWork);
+
+        var exception =
+            await Assert.ThrowsAsync<ArgumentException>(
+                () =>
+                    service.ReviewAttendanceAsync(
+                        session.Id,
+                        new ReviewAttendanceRequest
+                        {
+                            TeacherAttendanceStatus =
+                                "Present",
+
+                            StudentAttendanceStatus =
+                                "Present"
+                        }));
+
+        Assert.Contains(
+            "10-minute lesson grace",
+            exception.Message);
+
+        Assert.NotEqual(
+            AttendanceReviewStatus.Reviewed,
+            session.AttendanceReviewStatus);
+
+        sessionRepository.Verify(
+            x => x.Update(
+                It.IsAny<Session>()),
+            Times.Never);
+
+        unitOfWork.Verify(
+            x => x.SaveChangesAsync(
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+    [Fact]
     public async Task ReviewAttendance_NonCompletedSession_IsRejected()
     {
         var session =

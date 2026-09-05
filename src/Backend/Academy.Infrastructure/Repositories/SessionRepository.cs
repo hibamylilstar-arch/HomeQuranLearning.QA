@@ -86,6 +86,38 @@ public sealed class SessionRepository : ISessionRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Session>>
+        GetSessionsReadyForAttendanceFinalizationAsync(
+            DateTimeOffset scheduledEndCutoffUtc,
+            CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Sessions
+            .Where(
+                x =>
+                    x.Status ==
+                        SessionStatus.Completed)
+            .Where(
+                x =>
+                    x.AttendanceReviewStatus ==
+                        AttendanceReviewStatus.Pending)
+            .Where(
+                x =>
+                    x.ScheduledEndUtc <=
+                        scheduledEndCutoffUtc)
+            .Where(
+                x =>
+                    !x.Events.Any(
+                        e =>
+                            e.EventType ==
+                                SessionEventType
+                                    .AttendanceFinalizationCompleted))
+            .OrderBy(
+                x =>
+                    x.ScheduledEndUtc)
+            .ToListAsync(
+                cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Session>> GetClassWindowSessionsForDeviceAsync(
         Guid deviceId,
         DateTimeOffset fromUtc,

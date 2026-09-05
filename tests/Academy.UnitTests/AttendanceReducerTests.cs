@@ -982,7 +982,7 @@ public sealed class AttendanceReducerTests
     }
 
     [Fact]
-    public void LessonShared_OneHourAfterClass_StillProvesPresent()
+    public void LessonShared_OneHourAfterClass_DoesNotAutoResolveAttendance()
     {
         var start =
             DateTimeOffset.UtcNow.AddHours(-3);
@@ -1009,16 +1009,21 @@ public sealed class AttendanceReducerTests
             events);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.NeedsReview,
             session.TeacherAttendanceStatus);
 
         Assert.Equal(
-            AttendanceStatus.Present,
+            AttendanceStatus.NeedsReview,
             session.StudentAttendanceStatus);
 
         Assert.Equal(
-            AttendanceReviewStatus.AutoResolved,
+            AttendanceReviewStatus.Pending,
             session.AttendanceReviewStatus);
+
+        Assert.Contains(
+            "Lesson Shared: No",
+            session.AttendanceNotes ??
+            string.Empty);
 
         Assert.DoesNotContain(
             "late",
@@ -1027,7 +1032,6 @@ public sealed class AttendanceReducerTests
                 string.Empty
             ).ToLowerInvariant());
     }
-
     [Fact]
     public void LessonShared_WithTechnicalIssue_StillResolvesAttendance()
     {

@@ -128,6 +128,15 @@ public sealed class SessionService
                 $"Unknown event type '{request.EventType}'.");
         }
 
+        if (
+            eventType ==
+                SessionEventType.AttendanceFinalizationCompleted
+        )
+        {
+            throw new ArgumentException(
+                "AttendanceFinalizationCompleted is reserved for the backend.");
+        }
+
         var existing =
             await _sessionEventRepository.GetByIdempotencyKeyAsync(
                 request.IdempotencyKey,
@@ -205,6 +214,31 @@ public sealed class SessionService
             }
         }
 
+        if (
+            eventType ==
+                SessionEventType.LessonShared
+        )
+        {
+            DateTimeOffset earliestLesson =
+                session.ScheduledStartUtc
+                    .AddMinutes(-5);
+
+            DateTimeOffset latestLesson =
+                session.ScheduledEndUtc
+                    .AddMinutes(10);
+
+            if (
+                occurredAt <
+                    earliestLesson ||
+                occurredAt >
+                    latestLesson
+            )
+            {
+                throw new ArgumentException(
+                    "LessonShared evidence is outside the accepted session/grace window.");
+            }
+        }
+
         var sessionEvent = new SessionEvent
         {
             Id = Guid.NewGuid(),
@@ -234,15 +268,22 @@ public sealed class SessionService
                 session.Id,
                 cancellationToken);
 
-        _attendanceReducer.Reduce(
-            session,
-            sessionEvents);
+        if (
+            session.AttendanceReviewStatus !=
+                AttendanceReviewStatus.Reviewed
+        )
+        {
+            _attendanceReducer.Reduce(
+                session,
+                sessionEvents,
+                DateTimeOffset.UtcNow);
 
-        session.UpdatedAtUtc =
-            DateTimeOffset.UtcNow;
+            session.UpdatedAtUtc =
+                DateTimeOffset.UtcNow;
 
-        _sessionRepository.Update(
-            session);
+            _sessionRepository.Update(
+                session);
+        }
 
         await _unitOfWork.SaveChangesAsync(
             cancellationToken);
@@ -412,6 +453,16 @@ public sealed class SessionService
         {
             throw new ArgumentException(
                 "Attendance can only be reviewed after the session is completed.");
+        }
+
+        if (
+            DateTimeOffset.UtcNow <
+                session.ScheduledEndUtc
+                    .AddMinutes(10)
+        )
+        {
+            throw new ArgumentException(
+                "Attendance cannot be manually reviewed until the 10-minute lesson grace expires.");
         }
 
         if (!Enum.TryParse<AttendanceStatus>(

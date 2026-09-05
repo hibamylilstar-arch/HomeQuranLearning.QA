@@ -1,4 +1,4 @@
-﻿namespace Academy.Domain.Enums;
+namespace Academy.Domain.Enums;
 
 public enum SessionEventType
 {
@@ -35,5 +35,11 @@ public enum SessionEventType
     CallAttempted = 20,
     StudentCallConnected = 21,
     CallEnded = 22,
-    LessonShared = 23
+    LessonShared = 23,
+
+    // Aggregated positive scheduled-session participation evidence.
+    // Maximum one event per route/session from the shared canonical
+    // classroom audio consumer. These do not create a second capture chain.
+    TeacherAudioParticipationObserved = 24,
+    RemoteAudioParticipationObserved = 25
 }

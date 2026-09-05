@@ -186,6 +186,25 @@ public sealed class SessionService
                 "OccurredAtUtc is outside the accepted session evidence window.");
         }
 
+        if (
+            eventType ==
+                SessionEventType.TeacherAudioParticipationObserved ||
+            eventType ==
+                SessionEventType.RemoteAudioParticipationObserved
+        )
+        {
+            if (
+                occurredAt <
+                    session.ScheduledStartUtc ||
+                occurredAt >
+                    session.ScheduledEndUtc
+            )
+            {
+                throw new ArgumentException(
+                    "Audio participation evidence must be inside the scheduled session window.");
+            }
+        }
+
         var sessionEvent = new SessionEvent
         {
             Id = Guid.NewGuid(),

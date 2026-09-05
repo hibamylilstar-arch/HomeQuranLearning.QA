@@ -17,6 +17,7 @@
     <Project Path="src/Backend/Academy.Infrastructure/Academy.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Academy.Agent.Audio.Tests/Academy.Agent.Audio.Tests.csproj" />
     <Project Path="tests/Academy.IntegrationTests/Academy.IntegrationTests.csproj" />
     <Project Path="tests/Academy.UnitTests/Academy.UnitTests.csproj" />
   </Folder>

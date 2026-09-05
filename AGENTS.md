@@ -1,5 +1,127 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_SHARED_AUDIO_ATTENDANCE_EVIDENCE_20260905_BEGIN -->
+# SHARED AUDIO ATTENDANCE EVIDENCE - C2A SOURCE PROVEN - 2026-09-05
+
+Previous lesson-routing source commit:
+
+`e932a954bb5e9191ecbe5647e02ee84ceb0d5a00`
+
+## Implemented
+
+Attendance now consumes the existing canonical ClassroomAudioHub through its
+own bounded/non-blocking subscription.
+
+No second physical audio capture chain was created.
+
+Routes:
+
+- TeacherPcm = effective teacher communication microphone
+- SystemPcm = effective communication render/playback
+
+The existing shared ClassroomAudioRuntime is reused.
+
+Audio attribution is limited strictly to the scheduled Current Session.
+
+At ScheduledEndUtc audio attribution for that session stops.
+
+The separate 10-minute LessonShared grace receives no previous-session audio.
+
+## Evidence
+
+Maximum logical positive audio evidence per session:
+
+- TeacherAudioParticipationObserved
+- RemoteAudioParticipationObserved
+
+The old StudentAudioEvidenceWorker remains removed.
+
+The new worker remembers already-proven sides for the same SessionId during the
+Agent process so it does not unnecessarily reprocess the same class after both
+positive proofs are obtained.
+
+Backend idempotency remains authoritative across retries/restarts.
+
+## Detector
+
+Defaults:
+
+- float canonical PCM
+- 20ms frames
+- MinimumMeaningfulSeconds = 5
+- AbsoluteFloorDbfs = -55
+- NoiseMarginDb = 9
+- NoiseWindowSeconds = 2
+- adaptive background noise floor
+
+During C2A testing a configuration bug was caught before commit:
+
+threshold calculation used two duplicate uninitialized private fields instead
+of the constructor-populated public configuration properties.
+
+The duplicate private fields were removed.
+
+Threshold calculation now uses:
+
+- AbsoluteFloorDbfs
+- NoiseMarginDb
+
+A dedicated regression test verifies the configured threshold is really used.
+
+Synthetic tests cover:
+
+- silence rejection
+- steady hiss/noise rejection
+- steady tone rejection
+- speech-like burst acceptance
+- speech-like activity above stable hiss/noise
+
+Real academy hardware calibration is still required before runtime
+certification.
+
+## Backend boundary
+
+Teacher/remote participation events are accepted only inside:
+
+ScheduledStartUtc -> ScheduledEndUtc
+
+No post-end audio is attributed to LessonGrace.
+
+## Attendance semantics
+
+C2A produces positive evidence only.
+
+AttendanceReducer has NOT yet been changed to decide attendance from these
+events.
+
+That change belongs to C2B.
+
+## Runtime
+
+- source/build/tests only
+- Agent release not built
+- Agent not deployed
+- VPS not deployed
+
+## Next
+
+C2B ten-minute attendance finalization:
+
+- LessonShared remains strongest proof
+- keep attendance pending through lesson grace
+- after grace expires with no lesson:
+  - teacher audio proof => Teacher Present
+  - missing teacher proof => Teacher NeedsReview
+  - remote audio proof => Student Present
+  - missing remote proof => Student NeedsReview
+  - both proven => AutoResolved possible with Lesson Shared No
+- no automatic Absent solely from missing evidence
+- no Late from lesson timing
+- manually Reviewed results must not be automatically overwritten
+
+<!-- HQL_SHARED_AUDIO_ATTENDANCE_EVIDENCE_20260905_END -->
+
+
 <!-- HQL_TEN_MINUTE_LESSON_GRACE_SOURCE_20260905_BEGIN -->
 # 10-MINUTE LESSON GRACE ROUTING - SOURCE PROVEN - 2026-09-05
 

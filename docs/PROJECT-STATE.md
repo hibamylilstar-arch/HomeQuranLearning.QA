@@ -1,5 +1,65 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_ATTENDANCE_RUNTIME_BACKEND_C2_20260905_BEGIN -->
+# ATTENDANCE BACKEND/DASHBOARD RUNTIME DEPLOYED - 2026-09-05
+
+Runtime source commit:
+
+`f0c2ae52958c92a19e27b9ea2f6fa443665e7ad7`
+
+## VPS deployment
+
+Only these application containers were rebuilt/recreated:
+
+- academy-api
+- academy-dashboard
+
+Production API public health returned HTTP 200.
+
+Dashboard public endpoint returned a valid HTTP response.
+
+The existing Compose project and both production Compose files were retained.
+
+## Explicitly preserved
+
+- PostgreSQL not restarted
+- Redis not restarted
+- MinIO not restarted
+- QA worker not restarted
+- LiveKit not restarted
+- LiveKit Ingress not restarted
+- ingress-manager not restarted
+- Caddy not restarted
+- MediaMTX relay not restarted
+- recording archive services not restarted
+
+Custom VPS Caddyfile remained byte-identical with SHA256:
+
+`280DFE2CF855E4BE0029C36FE992AE4505DD393F50B25717AA25761447338AC1`
+
+No database migration was introduced.
+
+## Agent canary
+
+Immutable Agent canary is built but NOT yet published:
+
+- version `1.0.0-f0c2ae52958c-attendance1`
+- release `attendance-f0c2ae52958c-canary1`
+- SHA256 `7E65DE2AE775C8C80EC16D45533044D3D6E487B838B9492DFD3024D1182A3D17`
+- target count 1
+
+Current installed owner-laptop Agent has not yet been updated.
+
+## Next
+
+Publish the one-device canary manifest/package, allow only the owner device to
+update, then verify updater success and real attendance audio/session behavior.
+
+Audio-attendance remains not runtime-certified until the real headset/classroom
+canary passes.
+
+<!-- HQL_ATTENDANCE_RUNTIME_BACKEND_C2_20260905_END -->
+
 <!-- HQL_ATTENDANCE_PRESENTATION_C2C_20260905_BEGIN -->
 # ATTENDANCE PRESENTATION - C2C SOURCE PROVEN - 2026-09-05
 

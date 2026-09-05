@@ -1,4 +1,422 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
+
+<!-- HQL_RUNTIME_CERTIFIED_20260905_BEGIN -->
+# LATEST RUNTIME-CERTIFIED CHECKPOINT — 2026-09-05
+
+> **READ THIS BLOCK BEFORE OLDER HANDOFF TEXT BELOW.**
+>
+> Older sections are retained as historical context. Any older statement saying Usual Teachers or Activity Log is not deployed, migrated, or runtime-tested is superseded by this checkpoint.
+>
+> Do not reopen completed work without an observed regression or explicit Owner request.
+
+## Repository / deployed application state
+
+Repository:
+
+`C:\Dev\HomeQuranLearning.QA`
+
+GitHub:
+
+`hibamylilstar-arch/HomeQuranLearning.QA`
+
+Branch:
+
+`codex/local-development-mode`
+
+Current deployed application commit:
+
+`6f0b1654500b1ecbd2b97e857b4bdcacd854b38b`
+
+Commit message:
+
+`fix: clarify audit delete and assignment targets`
+
+The VPS application is deployed at this commit.
+
+Approved custom VPS Caddy SHA256:
+
+`280dfe2cf855e4be0029c36fe992ae4505dd393f50b25717aa25761447338ac1`
+
+The VPS Caddyfile is intentionally modified and MUST be preserved.
+
+---
+
+## Activity Log — RUNTIME CERTIFIED COMPLETE
+
+Dashboard:
+
+`Access -> Activity Log`
+
+Main implementation commit:
+
+`def5c0df27e68e9fe772a4a4e767456875318962`
+
+Proxy 204 fix:
+
+`e8013ecd6414ef6e1479ebf62fe5ac61d057838d`
+
+Delete semantics + friendly assignment target fix:
+
+`6f0b1654500b1ecbd2b97e857b4bdcacd854b38b`
+
+Supporting stale test correction:
+
+`367f7fe1565e39ed6eb1daf6b9eb1f767e6344b1`
+
+Migration:
+
+`20260904235031_AddActivityAuditLog`
+
+VPS migration:
+
+`APPLIED`
+
+Table:
+
+`audit_log_entries`
+
+Activity Log is append-only from application behavior. Normal dashboard/API users cannot edit or clear audit history.
+
+### Capture scope
+
+Meaningful authenticated human dashboard mutations from:
+
+- Owner
+- Admin
+- Manager
+
+are audited.
+
+Background/system noise remains intentionally excluded, including:
+
+- GET/page views
+- Agent heartbeat/polling
+- workers
+- scheduler ticks
+- LiveKit/media internals
+- recording worker internals
+- QA background workers
+- upload/ingest plumbing
+
+### Runtime capture
+
+The deployed path has been proven end-to-end:
+
+`Dashboard -> Next.js proxy -> authenticated API -> EF audit interceptor -> PostgreSQL`
+
+Activity Log create/update/delete capture is operational.
+
+---
+
+## Delete semantics — CURRENT PRODUCT RULE
+
+The dashboard presents the user action as:
+
+`Delete`
+
+Backend may preserve historical referential integrity using soft-delete/inactive state.
+
+For NEW dashboard deletes, Activity Log must display:
+
+`Deleted`
+
+NOT:
+
+`Archived`
+
+Runtime-certified Admin proof:
+
+- Teacher DELETE HTTP 204 = PASS
+- Student DELETE HTTP 204 = PASS
+- Course DELETE HTTP 204 = PASS
+
+Audit proof:
+
+- Teacher `Deleted` = 1
+- Teacher `Archived` = 0
+- Student `Deleted` = 1
+- Student `Archived` = 0
+- Course `Deleted` = 1
+- Course `Archived` = 0
+
+Old historical `Archived` audit rows are immutable and MUST NOT be rewritten.
+
+Delete confirmation UI remains enabled.
+
+Successful mutations retain automatic dashboard refresh.
+
+The previous false 500 was caused by the generic Next.js proxy attempting to put a JSON body on an upstream `204 No Content` response.
+
+Generic proxy handling for:
+
+- 204
+- 205
+- 304
+
+must continue to return bodyless responses.
+
+---
+
+## Human-readable assignment audit targets
+
+Manager -> Teacher audit target:
+
+`Manager: <Manager Name> -> Teacher: <Teacher Name>`
+
+Runtime proof:
+
+`MANAGER_TEACHER_NAMES_IN_LOG=PASS`
+
+Usual Teacher -> Laptop target:
+
+`Teacher: <Teacher Name> -> Laptop: <Laptop Name>`
+
+Both Assigned and Unassigned paths were runtime-certified.
+
+Proof:
+
+`TEACHER_LAPTOP_NAMES_IN_LOG=PASS`
+
+Do not regress these targets to GUID-only display.
+
+---
+
+## Activity Log role visibility — RUNTIME CERTIFIED
+
+### Owner
+
+Owner sees:
+
+- Owner
+- Admin
+- Manager
+
+Runtime proof:
+
+`OWNER_SEES_OWNER_ADMIN_MANAGER=PASS`
+
+Owner receives technical audit metadata.
+
+Proof:
+
+`OWNER_TECHNICAL_DETAILS=PASS`
+
+### Admin
+
+Admin sees:
+
+- Admin
+- Manager
+
+Admin MUST NOT see Owner actions.
+
+Runtime proof:
+
+`ADMIN_SEES_MANAGER=PASS`
+
+`ADMIN_SEES_OWNER=NO`
+
+Exact probe:
+
+`ADMIN_OWNER_MATCHES=0`
+
+Admin does not receive Owner-only technical metadata.
+
+`ADMIN_TECHNICAL_DETAILS_HIDDEN=PASS`
+
+### Manager
+
+Manager sees:
+
+- Manager
+- Admin
+
+Manager MUST NOT see Owner actions.
+
+Runtime proof:
+
+`MANAGER_SEES_ADMIN=PASS`
+
+`MANAGER_SEES_OWNER=NO`
+
+Exact probe:
+
+`MANAGER_OWNER_MATCHES=0`
+
+Manager does not receive Owner-only technical metadata.
+
+`MANAGER_TECHNICAL_DETAILS_HIDDEN=PASS`
+
+The backend repository filter is authoritative. This must never be reduced to UI-only hiding.
+
+Final security proof:
+
+`ACTIVITY_LOG_ROLE_SECURITY_RUNTIME_CERTIFIED=PASS`
+
+`ACTIVITY_LOG_FINAL_SECURITY_GATE=PASS`
+
+---
+
+## Activity Log visible wording
+
+The visible Activity Log accountability description does NOT mention Owner.
+
+Visible wording is centered on:
+
+`Admin · Manager`
+
+This is UI wording only.
+
+Owner backend visibility remains:
+
+Owner + Admin + Manager.
+
+---
+
+## Activity Log performance / safety
+
+Current design intentionally uses:
+
+- server-side filtering
+- `AsNoTracking`
+- max page size 100
+- `pageSize + 1` HasMore query
+- no CountAsync
+- no background polling
+- manual Refresh
+- human mutation audit only
+
+Audit must never expose:
+
+- passwords
+- password hashes
+- JWTs
+- API keys
+- stream keys
+- storage secrets
+- LiveKit secrets
+
+Password reset may log the action `Password Reset`, but never the secret value/hash.
+
+---
+
+## Laptop Name + Usual Teachers — DEPLOYED / CERTIFIED
+
+Older handoff statements saying this feature is not deployed are obsolete.
+
+Feature commit:
+
+`a4f5871fd24f7313d430b24653354f08c35f20af`
+
+PUT proxy fix:
+
+`5cb83d0257c9b9c80393904fd2b133718e966f87`
+
+Owner Managed badge removal:
+
+`7c880bef0168dd3d3d1cd9cd949849774f65da2f`
+
+Migration:
+
+`20260904212848_AddDeviceTeacherAssignments`
+
+VPS migration:
+
+`APPLIED`
+
+Runtime certification:
+
+`USUAL_TEACHERS_FEATURE_RUNTIME_CERTIFIED=COMPLETE`
+
+Final rules:
+
+- Laptop Name = friendly asset identity
+- Windows DeviceName remains separate technical identity
+- Laptop can have multiple Usual Teachers
+- Teacher can be usual on multiple laptops
+- Usual Teachers are informational only
+- actual Schedule/Session teacher remains authoritative
+- Usual Teachers create no blocking/warning/attendance restriction
+- Laptop Name edit = Owner-only
+- Usual Teachers management = Owner + Admin
+- Manager cannot manage Usual Teachers
+- Admin cannot guess and mutate an Owner-hidden device
+
+Do not reopen absent a real regression.
+
+---
+
+## Live/media accepted baseline
+
+Do not reopen absent regression.
+
+- `LIVE_AUDIO_LATENCY=ACCEPTABLE`
+- `LIVE_VIDEO_LATENCY=ACCEPTABLE`
+- `AUDIO_VIDEO_CONTEXT_SYNC=PASS`
+
+Accepted approximate latency:
+
+- audio ~1–2 sec
+- video ~4–5 sec
+
+Accepted path:
+
+`Windows H264/AAC RTMP -> MediaMTX -> LiveKit Ingress -> LiveKit -> Dashboard WebRTC`
+
+Known-good capture:
+
+- ddagrab video
+- NAudio/WASAPI loopback audio
+- UDP audio transport to FFmpeg
+
+Audio reliability remains the highest monitoring priority.
+
+---
+
+## Current immutable Agent release
+
+Version:
+
+`1.0.0-b043352365aa-resume1`
+
+Release ID:
+
+`resume-b043352365aa-1`
+
+SHA256:
+
+`872DDB40281A73DADE36FCA336C5A10EC1D70B994771B7605723CD82DE7CC5E1`
+
+Do not rebuild/overwrite without Agent source changes.
+
+---
+
+## Current feature state
+
+Activity Log:
+
+`RUNTIME_CERTIFIED=COMPLETE`
+
+Activity Log security:
+
+`RUNTIME_CERTIFIED=COMPLETE`
+
+Usual Teachers:
+
+`RUNTIME_CERTIFIED=COMPLETE`
+
+Synthetic runtime test fixtures were cleaned after certification.
+
+Custom Caddy configuration remained preserved throughout.
+
+After the next meaningful proven product milestone, update BOTH:
+
+- `AGENTS.md`
+- `docs/PROJECT-STATE.md`
+
+using the same inspect -> change -> test -> commit/push -> runtime-proof discipline.
+
+<!-- HQL_RUNTIME_CERTIFIED_20260905_END -->
 # CURRENT HANDOFF CHECKPOINT — 2026-09-05
 
 > **NEW AI / DEVELOPER: READ THIS SECTION FIRST.**

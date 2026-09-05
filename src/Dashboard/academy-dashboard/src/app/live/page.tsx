@@ -8,7 +8,6 @@ import type { DeviceListItem, SessionListItem } from "@/types";
 type FeedAccess = { url: string; token: string };
 
 const ONLINE_WINDOW_MS = 120_000;
-const METADATA_REFRESH_MS = 30_000;
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unable to connect to this feed.";
@@ -320,19 +319,6 @@ export default function LiveMonitoringPage() {
     };
   }, [loadMetadata]);
 
-  useEffect(() => {
-    const metadataTimer =
-      window.setInterval(() => {
-        void loadMetadata(false);
-      }, METADATA_REFRESH_MS);
-
-    return () => {
-      window.clearInterval(
-        metadataTimer
-      );
-    };
-  }, [loadMetadata]);
-
   const onlineDevices = useMemo(
     () =>
       devices
@@ -364,7 +350,7 @@ export default function LiveMonitoringPage() {
             Live Monitoring
           </h2>
           <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Adaptive live feeds • classroom metadata refreshes automatically every 30 seconds
+            Live video stays connected - refresh class metadata manually when needed
           </p>
         </div>
 

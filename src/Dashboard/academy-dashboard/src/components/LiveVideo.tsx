@@ -1,13 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  ConnectionQuality,
-  RemoteTrackPublication,
-  Room,
-  RoomEvent,
-  Track,
-} from "livekit-client";
+import { Room, RoomEvent, Track } from "livekit-client";
 
 interface LiveVideoProps {
   url: string;
@@ -41,83 +35,6 @@ function detachBrowserAudio(
   audio.pause();
   audio.muted = true;
   audio.srcObject = null;
-}
-
-function syncAudioSubscriptions(
-  room: Room | null,
-  enabled: boolean
-) {
-  if (!room) return false;
-
-  let available = false;
-
-  for (const participant of room.remoteParticipants.values()) {
-    for (const publication of participant.audioTrackPublications.values()) {
-      available = true;
-      publication.setSubscribed(enabled);
-    }
-  }
-
-  return available;
-}
-
-function syncInitialSubscriptions(
-  room: Room,
-  audioEnabled: boolean
-) {
-  for (const participant of room.remoteParticipants.values()) {
-    for (const publication of participant.videoTrackPublications.values()) {
-      publication.setSubscribed(true);
-    }
-  }
-
-  return syncAudioSubscriptions(room, audioEnabled);
-}
-
-function applyPublicationSubscription(
-  publication: RemoteTrackPublication,
-  audioEnabled: boolean
-) {
-  if (publication.kind === Track.Kind.Video) {
-    publication.setSubscribed(true);
-    return;
-  }
-
-  if (publication.kind === Track.Kind.Audio) {
-    publication.setSubscribed(audioEnabled);
-  }
-}
-
-function qualityLabel(quality: ConnectionQuality) {
-  switch (quality) {
-    case ConnectionQuality.Excellent:
-      return "Excellent";
-    case ConnectionQuality.Good:
-      return "Good";
-    case ConnectionQuality.Poor:
-      return "Poor";
-    case ConnectionQuality.Lost:
-      return "Lost";
-    default:
-      return "Checking";
-  }
-}
-
-function qualityClass(quality: ConnectionQuality) {
-  switch (quality) {
-    case ConnectionQuality.Excellent:
-    case ConnectionQuality.Good:
-      return "border-emerald-700/70 bg-emerald-950/80 text-emerald-300";
-
-    case ConnectionQuality.Poor:
-      return "border-amber-700/70 bg-amber-950/80 text-amber-300";
-
-    case ConnectionQuality.Lost:
-      return "border-rose-700/70 bg-rose-950/80 text-rose-300";
-
-    default:
-      return "border-slate-700 bg-slate-900/80 text-slate-300";
-  }
 }
 
 function stateLabel(
@@ -176,12 +93,8 @@ export default function LiveVideo({
   const [connectionState, setConnectionState] =
     useState<FeedConnectionState>("connecting");
 
-  const [connectionQuality, setConnectionQuality] =
-    useState<ConnectionQuality>(ConnectionQuality.Unknown);
-
   const [hasVideo, setHasVideo] = useState(false);
   const [hasAudio, setHasAudio] = useState(false);
-  const [videoStreamPaused, setVideoStreamPaused] = useState(false);
   const [error, setError] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [retryVersion, setRetryVersion] = useState(0);
@@ -193,13 +106,8 @@ export default function LiveVideo({
   useEffect(() => {
     audibleRef.current = isAudible;
 
-    const room = roomRef.current;
     const audio = audioRef.current;
     const track = audioTrackRef.current;
-
-    if (room) {
-      setHasAudio(syncAudioSubscriptions(room, isAudible));
-    }
 
     if (!isAudible) {
       detachBrowserAudio(audio, track);
@@ -260,29 +168,14 @@ export default function LiveVideo({
     async function connect() {
       try {
         setConnectionState("connecting");
-        setConnectionQuality(ConnectionQuality.Unknown);
         setHasVideo(false);
         setHasAudio(false);
-        setVideoStreamPaused(false);
         setError("");
 
-        const r = new Room({
-          adaptiveStream: true,
-        });
+        const r = new Room();
 
         room = r;
         roomRef.current = r;
-
-        r.on(RoomEvent.TrackPublished, (publication) => {
-          applyPublicationSubscription(
-            publication,
-            audibleRef.current
-          );
-
-          if (publication.kind === Track.Kind.Audio) {
-            setHasAudio(true);
-          }
-        });
 
         r.on(RoomEvent.TrackSubscribed, (track) => {
           if (
@@ -291,7 +184,6 @@ export default function LiveVideo({
           ) {
             track.attach(videoRef.current);
             setHasVideo(true);
-            setVideoStreamPaused(false);
 
             videoRef.current.play().catch(() => {});
           }
@@ -342,7 +234,6 @@ export default function LiveVideo({
             }
 
             setHasVideo(false);
-            setVideoStreamPaused(false);
           }
 
           if (
@@ -351,53 +242,15 @@ export default function LiveVideo({
           ) {
             detachBrowserAudio(audioRef.current, track);
             audioTrackRef.current = null;
-          }
-        });
-
-        r.on(RoomEvent.TrackUnpublished, (publication) => {
-          if (
-            publication.kind === Track.Kind.Audio &&
-            !cancelled
-          ) {
-            setHasAudio(
-              syncAudioSubscriptions(
-                r,
-                audibleRef.current
-              )
-            );
+            setHasAudio(false);
           }
         });
 
         r.on(RoomEvent.Connected, () => {
-          if (cancelled) return;
-
-          const publisher =
-            Array.from(r.remoteParticipants.values())[0];
-
-          setConnectionState("live");
-          setConnectionQuality(
-            publisher?.connectionQuality ??
-              ConnectionQuality.Unknown
-          );
-
-          setError("");
-        });
-
-        r.on(RoomEvent.ParticipantConnected, (participant) => {
           if (!cancelled) {
-            setConnectionQuality(
-              participant.connectionQuality
-            );
+            setConnectionState("live");
+            setError("");
           }
-        });
-
-        r.on(RoomEvent.ParticipantDisconnected, () => {
-          if (cancelled) return;
-
-          setConnectionQuality(ConnectionQuality.Unknown);
-          setHasVideo(false);
-          setHasAudio(false);
-          setVideoStreamPaused(false);
         });
 
         r.on(RoomEvent.Reconnecting, () => {
@@ -413,39 +266,6 @@ export default function LiveVideo({
           }
         });
 
-        r.on(
-          RoomEvent.ConnectionQualityChanged,
-          (quality, participant) => {
-            if (!cancelled && !participant.isLocal) {
-              setConnectionQuality(quality);
-            }
-          }
-        );
-
-        r.on(
-          RoomEvent.TrackStreamStateChanged,
-          (publication, streamState, participant) => {
-            if (
-              cancelled ||
-              participant.isLocal ||
-              publication.kind !== Track.Kind.Video
-            ) {
-              return;
-            }
-
-            setVideoStreamPaused(
-              streamState === Track.StreamState.Paused
-            );
-          }
-        );
-
-        r.on(RoomEvent.TrackSubscriptionFailed, () => {
-          if (!cancelled) {
-            setConnectionState("error");
-            setError("Live media subscription failed.");
-          }
-        });
-
         r.on(RoomEvent.Disconnected, () => {
           detachBrowserAudio(
             audioRef.current,
@@ -457,24 +277,11 @@ export default function LiveVideo({
           if (!cancelled) {
             setHasVideo(false);
             setHasAudio(false);
-            setVideoStreamPaused(false);
             setConnectionState("disconnected");
           }
         });
 
-        await r.connect(url, token, {
-          autoSubscribe: false,
-          maxRetries: 5,
-        });
-
-        if (!cancelled) {
-          setHasAudio(
-            syncInitialSubscriptions(
-              r,
-              audibleRef.current
-            )
-          );
-        }
+        await r.connect(url, token);
       } catch (err) {
         if (!cancelled) {
           setConnectionState("error");
@@ -522,10 +329,8 @@ export default function LiveVideo({
 
     setError("");
     setConnectionState("connecting");
-    setConnectionQuality(ConnectionQuality.Unknown);
     setHasVideo(false);
     setHasAudio(false);
-    setVideoStreamPaused(false);
 
     onAudibleChange(false);
     setRetryVersion((value) => value + 1);
@@ -538,7 +343,6 @@ export default function LiveVideo({
 
     if (isAudible) {
       audibleRef.current = false;
-      syncAudioSubscriptions(room, false);
 
       onAudibleChange(false);
       detachBrowserAudio(audio, track);
@@ -550,21 +354,7 @@ export default function LiveVideo({
     try {
       await room?.startAudio();
 
-      /*
-       * Set intent BEFORE requesting the subscription.
-       * TrackSubscribed can fire quickly and must see
-       * the correct audible state.
-       */
-      audibleRef.current = true;
-
-      const audioAvailable =
-        syncAudioSubscriptions(room, true);
-
-      setHasAudio(audioAvailable);
-
-      if (!audioAvailable) {
-        audibleRef.current = false;
-
+      if (!audio || !track) {
         setError(
           "Classroom audio is not available yet."
         );
@@ -572,16 +362,7 @@ export default function LiveVideo({
         return;
       }
 
-      onAudibleChange(true);
-
-      /*
-       * If the remote track is already present, attach now.
-       * Otherwise TrackSubscribed will attach it when the
-       * server completes the subscription.
-       */
-      if (!audio || !track) {
-        return;
-      }
+      audibleRef.current = true;
 
       if (!audio.srcObject) {
         track.attach(audio);
@@ -589,10 +370,11 @@ export default function LiveVideo({
 
       audio.muted = false;
       await audio.play();
+
+      onAudibleChange(true);
     } catch (err) {
       audibleRef.current = false;
 
-      syncAudioSubscriptions(room, false);
       detachBrowserAudio(audio, track);
       onAudibleChange(false);
 
@@ -676,14 +458,6 @@ export default function LiveVideo({
             {feedLabel}
           </span>
 
-          <span
-            className={
-              "rounded-md border px-2 py-1 text-[9px] font-bold " +
-              qualityClass(connectionQuality)
-            }
-          >
-            Feed {qualityLabel(connectionQuality)}
-          </span>
         </div>
 
         {connectionState === "connecting" ? (
@@ -705,21 +479,6 @@ export default function LiveVideo({
               </p>
               <p className="mt-1 text-[10px] text-amber-300/80">
                 Restoring the classroom connection automatically
-              </p>
-            </div>
-          </div>
-        ) : null}
-
-        {connectionState === "live" &&
-        hasVideo &&
-        videoStreamPaused ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/45">
-            <div className="rounded-xl border border-amber-800/70 bg-amber-950/85 px-4 py-3 text-center shadow-xl">
-              <p className="text-xs font-bold text-amber-200">
-                Video adapting
-              </p>
-              <p className="mt-1 text-[10px] text-amber-300/80">
-                Bandwidth is limited • video resumes automatically
               </p>
             </div>
           </div>

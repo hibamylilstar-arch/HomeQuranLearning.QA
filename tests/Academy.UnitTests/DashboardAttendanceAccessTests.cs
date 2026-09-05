@@ -1,4 +1,5 @@
 using Academy.Application.Abstractions;
+using Academy.Application.Contracts;
 using Academy.Application.Services;
 using Academy.Domain.Entities;
 using Academy.Domain.Enums;
@@ -194,6 +195,189 @@ public sealed class DashboardAttendanceAccessTests
             Times.Never);
     }
 
+    [Fact]
+    public async Task GetVisibleSessions_Owner_DuringGrace_ProjectsPendingLessonAndBlocksReview()
+    {
+        DateTimeOffset now =
+            DateTimeOffset.UtcNow;
+
+        Session session =
+            CreateSession(
+                Guid.NewGuid(),
+                AttendanceStatus.Present,
+                AttendanceStatus.Present,
+                AttendanceReviewStatus.Pending);
+
+        session.ScheduledStartUtc =
+            now.AddMinutes(-35);
+
+        session.ScheduledEndUtc =
+            now.AddMinutes(-5);
+
+        session.StartedAtUtc =
+            session.ScheduledStartUtc;
+
+        session.EndedAtUtc =
+            session.ScheduledEndUtc;
+
+        session.Events.Add(
+            new SessionEvent
+            {
+                Id =
+                    Guid.NewGuid(),
+
+                SessionId =
+                    session.Id,
+
+                EventType =
+                    SessionEventType.LessonShared,
+
+                OccurredAtUtc =
+                    now.AddMinutes(-10),
+
+                CreatedAtUtc =
+                    now.AddMinutes(-10)
+            });
+
+        var sessionRepository =
+            new Mock<ISessionRepository>();
+
+        sessionRepository
+            .Setup(x =>
+                x.GetAllWithDetailsAsync(
+                    It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                new List<Session>
+                {
+                    session
+                });
+
+        DashboardQueryService service =
+            CreateService(
+                sessionRepository,
+                new Mock<
+                    IManagerTeacherAssignmentRepository>());
+
+        SessionDto item =
+            Assert.Single(
+                await service.GetVisibleSessionsAsync(
+                    Guid.NewGuid(),
+                    UserRole.Owner.ToString()));
+
+        Assert.Equal(
+            session.ScheduledStartUtc,
+            item.ScheduledStartUtc);
+
+        Assert.Equal(
+            session.ScheduledEndUtc,
+            item.ScheduledEndUtc);
+
+        Assert.Equal(
+            session.ScheduledEndUtc.AddMinutes(10),
+            item.LessonGraceEndsAtUtc);
+
+        Assert.Equal(
+            "Pending",
+            item.LessonSharedStatus);
+
+        Assert.False(
+            item.AttendanceReviewAllowed);
+    }
+
+    [Fact]
+    public async Task GetVisibleSessions_Owner_AfterGrace_ProjectsLessonAndParticipationEvidence()
+    {
+        DateTimeOffset now =
+            DateTimeOffset.UtcNow;
+
+        Session session =
+            CreateSession(
+                Guid.NewGuid(),
+                AttendanceStatus.Present,
+                AttendanceStatus.Present,
+                AttendanceReviewStatus.AutoResolved);
+
+        session.ScheduledStartUtc =
+            now.AddMinutes(-50);
+
+        session.ScheduledEndUtc =
+            now.AddMinutes(-20);
+
+        session.StartedAtUtc =
+            session.ScheduledStartUtc;
+
+        session.EndedAtUtc =
+            session.ScheduledEndUtc;
+
+        foreach (
+            SessionEventType eventType in
+            new[]
+            {
+                SessionEventType.LessonShared,
+                SessionEventType
+                    .TeacherAudioParticipationObserved,
+                SessionEventType
+                    .RemoteAudioParticipationObserved
+            })
+        {
+            session.Events.Add(
+                new SessionEvent
+                {
+                    Id =
+                        Guid.NewGuid(),
+
+                    SessionId =
+                        session.Id,
+
+                    EventType =
+                        eventType,
+
+                    OccurredAtUtc =
+                        now.AddMinutes(-25),
+
+                    CreatedAtUtc =
+                        now.AddMinutes(-25)
+                });
+        }
+
+        var sessionRepository =
+            new Mock<ISessionRepository>();
+
+        sessionRepository
+            .Setup(x =>
+                x.GetAllWithDetailsAsync(
+                    It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                new List<Session>
+                {
+                    session
+                });
+
+        DashboardQueryService service =
+            CreateService(
+                sessionRepository,
+                new Mock<
+                    IManagerTeacherAssignmentRepository>());
+
+        SessionDto item =
+            Assert.Single(
+                await service.GetVisibleSessionsAsync(
+                    Guid.NewGuid(),
+                    UserRole.Owner.ToString()));
+
+        Assert.Equal(
+            "Yes",
+            item.LessonSharedStatus);
+
+        Assert.True(
+            item.TeacherParticipationEvidence);
+
+        Assert.True(
+            item.StudentParticipationEvidence);
+
+        Assert.True(
+            item.AttendanceReviewAllowed);
+    }
     [Fact]
     public async Task CanAccessSession_Manager_NormalSession_ReturnsTrue()
     {

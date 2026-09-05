@@ -231,67 +231,202 @@ public sealed class DashboardQueryService
             await GetUsualTeachersByDeviceAsync(
                 cancellationToken);
 
+        DateTimeOffset nowUtc =
+            DateTimeOffset.UtcNow;
+
         return sessions
             .OrderByDescending(
                 x => x.StartedAtUtc)
             .Select(
-                x => new SessionDto
-                {
-                    Id = x.Id,
-                    ScheduleId = x.ScheduleId,
-                    TeacherId = x.TeacherId,
-                    TeacherFullName =
-                        x.Teacher?.FullName
-                        ?? string.Empty,
-                    StudentId = x.StudentId,
-                    StudentFullName =
-                        x.Student?.FullName
-                        ?? string.Empty,
-                    CourseId = x.CourseId,
-                    CourseName =
-                        x.Course?.Name
-                        ?? string.Empty,
-                    DeviceId = x.DeviceId,
-                    DeviceName =
-                        x.Device?.DeviceName
-                        ?? string.Empty,
-                    LaptopName =
-                        !string.IsNullOrWhiteSpace(
-                            x.Device?.RecordingDisplayName)
-                            ? x.Device!.RecordingDisplayName!
-                            : x.Device?.DeviceName
-                              ?? string.Empty,
-                    UsualTeachers =
-                        GetUsualTeachers(
-                            usualTeachersByDevice,
-                            x.DeviceId),
-                    StartedAtUtc =
-                        x.StartedAtUtc,
-                    EndedAtUtc =
-                        x.EndedAtUtc,
-                    Status =
-                        x.Status.ToString(),
-                    TeacherAttendanceStatus =
-                        x.TeacherAttendanceStatus
-                            .ToString(),
-                    StudentAttendanceStatus =
-                        x.StudentAttendanceStatus
-                            .ToString(),
-                    AttendanceReviewStatus =
-                        x.AttendanceReviewStatus
-                            .ToString(),
-                    AttendanceNotes =
-                        x.AttendanceNotes,
-                    ActiveSeconds =
-                        x.ActiveSeconds,
-                    DisconnectCount =
-                        x.DisconnectCount,
-                    DisconnectSeconds =
-                        x.DisconnectSeconds
-                })
+                x =>
+                    MapSessionForDashboard(
+                        x,
+                        usualTeachersByDevice,
+                        nowUtc))
             .ToList();
     }
 
+    private static SessionDto MapSessionForDashboard(
+        Session session,
+        IReadOnlyDictionary<
+            Guid,
+            IReadOnlyList<DeviceTeacherInfoDto>>
+            usualTeachersByDevice,
+        DateTimeOffset nowUtc)
+    {
+        DateTimeOffset graceEndsAtUtc =
+            session.ScheduledEndUtc
+                .AddMinutes(10);
+
+        bool hasLessonShared =
+            HasValidLessonShared(
+                session);
+
+        bool teacherParticipation =
+            HasValidParticipationEvidence(
+                session,
+                SessionEventType
+                    .TeacherAudioParticipationObserved);
+
+        bool studentParticipation =
+            HasValidParticipationEvidence(
+                session,
+                SessionEventType
+                    .RemoteAudioParticipationObserved);
+
+        string lessonSharedStatus =
+            nowUtc <
+                graceEndsAtUtc
+                ? "Pending"
+                : hasLessonShared
+                    ? "Yes"
+                    : "No";
+
+        bool attendanceReviewAllowed =
+            session.Status ==
+                SessionStatus.Completed &&
+            nowUtc >=
+                graceEndsAtUtc;
+
+        return new SessionDto
+        {
+            Id =
+                session.Id,
+
+            ScheduleId =
+                session.ScheduleId,
+
+            TeacherId =
+                session.TeacherId,
+
+            TeacherFullName =
+                session.Teacher?.FullName
+                ?? string.Empty,
+
+            StudentId =
+                session.StudentId,
+
+            StudentFullName =
+                session.Student?.FullName
+                ?? string.Empty,
+
+            CourseId =
+                session.CourseId,
+
+            CourseName =
+                session.Course?.Name
+                ?? string.Empty,
+
+            DeviceId =
+                session.DeviceId,
+
+            DeviceName =
+                session.Device?.DeviceName
+                ?? string.Empty,
+
+            LaptopName =
+                !string.IsNullOrWhiteSpace(
+                    session.Device?.RecordingDisplayName)
+                    ? session.Device!
+                        .RecordingDisplayName!
+                    : session.Device?.DeviceName
+                      ?? string.Empty,
+
+            UsualTeachers =
+                GetUsualTeachers(
+                    usualTeachersByDevice,
+                    session.DeviceId),
+
+            StartedAtUtc =
+                session.StartedAtUtc,
+
+            EndedAtUtc =
+                session.EndedAtUtc,
+
+            Status =
+                session.Status.ToString(),
+
+            TeacherAttendanceStatus =
+                session.TeacherAttendanceStatus
+                    .ToString(),
+
+            StudentAttendanceStatus =
+                session.StudentAttendanceStatus
+                    .ToString(),
+
+            AttendanceReviewStatus =
+                session.AttendanceReviewStatus
+                    .ToString(),
+
+            AttendanceNotes =
+                session.AttendanceNotes,
+
+            ScheduledStartUtc =
+                session.ScheduledStartUtc,
+
+            ScheduledEndUtc =
+                session.ScheduledEndUtc,
+
+            LessonGraceEndsAtUtc =
+                graceEndsAtUtc,
+
+            LessonSharedStatus =
+                lessonSharedStatus,
+
+            TeacherParticipationEvidence =
+                teacherParticipation,
+
+            StudentParticipationEvidence =
+                studentParticipation,
+
+            AttendanceReviewAllowed =
+                attendanceReviewAllowed,
+
+            ActiveSeconds =
+                session.ActiveSeconds,
+
+            DisconnectCount =
+                session.DisconnectCount,
+
+            DisconnectSeconds =
+                session.DisconnectSeconds
+        };
+    }
+
+    private static bool HasValidLessonShared(
+        Session session)
+    {
+        DateTimeOffset earliest =
+            session.ScheduledStartUtc
+                .AddMinutes(-5);
+
+        DateTimeOffset latest =
+            session.ScheduledEndUtc
+                .AddMinutes(10);
+
+        return session.Events.Any(
+            e =>
+                e.EventType ==
+                    SessionEventType.LessonShared &&
+                e.OccurredAtUtc >=
+                    earliest &&
+                e.OccurredAtUtc <=
+                    latest);
+    }
+
+    private static bool HasValidParticipationEvidence(
+        Session session,
+        SessionEventType eventType)
+    {
+        return session.Events.Any(
+            e =>
+                e.EventType ==
+                    eventType &&
+                e.OccurredAtUtc >=
+                    session.ScheduledStartUtc &&
+                e.OccurredAtUtc <=
+                    session.ScheduledEndUtc);
+    }
     public async Task<bool> CanAccessSessionAsync(
         Guid sessionId,
         Guid userId,

@@ -1,5 +1,55 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_C2C_DASHBOARD_SESSION_PROJECTION_FIX_20260906_BEGIN -->
+# C2C DASHBOARD SESSION PROJECTION FIX - 2026-09-06
+
+Pre-class runtime review found that `/api/admin/sessions` uses
+`DashboardQueryService.GetVisibleSessionsAsync`.
+
+C2C presentation calculations already existed in SessionService, but the
+independent DashboardQueryService SessionDto projection did not expose the new
+attendance presentation fields.
+
+DashboardQueryService now projects:
+
+- ScheduledStartUtc
+- ScheduledEndUtc
+- LessonGraceEndsAtUtc
+- LessonSharedStatus
+- TeacherParticipationEvidence
+- StudentParticipationEvidence
+- AttendanceReviewAllowed
+
+Rules remain:
+
+- Lesson Shared stays Pending through the full 10-minute grace
+- after grace valid LessonShared = Yes, otherwise No
+- teacher participation requires TeacherAudioParticipationObserved inside the scheduled window
+- student participation requires RemoteAudioParticipationObserved inside the scheduled window
+- attendance review remains unavailable until Completed + grace expiry
+
+The actual DashboardQueryService route now has regression coverage.
+
+The first targeted test run stopped only because the new test referenced
+SessionDto without importing Academy.Application.Contracts. The interrupted
+state was preserved; no reset was used. The missing test namespace was added
+and validation resumed from the failed point.
+
+No Agent source changed.
+
+No database schema changed.
+
+No QA, Live, Recording, or audio-capture pipeline changed.
+
+Owner-laptop canary Agent remains:
+
+`1.0.0-f0c2ae52958c-attendance1`
+
+Real scheduled-class attendance canary must wait until this backend-only fix is
+deployed and the Sessions API presentation payload is runtime verified.
+
+<!-- HQL_C2C_DASHBOARD_SESSION_PROJECTION_FIX_20260906_END -->
+
 <!-- HQL_ATTENDANCE_CANARY_PUBLISHED_20260905_BEGIN -->
 # ATTENDANCE AGENT CANARY PUBLISHED BUT NOT QUEUED - 2026-09-05
 

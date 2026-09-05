@@ -47,6 +47,8 @@ interface DeviceLiveCardProps {
   onAudibleChange: (enabled: boolean) => void;
   onExpand: () => void;
   onClose: () => void;
+  onRefreshMetadata: () => void;
+  refreshingMetadata: boolean;
 }
 
 function DeviceLiveCard({
@@ -57,6 +59,8 @@ function DeviceLiveCard({
   onAudibleChange,
   onExpand,
   onClose,
+  onRefreshMetadata,
+  refreshingMetadata,
 }: DeviceLiveCardProps) {
   const [access, setAccess] = useState<FeedAccess | null>(null);
   const [feedError, setFeedError] = useState("");
@@ -137,13 +141,27 @@ function DeviceLiveCard({
           </div>
 
           {expanded ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800"
-            >
-              Close
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={refreshingMetadata}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRefreshMetadata();
+                }}
+                className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60"
+              >
+                {refreshingMetadata ? "Refreshing..." : "Refresh"}
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800"
+              >
+                Close
+              </button>
+            </>
           ) : null}
         </div>
       </div>
@@ -270,6 +288,7 @@ export default function LiveMonitoringPage() {
   const [error, setError] = useState("");
   const [expandedDeviceId, setExpandedDeviceId] = useState<string | null>(null);
   const [audibleDeviceId, setAudibleDeviceId] = useState<string | null>(null);
+  const [refreshingMetadata, setRefreshingMetadata] = useState(false);
 
   const loadMetadata = useCallback(async (showLoading = false) => {
     if (showLoading) {
@@ -308,6 +327,20 @@ export default function LiveMonitoringPage() {
       }
     }
   }, []);
+
+  const refreshMetadata = useCallback(async () => {
+    if (refreshingMetadata) {
+      return;
+    }
+
+    setRefreshingMetadata(true);
+
+    try {
+      await loadMetadata(false);
+    } finally {
+      setRefreshingMetadata(false);
+    }
+  }, [loadMetadata, refreshingMetadata]);
 
   useEffect(() => {
     const initialTimer = window.setTimeout(() => {
@@ -356,10 +389,11 @@ export default function LiveMonitoringPage() {
 
         <button
           type="button"
-          onClick={() => void loadMetadata(false)}
-          className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-900"
+          disabled={refreshingMetadata}
+          onClick={() => void refreshMetadata()}
+          className="min-w-[108px] rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-900 disabled:cursor-wait disabled:opacity-60"
         >
-          Refresh now
+          {refreshingMetadata ? "Refreshing..." : "Refresh now"}
         </button>
       </div>
 
@@ -418,6 +452,8 @@ export default function LiveMonitoringPage() {
                 }}
                 onExpand={() => setExpandedDeviceId(device.id)}
                 onClose={() => setExpandedDeviceId(null)}
+                onRefreshMetadata={() => void refreshMetadata()}
+                refreshingMetadata={refreshingMetadata}
               />
             );
           })}

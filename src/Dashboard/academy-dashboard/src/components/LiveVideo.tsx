@@ -97,6 +97,7 @@ export default function LiveVideo({
   const [hasAudio, setHasAudio] = useState(false);
   const [error, setError] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMobileImmersive, setIsMobileImmersive] = useState(false);
   const [retryVersion, setRetryVersion] = useState(0);
 
   useEffect(() => {
@@ -137,6 +138,19 @@ export default function LiveVideo({
       onAudibleChangeRef.current(false);
     });
   }, [isAudible]);
+
+  useEffect(() => {
+    if (!isMobileImmersive) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobileImmersive]);
 
   useEffect(() => {
     function handleFullscreenChange() {
@@ -389,6 +403,14 @@ export default function LiveVideo({
   async function toggleFullscreen() {
     setError("");
 
+    const mobileViewport =
+      window.matchMedia("(max-width: 767px), (pointer: coarse)").matches;
+
+    if (mobileViewport) {
+      setIsMobileImmersive((current) => !current);
+      return;
+    }
+
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
@@ -424,14 +446,22 @@ export default function LiveVideo({
     stateLabel(connectionState, hasVideo);
 
   return (
-    <div className="space-y-2">
+    <div
+      className={
+        isMobileImmersive
+          ? "fixed inset-0 z-[100] flex h-[100dvh] w-screen flex-col bg-black p-2"
+          : "space-y-2"
+      }
+    >
       <div
         ref={playerRef}
         className={
-          "relative w-full overflow-hidden bg-black " +
-          (expanded
-            ? "aspect-video max-h-[58dvh] rounded-lg"
-            : "aspect-video rounded-lg")
+          isMobileImmersive
+            ? "relative min-h-0 flex-1 overflow-hidden bg-black"
+            : "relative w-full overflow-hidden bg-black " +
+              (expanded
+                ? "aspect-video max-h-[58dvh] rounded-lg"
+                : "aspect-video rounded-lg")
         }
       >
         <video
@@ -526,7 +556,13 @@ export default function LiveVideo({
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        className={
+          isMobileImmersive
+            ? "flex shrink-0 flex-row items-center justify-between gap-2 border-t border-slate-800 bg-black px-1 py-2"
+            : "flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+        }
+      >
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <button
             type="button"
@@ -562,7 +598,7 @@ export default function LiveVideo({
             disabled={!hasVideo}
             className="min-h-10 rounded-lg border border-slate-700 bg-slate-900 px-4 text-xs font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {isFullscreen
+            {isFullscreen || isMobileImmersive
               ? "Exit fullscreen"
               : "Fullscreen"}
           </button>

@@ -63,7 +63,9 @@ public sealed class ManagerAssignmentService
         {
             Id = Guid.NewGuid(),
             ManagerUserId = managerUserId,
+            ManagerUser = manager,
             TeacherId = teacherId,
+            Teacher = teacher,
             AssignedAtUtc = DateTimeOffset.UtcNow
         };
 

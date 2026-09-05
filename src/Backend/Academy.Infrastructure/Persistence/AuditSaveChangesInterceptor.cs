@@ -287,6 +287,14 @@ public sealed class AuditSaveChangesInterceptor :
                 Recording x =>
                     x.FileName,
 
+                ManagerTeacherAssignment x =>
+                    GetManagerAssignmentDisplayName(
+                        x),
+
+                DeviceTeacherAssignment x =>
+                    GetDeviceTeacherAssignmentDisplayName(
+                        x),
+
                 QaRule x =>
                     x.Phrase,
 
@@ -298,6 +306,74 @@ public sealed class AuditSaveChangesInterceptor :
                 value)
             ? entityType
             : value;
+    }
+
+    private static string
+        GetManagerAssignmentDisplayName(
+            ManagerTeacherAssignment assignment)
+    {
+        string managerName =
+            FriendlyName(
+                assignment.ManagerUser?.FullName,
+                assignment.ManagerUserId);
+
+        string teacherName =
+            FriendlyName(
+                assignment.Teacher?.FullName,
+                assignment.TeacherId);
+
+        return
+            $"Manager: {managerName} -> Teacher: {teacherName}";
+    }
+
+    private static string
+        GetDeviceTeacherAssignmentDisplayName(
+            DeviceTeacherAssignment assignment)
+    {
+        string teacherName =
+            FriendlyName(
+                assignment.Teacher?.FullName,
+                assignment.TeacherId);
+
+        string laptopName;
+
+        if (
+            assignment.Device is not null &&
+            !string.IsNullOrWhiteSpace(
+                assignment.Device
+                    .RecordingDisplayName)
+        ) {
+            laptopName =
+                assignment.Device
+                    .RecordingDisplayName!;
+        }
+        else if (
+            assignment.Device is not null &&
+            !string.IsNullOrWhiteSpace(
+                assignment.Device.DeviceName)
+        ) {
+            laptopName =
+                assignment.Device.DeviceName;
+        }
+        else
+        {
+            laptopName =
+                assignment.DeviceId
+                    .ToString();
+        }
+
+        return
+            $"Teacher: {teacherName} -> Laptop: {laptopName}";
+    }
+
+    private static string FriendlyName(
+        string? name,
+        Guid fallbackId)
+    {
+        return
+            string.IsNullOrWhiteSpace(name)
+                ? fallbackId.ToString()
+                : name.Trim();
     }
 
     private static string DetermineAction(
@@ -366,7 +442,7 @@ public sealed class AuditSaveChangesInterceptor :
                 entry,
                 "IsActive") is false
         ) {
-            return "Archived";
+            return "Deleted";
         }
 
         if (
@@ -492,13 +568,115 @@ public sealed class AuditSaveChangesInterceptor :
                 {
                     ["field"] = name,
                     ["before"] =
-                        Format(before),
+                        FormatPropertyValue(
+                            entry.Entity,
+                            name,
+                            before),
                     ["after"] =
-                        Format(after)
+                        FormatPropertyValue(
+                            entry.Entity,
+                            name,
+                            after)
                 });
         }
 
         return result;
+    }
+
+    private static string?
+        FormatPropertyValue(
+            object entity,
+            string propertyName,
+            object? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (
+            entity is
+                ManagerTeacherAssignment
+                    managerAssignment
+        ) {
+            if (
+                string.Equals(
+                    propertyName,
+                    "ManagerUserId",
+                    StringComparison.Ordinal)
+            ) {
+                return FriendlyName(
+                    managerAssignment
+                        .ManagerUser?.FullName,
+                    managerAssignment
+                        .ManagerUserId);
+            }
+
+            if (
+                string.Equals(
+                    propertyName,
+                    "TeacherId",
+                    StringComparison.Ordinal)
+            ) {
+                return FriendlyName(
+                    managerAssignment
+                        .Teacher?.FullName,
+                    managerAssignment
+                        .TeacherId);
+            }
+        }
+
+        if (
+            entity is
+                DeviceTeacherAssignment
+                    deviceAssignment
+        ) {
+            if (
+                string.Equals(
+                    propertyName,
+                    "TeacherId",
+                    StringComparison.Ordinal)
+            ) {
+                return FriendlyName(
+                    deviceAssignment
+                        .Teacher?.FullName,
+                    deviceAssignment
+                        .TeacherId);
+            }
+
+            if (
+                string.Equals(
+                    propertyName,
+                    "DeviceId",
+                    StringComparison.Ordinal)
+            ) {
+                if (
+                    deviceAssignment.Device
+                        is not null &&
+                    !string.IsNullOrWhiteSpace(
+                        deviceAssignment.Device
+                            .RecordingDisplayName)
+                ) {
+                    return
+                        deviceAssignment.Device
+                            .RecordingDisplayName;
+                }
+
+                if (
+                    deviceAssignment.Device
+                        is not null &&
+                    !string.IsNullOrWhiteSpace(
+                        deviceAssignment.Device
+                            .DeviceName)
+                ) {
+                    return
+                        deviceAssignment.Device
+                            .DeviceName;
+                }
+            }
+        }
+
+        return Format(value);
     }
 
     private static bool Changed(

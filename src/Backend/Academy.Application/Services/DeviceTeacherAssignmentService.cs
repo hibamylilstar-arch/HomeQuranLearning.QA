@@ -36,7 +36,7 @@ public sealed class DeviceTeacherAssignmentService
             IReadOnlyCollection<Guid> teacherIds,
             CancellationToken cancellationToken = default)
     {
-        _ =
+        var device =
             await _deviceRepository.GetByIdAsync(
                 deviceId,
                 cancellationToken)
@@ -87,6 +87,14 @@ public sealed class DeviceTeacherAssignmentService
 
         if (remove.Length > 0)
         {
+            foreach (
+                DeviceTeacherAssignment assignment
+                in remove)
+            {
+                assignment.Device =
+                    device;
+            }
+
             _assignmentRepository.RemoveRange(
                 remove);
         }
@@ -111,7 +119,13 @@ public sealed class DeviceTeacherAssignmentService
                 {
                     Id = Guid.NewGuid(),
                     DeviceId = deviceId,
+                    Device = device,
                     TeacherId = teacherId,
+                    Teacher =
+                        teachers.First(
+                            x =>
+                                x.Id ==
+                                teacherId),
                     AssignedAtUtc = now
                 },
                 cancellationToken);

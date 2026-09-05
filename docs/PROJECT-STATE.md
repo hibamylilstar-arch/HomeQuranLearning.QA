@@ -1,5 +1,33 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_LEGACY_SESSION_INFINITY_RUNTIME_VERIFIED_20260906_BEGIN -->
+# LEGACY SESSION INFINITY FIX - RUNTIME VERIFIED - 2026-09-06
+
+The Sessions workspace was refreshed after deployment of the legacy session
+window compatibility fix.
+
+Runtime UI proof:
+
+- Sessions page loads without the previous HTTP 500 failure
+- 22 of 22 historical sessions are visible
+- legacy manually-created Scheduled rows no longer crash the projection
+- Completed historical sessions remain visible
+- Lesson Shared presentation is rendered
+- Teacher participation presentation is rendered
+- Student participation presentation is rendered
+- Attendance and Review presentation is rendered
+
+No historical Session database rows were rewritten for this compatibility fix.
+
+Manual Session creation remains owner-controlled. Do not automatically create
+test Sessions; the owner will create one manually when a real attendance
+canary is required.
+
+The next product step is the real scheduled-class attendance canary using the
+owner laptop and real communication headset/Teams audio.
+
+<!-- HQL_LEGACY_SESSION_INFINITY_RUNTIME_VERIFIED_20260906_END -->
+
 <!-- HQL_LEGACY_SESSION_INFINITY_FIX_20260906_BEGIN -->
 # LEGACY SESSION INFINITY COMPATIBILITY FIX - 2026-09-06
 

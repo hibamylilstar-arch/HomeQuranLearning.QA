@@ -12,6 +12,37 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Academy.IntegrationTests;
 
+internal sealed class IntegrationTestAuditActorContext :
+    IAuditActorContext
+{
+    public bool ShouldAudit =>
+        false;
+
+    public Guid UserId =>
+        Guid.Empty;
+
+    public string FullName =>
+        "Integration Test";
+
+    public string Role =>
+        "Test";
+
+    public string? RequestMethod =>
+        null;
+
+    public string? RequestPath =>
+        null;
+
+    public string? RequestId =>
+        null;
+
+    public string? IpAddress =>
+        null;
+
+    public string? UserAgent =>
+        null;
+}
+
 public class IntegrationTestBase : IDisposable
 {
     protected readonly ServiceProvider ServiceProvider;
@@ -55,6 +86,8 @@ public class IntegrationTestBase : IDisposable
         var configuration = configBuilder.Build();
 
         var services = new ServiceCollection();
+        services.AddSingleton<IAuditActorContext>(
+            new IntegrationTestAuditActorContext());
         services.AddInfrastructure(configuration);
         ServiceProvider = services.BuildServiceProvider();
         DbContext = ServiceProvider.GetRequiredService<AppDbContext>();
@@ -273,6 +306,7 @@ public class RecordingServiceIntegrationTests : IntegrationTestBase
             new QaAlertRepository(DbContext),
             new QaCandidateRepository(DbContext),
             new DeviceRepository(DbContext),
+            new DeviceTeacherAssignmentRepository(DbContext),
             new ManagerTeacherAssignmentRepository(DbContext),
             new SessionRepository(DbContext),
             new SessionEventRepository(DbContext));

@@ -1,5 +1,97 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_ATTENDANCE_FINAL_10MIN_CONTRACT_20260905_BEGIN -->
+# ATTENDANCE + LESSON SOP - FINAL OWNER CONTRACT - 2026-09-05
+
+This checkpoint supersedes the earlier assumption that delayed lessons may need
+one-hour or multi-hour reconciliation.
+
+## Final operational rule
+
+Each student keeps an independent scheduled Session.
+
+The Teams call may continue across consecutive student sessions.
+
+At scheduled session end:
+
+- finished session mic/render evidence freezes;
+- next scheduled session may start immediately;
+- finished session remains only as a Lesson Grace Target.
+
+Lesson grace:
+
+- expected teacher SOP: about 5 minutes;
+- hard maximum grace: 10 minutes;
+- grace is ONLY for LessonShared;
+- previous-session audio does not continue during grace.
+
+State model:
+
+- Current Session
+- immediately previous Lesson Grace Target only
+
+No four-hour reconciliation.
+
+No sibling metadata.
+
+No family ID.
+
+No Teams Chat Name field.
+
+No artificial combined sibling student/session.
+
+Lesson association may use the saved session student name appearing in the
+teacher's outgoing lesson text.
+
+Safe normalization is allowed; ambiguous fuzzy matching must not guess.
+
+## Attendance
+
+LessonShared for the correct session:
+
+- Teacher Present
+- Student Present
+- AutoResolved
+
+If lesson grace expires without LessonShared:
+
+- Lesson Shared = No
+- use frozen scheduled-session activity evidence
+
+Teacher-side meaningful effective microphone speech/activity can prove teacher
+participation.
+
+Meaningful effective communication render/playback speech/activity can prove
+remote/student participation.
+
+This is communication-route participation evidence, not biometric speaker
+identity.
+
+Raw hiss/noise/device-open state is not enough.
+
+No automatic Absent solely from missing evidence.
+
+No automatic Late from lesson timestamp.
+
+If activity proves both sides Present, attendance may AutoResolve while Lesson
+Shared remains No.
+
+If either side is uncertain, that side remains NeedsReview.
+
+## Preservation
+
+Do not restore StudentAudioEvidenceWorker.
+
+Do not create a second physical audio capture chain.
+
+Attendance activity must consume the existing canonical/shared classroom audio
+architecture.
+
+Live Monitoring remains the highest-priority audio consumer.
+
+<!-- HQL_ATTENDANCE_FINAL_10MIN_CONTRACT_20260905_END -->
+
+
 <!-- HQL_ATTENDANCE_SIMPLIFICATION_20260905_BEGIN -->
 # ATTENDANCE SIMPLIFICATION - SOURCE COMPLETE / RUNTIME PENDING - 2026-09-05
 

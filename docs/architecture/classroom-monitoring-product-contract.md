@@ -198,26 +198,198 @@ source rather than requiring USB teacher provenance.
 
 ## 8. Attendance source of truth
 
-Attendance is independent from Live audio routing and QA audio analysis.
+Attendance is independent from QA classification and speaker identification.
 
-The authoritative automatic attendance rule is:
+The attendance system works from the scheduled Session boundary.
 
-A valid LessonShared event for the correct scheduled session/student and valid
-session time window means:
+### 8.1 Session activity window
+
+Teacher/student activity evidence belongs only to the immutable scheduled
+session window:
+
+`ScheduledStartUtc -> ScheduledEndUtc`
+
+At ScheduledEndUtc:
+
+- the finished session's teacher-microphone activity stops accumulating;
+- the finished session's communication-render activity stops accumulating;
+- those activity totals are frozen for that session;
+- the next scheduled session may start immediately even when the same Teams
+  call remains connected.
+
+A continuing Teams call does not merge two scheduled student sessions.
+
+The same communication call may therefore span consecutive student sessions
+while attendance evidence remains partitioned by scheduled session time.
+
+### 8.2 Audio meaning
+
+Attendance may use the already-approved shared classroom audio architecture.
+
+For attendance evidence:
+
+- meaningful activity on the effective teacher communication microphone is
+  teacher-side participation evidence;
+- meaningful activity on the effective communication playback/render route is
+  remote/student-side participation evidence.
+
+The system does not claim biometric speaker identity.
+
+It does not need to prove the human identity of a voice.
+
+It uses the scheduled class context plus the effective communication routes.
+
+Raw noise level, hiss or an always-open endpoint must not by itself become
+attendance evidence.
+
+Attendance must use meaningful speech/activity evidence rather than simple
+device-open state or raw audio presence.
+
+No duplicate physical audio capture chain may be created for attendance.
+
+The removed StudentAudioEvidenceWorker must not be restored.
+
+### 8.3 LessonShared
+
+LessonShared remains the strongest direct attendance evidence.
+
+A valid LessonShared event associated with the correct session means:
 
 - Teacher = Present
 - Student = Present
+- attendance may be automatically resolved.
 
-Audio meters, generic audio activity, communication-process detection, greeting
-detection, call-attempt detection and speaker inference must not independently
-decide automatic teacher/student attendance.
+Lesson delivery time is not arrival time and must never create Late status.
 
-Those signals may remain temporarily as operational diagnostics during
-migration, but they are not attendance truth.
+### 8.4 Lesson grace
 
-LessonShared must continue to be tied to the correct scheduled session and
-student. Existing validation that protects that association must not be
-weakened.
+The teacher SOP is to share the completed student's lesson at the session
+boundary.
+
+Normal expected behavior is within about five minutes.
+
+The system provides a maximum lesson grace period of:
+
+**10 minutes after ScheduledEndUtc**
+
+This grace period is ONLY for LessonShared evidence.
+
+It is not an extension of the class activity/audio window.
+
+During that ten-minute grace:
+
+- the completed session remains open only for lesson evidence;
+- its mic/render activity remains frozen;
+- the next scheduled session may run normally;
+- the same Teams call may remain connected.
+
+The system therefore maintains:
+
+1. one operational Current Session;
+2. at most the immediately previous completed session as a Lesson Grace Target,
+   until its ten-minute deadline expires or its lesson is accepted.
+
+There is no four-hour delayed reconciliation design.
+
+There is no multi-hour historical lesson scan.
+
+### 8.5 Lesson association
+
+The lesson is associated with the scheduled session/student.
+
+Teacher lesson messages normally include the student's saved name, for example:
+
+`Ahmed Lesson - Para No ...`
+
+The lesson detector may use the saved session student name as confirmation when
+matching lesson evidence to the previous Lesson Grace Target.
+
+Safe normalization may ignore:
+
+- letter case;
+- surrounding punctuation;
+- harmless spacing differences.
+
+The system must not use aggressive fuzzy guessing that could silently assign a
+lesson to the wrong student.
+
+If the student-name evidence is ambiguous or does not safely match, do not
+guess.
+
+### 8.6 Consecutive students / siblings
+
+No sibling flag, family identifier, Teams Chat Name field or combined-student
+session is required.
+
+Each scheduled student keeps an independent Session.
+
+Example:
+
+- Student A: 06:00-06:30
+- Student B: 06:30-07:00
+
+At 06:30:
+
+- Student A audio evidence freezes;
+- Student A becomes the Lesson Grace Target until 06:40;
+- Student B becomes Current Session immediately;
+- the Teams call may continue without disconnecting.
+
+If Student A's valid lesson is shared during the grace period, it belongs to
+Student A's previous session while Student B's class continues.
+
+At Student B's scheduled end, the same process applies to Student B.
+
+### 8.7 Grace expiry attendance finalization
+
+At the ten-minute lesson deadline:
+
+If valid LessonShared exists:
+
+- Teacher = Present
+- Student = Present
+- attendance = AutoResolved.
+
+If LessonShared does not exist:
+
+- `Lesson Shared = No` is visible as an SOP fact;
+- attendance is finalized from the frozen scheduled-session activity evidence.
+
+Teacher-side meaningful microphone activity:
+
+- sufficient evidence -> Teacher Present;
+- insufficient/uncertain evidence -> Teacher NeedsReview.
+
+Remote/student-side meaningful communication-render activity:
+
+- sufficient evidence -> Student Present;
+- insufficient/uncertain evidence -> Student NeedsReview.
+
+The automatic engine must not create Absent solely because evidence is missing.
+
+The automatic engine must not create Late from lesson timing.
+
+When both attendance sides are confidently Present from session activity,
+attendance may be AutoResolved even when LessonShared is No.
+
+When either side remains uncertain, attendance remains Pending/NeedsReview for
+human review.
+
+### 8.8 Separation of facts
+
+The system must keep these concepts distinct:
+
+- attendance result;
+- session activity evidence;
+- Lesson Shared Yes/No;
+- lesson grace deadline;
+- human review status.
+
+A teacher may have genuine Present attendance while still failing the
+LessonShared SOP.
+
+That SOP failure must not falsely convert genuine attendance into Absent.
+
 
 ---
 

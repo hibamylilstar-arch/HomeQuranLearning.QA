@@ -1,10 +1,12 @@
-﻿namespace Academy.Agent.Cloud;
+namespace Academy.Agent.Cloud;
 
 public sealed class AgentClassWindowResponse
 {
     public DateTimeOffset ServerTimeUtc { get; init; }
 
     public AgentClassWindowItem? Current { get; init; }
+
+    public AgentClassWindowItem? LessonGrace { get; init; }
 
     public AgentClassWindowItem? Next { get; init; }
 }

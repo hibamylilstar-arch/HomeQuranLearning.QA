@@ -5,12 +5,16 @@ using Academy.Agent.Teams;
 
 namespace Academy.Agent.TeamsHelper;
 
+internal sealed record TeamsTargetsSnapshot(
+    TeamsObservationTarget? Current,
+    TeamsObservationTarget? LessonGrace);
+
 internal sealed class TeamsEvidencePipeClient
 {
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
 
-    public async Task<TeamsObservationTarget?> GetTargetAsync(
+    public async Task<TeamsTargetsSnapshot> GetTargetsAsync(
         CancellationToken cancellationToken)
     {
         TeamsPipeResponse response =
@@ -29,7 +33,19 @@ internal sealed class TeamsEvidencePipeClient
                 "Agent rejected target request.");
         }
 
-        return response.Target;
+        return new TeamsTargetsSnapshot(
+            response.Target,
+            response.LessonGraceTarget);
+    }
+
+    public async Task<TeamsObservationTarget?> GetTargetAsync(
+        CancellationToken cancellationToken)
+    {
+        TeamsTargetsSnapshot targets =
+            await GetTargetsAsync(
+                cancellationToken);
+
+        return targets.Current;
     }
 
     public async Task PublishEvidenceAsync(

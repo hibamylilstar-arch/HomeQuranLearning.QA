@@ -33,13 +33,6 @@ public sealed class ClassObserverWorker : BackgroundService
                 5,
                 60));
 
-    private TimeSpan ObservationGrace =>
-        TimeSpan.FromMinutes(
-            Math.Clamp(
-                _configuration.GetValue<int?>(
-                    "Attendance:ObservationGraceMinutes") ?? 5,
-                0,
-                30));
 
     public ClassObserverWorker(
         ILogger<ClassObserverWorker> logger,
@@ -91,11 +84,10 @@ public sealed class ClassObserverWorker : BackgroundService
 
 
         _logger.LogInformation(
-            "Class observer started. DeviceId={DeviceId}, InstanceId={InstanceId}, Poll={PollSeconds}s, Grace={GraceMinutes}m",
+            "Class observer started. DeviceId={DeviceId}, InstanceId={InstanceId}, Poll={PollSeconds}s",
             identity.DeviceId,
             _observerInstanceId,
-            PollInterval.TotalSeconds,
-            ObservationGrace.TotalMinutes);
+            PollInterval.TotalSeconds);
 
         try
         {
@@ -244,6 +236,10 @@ public sealed class ClassObserverWorker : BackgroundService
             DateTimeOffset.UtcNow +
             _serverClockOffset;
 
+        UpdateLessonGraceTarget(
+            window,
+            observedNow);
+
         var candidate =
             ResolveObservedClass(
                 window,
@@ -251,16 +247,6 @@ public sealed class ClassObserverWorker : BackgroundService
 
         if (candidate is null)
         {
-            if (_observedClass is not null &&
-                observedNow <=
-                    _observedClass.ScheduledEndUtc +
-                    ObservationGrace)
-            {
-                // Server may mark the session completed exactly at scheduled
-                // end. Keep the existing class locally through grace.
-                return;
-            }
-
             if (_observedSessionId.HasValue)
             {
                 _logger.LogInformation(
@@ -362,9 +348,10 @@ public sealed class ClassObserverWorker : BackgroundService
                 continue;
             }
 
-            // Never attach evidence from after the observation grace window.
+            // Activity attribution belongs only to the scheduled
+            // session window. Lesson grace is handled separately.
             if (signal.OccurredAtUtc >
-                session.ScheduledEndUtc + ObservationGrace)
+                session.ScheduledEndUtc)
             {
                 continue;
             }
@@ -439,6 +426,53 @@ public sealed class ClassObserverWorker : BackgroundService
                 null
         };
     }
+    private void UpdateLessonGraceTarget(
+        AgentClassWindowResponse window,
+        DateTimeOffset nowUtc)
+    {
+        AgentClassWindowItem? lessonGrace =
+            ResolveLessonGraceClass(
+                window,
+                nowUtc);
+
+        if (lessonGrace is null)
+        {
+            _teamsObservationTargetState
+                .ClearLessonGrace();
+
+            return;
+        }
+
+        _teamsObservationTargetState
+            .SetLessonGrace(
+                lessonGrace);
+    }
+
+    private static AgentClassWindowItem?
+        ResolveLessonGraceClass(
+            AgentClassWindowResponse window,
+            DateTimeOffset nowUtc)
+    {
+        return new[]
+            {
+                window.LessonGrace,
+                window.Current,
+                window.Next
+            }
+            .Where(
+                item =>
+                    item is not null &&
+                    nowUtc >
+                        item.ScheduledEndUtc &&
+                    nowUtc <=
+                        item.ScheduledEndUtc
+                            .AddMinutes(10))
+            .OrderByDescending(
+                item =>
+                    item!.ScheduledEndUtc)
+            .FirstOrDefault();
+    }
+
     private AgentClassWindowItem? ResolveObservedClass(
         AgentClassWindowResponse window,
         DateTimeOffset nowUtc)
@@ -475,7 +509,7 @@ public sealed class ClassObserverWorker : BackgroundService
 
         return
             nowUtc >= item.ScheduledStartUtc &&
-            nowUtc <= item.ScheduledEndUtc + ObservationGrace;
+            nowUtc <= item.ScheduledEndUtc;
     }
 
     private async Task QueueEventAsync(

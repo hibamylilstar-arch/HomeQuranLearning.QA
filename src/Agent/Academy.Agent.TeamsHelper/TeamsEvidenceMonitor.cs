@@ -7,14 +7,27 @@ internal sealed class TeamsEvidenceMonitor
     private static readonly TimeSpan PollInterval =
         TimeSpan.FromMilliseconds(750);
 
+    private static readonly TimeSpan LessonGraceScanInterval =
+        TimeSpan.FromSeconds(2);
+
     private static readonly TimeSpan ErrorBackoff =
         TimeSpan.FromSeconds(2);
 
     private readonly TeamsEvidencePipeClient _pipeClient =
         new();
 
-    private readonly TeamsEvidenceStateMachine _stateMachine =
-        new();
+    private readonly TeamsEvidenceStateMachine
+        _currentStateMachine =
+            new();
+
+    private readonly TeamsEvidenceStateMachine
+        _lessonGraceStateMachine =
+            new();
+
+    private DateTimeOffset _nextLessonGraceScanUtc =
+        DateTimeOffset.MinValue;
+
+    private Guid? _lessonGraceSessionId;
 
     private readonly TeamsHelperFileLog _log;
     private readonly TeamsHelperHealthReporter _health;
@@ -44,13 +57,22 @@ internal sealed class TeamsEvidenceMonitor
         {
             try
             {
-                TeamsObservationTarget? target =
-                    await _pipeClient.GetTargetAsync(
+                TeamsTargetsSnapshot targets =
+                    await _pipeClient.GetTargetsAsync(
                         cancellationToken);
 
-                if (target is null)
+                TeamsObservationTarget? current =
+                    targets.Current;
+
+                TeamsObservationTarget? lessonGrace =
+                    targets.LessonGrace;
+
+                if (
+                    current is null &&
+                    lessonGrace is null
+                )
                 {
-                    _stateMachine.Reset();
+                    ResetAll();
 
                     _health.TryUpdate(
                         "Idle");
@@ -65,18 +87,105 @@ internal sealed class TeamsEvidenceMonitor
                 _health.TryUpdate(
                     "Monitoring");
 
-                TeamsUiSnapshot snapshot =
-                    TeamsUiAutomationDetector.Scan(
-                        target.StudentFullName,
-                        target.TeacherFullName);
+                var evidence =
+                    new List<TeamsEvidenceEnvelope>();
 
-                IReadOnlyList<TeamsEvidenceEnvelope> evidence =
-                    _stateMachine.Evaluate(
-                        target,
-                        snapshot,
-                        DateTimeOffset.UtcNow);
+                if (current is null)
+                {
+                    _currentStateMachine.Reset();
+                }
+                else
+                {
+                    TeamsUiSnapshot snapshot =
+                        TeamsUiAutomationDetector.Scan(
+                            current.StudentFullName,
+                            current.TeacherFullName);
 
-                foreach (TeamsEvidenceEnvelope item in evidence)
+                    // When a previous lesson grace target also exists,
+                    // a lesson message must identify the current student
+                    // before it may resolve the current session.
+                    //
+                    // This prevents one sibling's delayed lesson from
+                    // being silently attached to the next sibling.
+                    if (lessonGrace is not null)
+                    {
+                        snapshot =
+                            snapshot with
+                            {
+                                Lessons =
+                                    snapshot.Lessons
+                                        .Where(
+                                            message =>
+                                                TeamsUiAutomationDetector
+                                                    .ContainsStudentName(
+                                                        message.MessageText,
+                                                        current.StudentFullName))
+                                        .ToArray()
+                            };
+                    }
+
+                    evidence.AddRange(
+                        _currentStateMachine.Evaluate(
+                            current,
+                            snapshot,
+                            DateTimeOffset.UtcNow));
+                }
+
+                if (lessonGrace is null)
+                {
+                    ResetLessonGrace();
+                }
+                else
+                {
+                    DateTimeOffset now =
+                        DateTimeOffset.UtcNow;
+
+                    if (_lessonGraceSessionId !=
+                        lessonGrace.SessionId)
+                    {
+                        _lessonGraceStateMachine.Reset();
+
+                        _lessonGraceSessionId =
+                            lessonGrace.SessionId;
+
+                        _nextLessonGraceScanUtc =
+                            DateTimeOffset.MinValue;
+                    }
+
+                    if (now >=
+                        _nextLessonGraceScanUtc)
+                    {
+                        IReadOnlyList<TeamsDetectedMessage>
+                            lessons =
+                                TeamsUiAutomationDetector
+                                    .ScanLessonMessagesForStudent(
+                                        lessonGrace.StudentFullName);
+
+                        evidence.AddRange(
+                            _lessonGraceStateMachine
+                                .EvaluateLessonOnly(
+                                    lessonGrace,
+                                    lessons));
+
+                        _nextLessonGraceScanUtc =
+                            now +
+                            LessonGraceScanInterval;
+                    }
+                }
+
+                IReadOnlyList<TeamsEvidenceEnvelope>
+                    safeEvidence =
+                        SuppressAmbiguousLessonEvidence(
+                            evidence);
+
+                foreach (
+                    TeamsEvidenceEnvelope item in
+                    safeEvidence
+                        .GroupBy(
+                            x => x.IdempotencyKey,
+                            StringComparer.Ordinal)
+                        .Select(
+                            x => x.First()))
                 {
                     await _pipeClient.PublishEvidenceAsync(
                         item,
@@ -148,5 +257,70 @@ internal sealed class TeamsEvidenceMonitor
 
         _log.Information(
             "TEAMS_EVIDENCE_MONITOR_STOPPED");
+    }
+
+    internal static IReadOnlyList<TeamsEvidenceEnvelope>
+        SuppressAmbiguousLessonEvidence(
+            IReadOnlyList<TeamsEvidenceEnvelope> evidence)
+    {
+        ArgumentNullException.ThrowIfNull(
+            evidence);
+
+        HashSet<string> ambiguousMessageIds =
+            evidence
+                .Where(
+                    x =>
+                        x.Type ==
+                            TeamsEvidenceType.LessonShared &&
+                        !string.IsNullOrWhiteSpace(
+                            x.MessageId))
+                .GroupBy(
+                    x => x.MessageId!,
+                    StringComparer.Ordinal)
+                .Where(
+                    group =>
+                        group
+                            .Select(
+                                x => x.SessionId)
+                            .Distinct()
+                            .Count() > 1)
+                .Select(
+                    group => group.Key)
+                .ToHashSet(
+                    StringComparer.Ordinal);
+
+        if (ambiguousMessageIds.Count == 0)
+        {
+            return evidence;
+        }
+
+        return evidence
+            .Where(
+                x =>
+                    x.Type !=
+                        TeamsEvidenceType.LessonShared ||
+                    string.IsNullOrWhiteSpace(
+                        x.MessageId) ||
+                    !ambiguousMessageIds.Contains(
+                        x.MessageId))
+            .ToArray();
+    }
+
+    private void ResetAll()
+    {
+        _currentStateMachine.Reset();
+
+        ResetLessonGrace();
+    }
+
+    private void ResetLessonGrace()
+    {
+        _lessonGraceStateMachine.Reset();
+
+        _lessonGraceSessionId =
+            null;
+
+        _nextLessonGraceScanUtc =
+            DateTimeOffset.MinValue;
     }
 }

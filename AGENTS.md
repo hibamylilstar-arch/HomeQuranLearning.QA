@@ -1,5 +1,71 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_TEN_MINUTE_LESSON_GRACE_SOURCE_20260905_BEGIN -->
+# 10-MINUTE LESSON GRACE ROUTING - SOURCE PROVEN - 2026-09-05
+
+Authoritative attendance/lesson contract commit:
+
+`c7c4c41306d4eee963788fec5eb387f66404bb46`
+
+## Implemented
+
+- operational Current Session remains independent from lesson grace;
+- backend class window exposes one `LessonGrace` session;
+- LessonGrace is the immediately previous Pending/unresolved session;
+- maximum LessonShared grace = 10 minutes after ScheduledEndUtc;
+- current/next scheduled operation is preserved;
+- current session can start while the previous lesson grace remains open;
+- same Teams call may continue across the scheduled session boundary;
+- completed-session activity attribution ends exactly at ScheduledEndUtc;
+- the previous session receives no post-end mic/render/call/activity attribution;
+- Teams IPC exposes Current + LessonGrace targets;
+- normal Teams evidence remains Current-only;
+- LessonShared may resolve Current or LessonGrace;
+- helper uses a separate lesson-only state machine for the grace target;
+- local message text is used only for safe student-name matching and is not
+  persisted as attendance evidence;
+- during overlap, current and previous lesson routing uses saved student names;
+- case/punctuation/spacing normalization is allowed;
+- fuzzy typo guessing is not used;
+- a single lesson MessageId matching two different sessions is suppressed as
+  ambiguous rather than assigning it to either session;
+- online backend LessonGrace is supported;
+- cached Current/Next timestamps can preserve the previous 10-minute lesson
+  target during short backend connectivity loss;
+- no sibling/family/Teams-chat metadata was added;
+- no database schema change;
+- no canonical audio source change;
+- no Live/Recording/QA change;
+- StudentAudioEvidenceWorker remains removed.
+
+## Runtime state
+
+Source/build/test proof only.
+
+No new Agent immutable release has been built.
+
+No Agent deployment has occurred.
+
+No VPS deployment has occurred.
+
+## Next
+
+Phase C2:
+
+Consume the existing shared canonical ClassroomAudioHub non-blockingly to derive
+scheduled-session teacher-side and remote-side meaningful speech/activity
+evidence.
+
+Do not create another WASAPI/physical capture owner.
+
+Do not restore StudentAudioEvidenceWorker.
+
+Audio attribution must stop at ScheduledEndUtc even while LessonShared grace
+continues separately.
+
+<!-- HQL_TEN_MINUTE_LESSON_GRACE_SOURCE_20260905_END -->
+
+
 <!-- HQL_ATTENDANCE_FINAL_10MIN_CONTRACT_20260905_BEGIN -->
 # ATTENDANCE + LESSON SOP - FINAL OWNER CONTRACT - 2026-09-05
 

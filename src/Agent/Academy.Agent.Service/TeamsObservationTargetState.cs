@@ -10,47 +10,22 @@ public sealed class TeamsObservationTargetState
 
     private TeamsObservationTarget? _current;
 
+    private TeamsObservationTarget? _lessonGrace;
+
     public void Set(
         AgentClassWindowItem item)
     {
-        ArgumentNullException.ThrowIfNull(item);
+        SetCurrent(item);
+    }
 
-        var target =
-            new TeamsObservationTarget
-            {
-                SessionId =
-                    item.SessionId,
+    public void SetCurrent(
+        AgentClassWindowItem item)
+    {
+        ArgumentNullException.ThrowIfNull(
+            item);
 
-                ScheduleId =
-                    item.ScheduleId,
-
-                DeviceId =
-                    item.DeviceId,
-
-                TeacherId =
-                    item.TeacherId,
-
-                TeacherFullName =
-                    item.TeacherFullName,
-
-                StudentId =
-                    item.StudentId,
-
-                StudentFullName =
-                    item.StudentFullName,
-
-                CourseId =
-                    item.CourseId,
-
-                CourseName =
-                    item.CourseName,
-
-                ScheduledStartUtc =
-                    item.ScheduledStartUtc,
-
-                ScheduledEndUtc =
-                    item.ScheduledEndUtc
-            };
+        TeamsObservationTarget target =
+            Map(item);
 
         lock (_sync)
         {
@@ -59,11 +34,40 @@ public sealed class TeamsObservationTargetState
         }
     }
 
+    public void SetLessonGrace(
+        AgentClassWindowItem? item)
+    {
+        TeamsObservationTarget? target =
+            item is null
+                ? null
+                : Map(item);
+
+        lock (_sync)
+        {
+            _lessonGrace =
+                target;
+        }
+    }
+
     public void Clear()
+    {
+        ClearCurrent();
+    }
+
+    public void ClearCurrent()
     {
         lock (_sync)
         {
             _current =
+                null;
+        }
+    }
+
+    public void ClearLessonGrace()
+    {
+        lock (_sync)
+        {
+            _lessonGrace =
                 null;
         }
     }
@@ -74,5 +78,53 @@ public sealed class TeamsObservationTargetState
         {
             return _current;
         }
+    }
+
+    public TeamsObservationTarget? GetLessonGrace()
+    {
+        lock (_sync)
+        {
+            return _lessonGrace;
+        }
+    }
+
+    private static TeamsObservationTarget Map(
+        AgentClassWindowItem item)
+    {
+        return new TeamsObservationTarget
+        {
+            SessionId =
+                item.SessionId,
+
+            ScheduleId =
+                item.ScheduleId,
+
+            DeviceId =
+                item.DeviceId,
+
+            TeacherId =
+                item.TeacherId,
+
+            TeacherFullName =
+                item.TeacherFullName,
+
+            StudentId =
+                item.StudentId,
+
+            StudentFullName =
+                item.StudentFullName,
+
+            CourseId =
+                item.CourseId,
+
+            CourseName =
+                item.CourseName,
+
+            ScheduledStartUtc =
+                item.ScheduledStartUtc,
+
+            ScheduledEndUtc =
+                item.ScheduledEndUtc
+        };
     }
 }

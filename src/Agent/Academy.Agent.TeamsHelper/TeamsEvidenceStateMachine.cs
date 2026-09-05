@@ -85,6 +85,39 @@ internal sealed class TeamsEvidenceStateMachine
         return output;
     }
 
+    public IReadOnlyList<TeamsEvidenceEnvelope>
+        EvaluateLessonOnly(
+            TeamsObservationTarget target,
+            IReadOnlyList<TeamsDetectedMessage> lessons)
+    {
+        ArgumentNullException.ThrowIfNull(
+            target);
+
+        ArgumentNullException.ThrowIfNull(
+            lessons);
+
+        if (_activeSessionId !=
+            target.SessionId)
+        {
+            Reset();
+
+            _activeSessionId =
+                target.SessionId;
+        }
+
+        var output =
+            new List<TeamsEvidenceEnvelope>();
+
+        AddMessageEvidence(
+            target,
+            lessons,
+            TeamsEvidenceType.LessonShared,
+            "lesson",
+            output);
+
+        return output;
+    }
+
     private void AddMessageEvidence(
         TeamsObservationTarget target,
         IReadOnlyList<TeamsDetectedMessage> messages,
@@ -104,7 +137,8 @@ internal sealed class TeamsEvidenceStateMachine
 
             if (!IsInsideEvidenceWindow(
                     target,
-                    occurredAtUtc))
+                    occurredAtUtc,
+                    type))
             {
                 continue;
             }
@@ -349,13 +383,17 @@ internal sealed class TeamsEvidenceStateMachine
 
     private static bool IsInsideEvidenceWindow(
         TeamsObservationTarget target,
-        DateTimeOffset occurredAtUtc)
+        DateTimeOffset occurredAtUtc,
+        TeamsEvidenceType type)
     {
         DateTimeOffset earliest =
             target.ScheduledStartUtc.AddMinutes(-5);
 
         DateTimeOffset latest =
-            target.ScheduledEndUtc.AddMinutes(15);
+            type ==
+                TeamsEvidenceType.LessonShared
+                ? target.ScheduledEndUtc.AddMinutes(10)
+                : target.ScheduledEndUtc;
 
         return
             occurredAtUtc >= earliest &&

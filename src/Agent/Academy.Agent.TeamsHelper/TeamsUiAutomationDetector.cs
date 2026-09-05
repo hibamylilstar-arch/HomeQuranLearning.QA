@@ -8,7 +8,8 @@ namespace Academy.Agent.TeamsHelper;
 internal sealed record TeamsDetectedMessage(
     string MessageId,
     DateTimeOffset? OccurredAtUtc,
-    string? AttachmentName);
+    string? AttachmentName,
+    string MessageText = "");
 
 internal sealed record TeamsUiSnapshot(
     int TeamsWebViewCount,
@@ -260,6 +261,64 @@ public static TeamsUiSnapshot Scan(
                 lessons);
     }
 
+    public static IReadOnlyList<TeamsDetectedMessage>
+        ScanLessonMessagesForStudent(
+            string studentName)
+    {
+        if (string.IsNullOrWhiteSpace(
+                studentName))
+        {
+            throw new ArgumentException(
+                "Student name is required.",
+                nameof(studentName));
+        }
+
+        studentName =
+            studentName.Trim();
+
+        var result =
+            new Dictionary<string, TeamsDetectedMessage>(
+                StringComparer.Ordinal);
+
+        foreach (
+            int processId in
+            FindTeamsWebViewProcessIds())
+        {
+            IReadOnlyList<AutomationElement> elements =
+                ReadProcessElements(
+                    processId);
+
+            if (elements.Count == 0)
+            {
+                continue;
+            }
+
+            foreach (
+                TeamsDetectedMessage message in
+                DetectMessages(
+                    elements,
+                    MessageKind.Lesson))
+            {
+                if (!ContainsStudentName(
+                        message.MessageText,
+                        studentName))
+                {
+                    continue;
+                }
+
+                result[message.MessageId] =
+                    message;
+            }
+        }
+
+        return result.Values
+            .OrderBy(
+                x =>
+                    x.OccurredAtUtc ??
+                    DateTimeOffset.MinValue)
+            .ToList();
+    }
+
     private static List<TeamsDetectedMessage> DetectMessages(
         IReadOnlyList<AutomationElement> elements,
         MessageKind kind)
@@ -350,7 +409,10 @@ public static TeamsUiSnapshot Scan(
                             messageId),
 
                     AttachmentName:
-                        attachmentName);
+                        attachmentName,
+
+                    MessageText:
+                        name);
         }
 
         return result.Values
@@ -430,6 +492,57 @@ public static TeamsUiSnapshot Scan(
 
         return LessonKeywordRegex.IsMatch(
             text);
+    }
+
+    internal static bool ContainsStudentName(
+        string? text,
+        string? studentName)
+    {
+        if (
+            string.IsNullOrWhiteSpace(text) ||
+            string.IsNullOrWhiteSpace(studentName)
+        )
+        {
+            return false;
+        }
+
+        static string Normalize(
+            string value)
+        {
+            var chars =
+                value
+                    .ToLowerInvariant()
+                    .Select(
+                        ch =>
+                            char.IsLetterOrDigit(ch)
+                                ? ch
+                                : ' ')
+                    .ToArray();
+
+            return string.Join(
+                " ",
+                new string(chars)
+                    .Split(
+                        ' ',
+                        StringSplitOptions.RemoveEmptyEntries |
+                        StringSplitOptions.TrimEntries));
+        }
+
+        string normalizedText =
+            Normalize(text);
+
+        string normalizedName =
+            Normalize(studentName);
+
+        if (normalizedName.Length == 0)
+        {
+            return false;
+        }
+
+        return
+            $" {normalizedText} ".Contains(
+                $" {normalizedName} ",
+                StringComparison.Ordinal);
     }
 
     private static string? FindAttachmentName(

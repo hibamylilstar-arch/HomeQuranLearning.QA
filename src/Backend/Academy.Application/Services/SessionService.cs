@@ -276,6 +276,16 @@ public sealed class SessionService
             .OrderBy(x => x.ScheduledStartUtc)
             .FirstOrDefault();
 
+        var lessonGrace = sessions
+            .Where(x =>
+                x.ScheduledEndUtc < now &&
+                x.ScheduledEndUtc.AddMinutes(10) >= now &&
+                x.Status != SessionStatus.Cancelled &&
+                x.AttendanceReviewStatus ==
+                    AttendanceReviewStatus.Pending)
+            .OrderByDescending(x => x.ScheduledEndUtc)
+            .FirstOrDefault();
+
         var next = sessions
             .Where(x =>
                 x.ScheduledStartUtc > now &&
@@ -287,6 +297,8 @@ public sealed class SessionService
         {
             ServerTimeUtc = now,
             Current = MapAgentClassWindowItem(current),
+            LessonGrace =
+                MapAgentClassWindowItem(lessonGrace),
             Next = MapAgentClassWindowItem(next)
         };
     }

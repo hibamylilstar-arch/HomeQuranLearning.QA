@@ -180,7 +180,10 @@ public sealed class TeamsEvidencePipeServer :
             {
                 Ok = true,
                 Target =
-                    _targetState.GetCurrent()
+                    _targetState.GetCurrent(),
+
+                LessonGraceTarget =
+                    _targetState.GetLessonGrace()
             };
         }
 
@@ -238,33 +241,39 @@ public sealed class TeamsEvidencePipeServer :
                 "Evidence details are too long.");
         }
 
-        TeamsObservationTarget? target =
+        TeamsObservationTarget? currentTarget =
             _targetState.GetCurrent();
+
+        TeamsObservationTarget? lessonGraceTarget =
+            _targetState.GetLessonGrace();
+
+        TeamsObservationTarget? target =
+            MatchesTarget(
+                evidence,
+                currentTarget)
+                ? currentTarget
+                : evidence.Type ==
+                    TeamsEvidenceType.LessonShared &&
+                  MatchesTarget(
+                      evidence,
+                      lessonGraceTarget)
+                    ? lessonGraceTarget
+                    : null;
 
         if (target is null)
         {
-            return Fail(
-                "No scheduled class is currently being observed.");
-        }
-
-        if (evidence.SessionId != target.SessionId ||
-            evidence.DeviceId != target.DeviceId ||
-            evidence.TeacherId != target.TeacherId ||
-            evidence.StudentId != target.StudentId)
-        {
             _logger.LogWarning(
                 "Rejected mismatched Teams evidence. " +
-                "EvidenceSession={EvidenceSession}, " +
-                "ExpectedSession={ExpectedSession}, " +
-                "EvidenceStudent={EvidenceStudent}, " +
-                "ExpectedStudent={ExpectedStudent}",
+                "Session={SessionId}, Student={StudentId}, Type={Type}",
                 evidence.SessionId,
-                target.SessionId,
                 evidence.StudentId,
-                target.StudentId);
+                evidence.Type);
 
             return Fail(
-                "Evidence does not match the active scheduled class.");
+                evidence.Type ==
+                    TeamsEvidenceType.LessonShared
+                    ? "Lesson evidence does not match the current or lesson-grace session."
+                    : "Evidence does not match the active scheduled class.");
         }
 
         if (!string.Equals(
@@ -280,13 +289,16 @@ public sealed class TeamsEvidencePipeServer :
             target.ScheduledStartUtc.AddMinutes(-5);
 
         DateTimeOffset latest =
-            target.ScheduledEndUtc.AddMinutes(15);
+            evidence.Type ==
+                TeamsEvidenceType.LessonShared
+                ? target.ScheduledEndUtc.AddMinutes(10)
+                : target.ScheduledEndUtc;
 
         if (evidence.OccurredAtUtc < earliest ||
             evidence.OccurredAtUtc > latest)
         {
             return Fail(
-                "Evidence timestamp is outside the allowed class window.");
+                "Evidence timestamp is outside the allowed session window.");
         }
 
         if (!_inbox.TryPublish(
@@ -309,6 +321,22 @@ public sealed class TeamsEvidencePipeServer :
         {
             Ok = true
         };
+    }
+
+    private static bool MatchesTarget(
+        TeamsEvidenceEnvelope evidence,
+        TeamsObservationTarget? target)
+    {
+        return
+            target is not null &&
+            evidence.SessionId ==
+                target.SessionId &&
+            evidence.DeviceId ==
+                target.DeviceId &&
+            evidence.TeacherId ==
+                target.TeacherId &&
+            evidence.StudentId ==
+                target.StudentId;
     }
 
     private static PipeSecurity CreatePipeSecurity()

@@ -375,6 +375,45 @@ static void RunDetectorPolicyProbe()
     }
 
 
+    string[] validStudentMatches =
+    {
+        "Ahmed Lesson - Para No 5",
+        "AHMED lesson page 3",
+        "Seen Ahmed's Lesson - Qaida Page 2"
+    };
+
+    foreach (string value in validStudentMatches)
+    {
+        if (!TeamsUiAutomationDetector.ContainsStudentName(
+                value,
+                "Ahmed"))
+        {
+            throw new InvalidOperationException(
+                $"Valid student-name match rejected: {value}");
+        }
+    }
+
+    string[] unsafeStudentMatches =
+    {
+        "Ali Lesson - Para No 5",
+        "Ahmad Lesson - Para No 5",
+        "Lesson - Para No 5"
+    };
+
+    foreach (string value in unsafeStudentMatches)
+    {
+        if (TeamsUiAutomationDetector.ContainsStudentName(
+                value,
+                "Ahmed"))
+        {
+            throw new InvalidOperationException(
+                $"Unsafe student-name match accepted: {value}");
+        }
+    }
+
+    Console.WriteLine(
+        "STUDENT_NAME_MATCHING_OK");
+
     Console.WriteLine("SALAM_VARIANTS_OK");
     Console.WriteLine("SALAM_REQUIRED_OK");
     Console.WriteLine("LESSON_KEYWORDS_OK");
@@ -546,6 +585,112 @@ static void RunStateMachineProbe()
         throw new InvalidOperationException(
             $"State machine failure. Events={all.Count}, Unique={uniqueKeys}");
     }
+
+    var graceTarget =
+        new TeamsObservationTarget
+        {
+            SessionId = Guid.NewGuid(),
+            ScheduleId = Guid.NewGuid(),
+            DeviceId = target.DeviceId,
+            TeacherId = target.TeacherId,
+            TeacherFullName =
+                target.TeacherFullName,
+            StudentId = Guid.NewGuid(),
+            StudentFullName =
+                "Grace Student",
+            CourseId = target.CourseId,
+            CourseName =
+                target.CourseName,
+            ScheduledStartUtc =
+                now.AddMinutes(-35),
+            ScheduledEndUtc =
+                now.AddMinutes(-5)
+        };
+
+    var graceMachine =
+        new TeamsEvidenceStateMachine();
+
+    IReadOnlyList<TeamsEvidenceEnvelope>
+        insideGrace =
+            graceMachine.EvaluateLessonOnly(
+                graceTarget,
+                new[]
+                {
+                    new TeamsDetectedMessage(
+                        "1900000000010",
+                        graceTarget.ScheduledEndUtc
+                            .AddMinutes(9),
+                        "grace.jpg",
+                        "Grace Student Lesson Para 5")
+                });
+
+    IReadOnlyList<TeamsEvidenceEnvelope>
+        outsideGrace =
+            graceMachine.EvaluateLessonOnly(
+                graceTarget,
+                new[]
+                {
+                    new TeamsDetectedMessage(
+                        "1900000000011",
+                        graceTarget.ScheduledEndUtc
+                            .AddMinutes(10)
+                            .AddSeconds(1),
+                        "too-late.jpg",
+                        "Grace Student Lesson Para 6")
+                });
+
+    if (
+        insideGrace.Count != 1 ||
+        outsideGrace.Count != 0
+    )
+    {
+        throw new InvalidOperationException(
+            "Ten-minute LessonShared grace policy failure.");
+    }
+
+    var ambiguousCurrent =
+        new TeamsEvidenceEnvelope
+        {
+            Type =
+                TeamsEvidenceType.LessonShared,
+            SessionId =
+                Guid.NewGuid(),
+            MessageId =
+                "ambiguous-message"
+        };
+
+    var ambiguousPrevious =
+        new TeamsEvidenceEnvelope
+        {
+            Type =
+                TeamsEvidenceType.LessonShared,
+            SessionId =
+                Guid.NewGuid(),
+            MessageId =
+                "ambiguous-message"
+        };
+
+    IReadOnlyList<TeamsEvidenceEnvelope>
+        ambiguityResult =
+            TeamsEvidenceMonitor
+                .SuppressAmbiguousLessonEvidence(
+                    new[]
+                    {
+                        ambiguousCurrent,
+                        ambiguousPrevious
+                    });
+
+    if (ambiguityResult.Count != 0)
+    {
+        throw new InvalidOperationException(
+            "Ambiguous lesson evidence was not suppressed.");
+    }
+
+    Console.WriteLine(
+        "TEN_MINUTE_LESSON_GRACE_OK");
+
+    Console.WriteLine(
+        "AMBIGUOUS_LESSON_SUPPRESSION_OK");
 
     Console.WriteLine(
         "MESSAGE_DEDUPE_OK");

@@ -35,4 +35,6 @@ public sealed class TeamsPipeResponse
     public string? Error { get; init; }
 
     public TeamsObservationTarget? Target { get; init; }
+
+    public TeamsObservationTarget? LessonGraceTarget { get; init; }
 }

@@ -8,6 +8,7 @@ import type { DeviceListItem, SessionListItem } from "@/types";
 type FeedAccess = { url: string; token: string };
 
 const ONLINE_WINDOW_MS = 120_000;
+const METADATA_REFRESH_MS = 30_000;
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unable to connect to this feed.";
@@ -132,7 +133,7 @@ function DeviceLiveCard({
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
             </span>
             <span className="text-[10px] font-bold tracking-wider text-emerald-400">
-              ONLINE
+              DEVICE ONLINE
             </span>
           </div>
 
@@ -319,6 +320,19 @@ export default function LiveMonitoringPage() {
     };
   }, [loadMetadata]);
 
+  useEffect(() => {
+    const metadataTimer =
+      window.setInterval(() => {
+        void loadMetadata(false);
+      }, METADATA_REFRESH_MS);
+
+    return () => {
+      window.clearInterval(
+        metadataTimer
+      );
+    };
+  }, [loadMetadata]);
+
   const onlineDevices = useMemo(
     () =>
       devices
@@ -347,10 +361,10 @@ export default function LiveMonitoringPage() {
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-white">
-            Live Classroom Devices
+            Live Monitoring
           </h2>
           <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Live video stays connected • refresh class metadata manually when needed
+            Adaptive live feeds • classroom metadata refreshes automatically every 30 seconds
           </p>
         </div>
 
@@ -359,7 +373,7 @@ export default function LiveMonitoringPage() {
           onClick={() => void loadMetadata(false)}
           className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-900"
         >
-          Refresh metadata
+          Refresh now
         </button>
       </div>
 

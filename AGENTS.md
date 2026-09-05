@@ -1,5 +1,71 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_ATTENDANCE_CANARY_PUBLISHED_20260905_BEGIN -->
+# ATTENDANCE AGENT CANARY PUBLISHED BUT NOT QUEUED - 2026-09-05
+
+Runtime application source remains:
+
+`f0c2ae52958c92a19e27b9ea2f6fa443665e7ad7`
+
+Published immutable Agent release:
+
+- version `1.0.0-f0c2ae52958c-attendance1`
+- releaseId `attendance-f0c2ae52958c-canary1`
+- installer SHA256 `7E65DE2AE775C8C80EC16D45533044D3D6E487B838B9492DFD3024D1182A3D17`
+- manifest target list count 1
+
+Package was published before the manifest.
+
+The previous manifest was preserved in manifest history.
+
+The API container sees both the manifest and package through the existing
+read-only Agent release mount.
+
+## Important eligibility contract
+
+The manifest TargetDeviceIds list is not the runtime authorization gate.
+
+The backend serves an enabled update only when the managed Device has:
+
+`PendingAgentUpdateVersion == published manifest Version`
+
+That pending version is set by the Owner-only Agent update request endpoint.
+
+Immediately after publication the canary device was verified as:
+
+`enabled = false`
+
+Therefore publication alone did not authorize or install the Agent update.
+
+The owner laptop remained on:
+
+`1.0.0-b043352365aa-resume1`
+
+## Runtime safety
+
+- API/dashboard were not restarted by release publication
+- no other container was restarted
+- VPS application source was not changed
+- custom Caddy was not changed
+- database was not changed
+- Agent was not updated yet
+
+## Next
+
+Explicitly queue the published release for the owner canary device only.
+
+Then run/observe the updater and verify:
+
+- exact new Agent version
+- installer/update success
+- Recording.Enabled remains false
+- LiveStreaming remains enabled
+- heartbeat and class-window recover
+- no second device receives an update
+- real scheduled-class attendance/audio calibration before certification
+
+<!-- HQL_ATTENDANCE_CANARY_PUBLISHED_20260905_END -->
+
 <!-- HQL_ATTENDANCE_RUNTIME_BACKEND_C2_20260905_BEGIN -->
 # ATTENDANCE BACKEND/DASHBOARD RUNTIME DEPLOYED - 2026-09-05
 

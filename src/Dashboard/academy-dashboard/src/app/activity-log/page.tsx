@@ -387,8 +387,8 @@ export default function ActivityLogPage() {
 
           <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
             A permanent record of meaningful
-            dashboard changes made by Owner,
-            Admin and Manager accounts.
+            dashboard changes made by Admin and
+            Manager accounts.
           </p>
         </div>
 
@@ -435,15 +435,13 @@ export default function ActivityLogPage() {
 
         <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
-            Visibility
+            Accountability
           </div>
           <div className="mt-1 text-sm font-bold text-slate-900">
-            {isOwner
-              ? "Owner · Admin · Manager"
-              : "Admin · Manager"}
+            Admin · Manager
           </div>
           <div className="mt-1 text-[11px] text-slate-500">
-            enforced by the server
+            shared management activity
           </div>
         </div>
 

@@ -1,4 +1,5 @@
 using Academy.Application.Abstractions;
+using Academy.Application.Contracts;
 using Academy.Application.Services;
 using Academy.Domain.Entities;
 using Academy.Domain.Enums;
@@ -145,6 +146,158 @@ public sealed class SessionPresentationStatusTests
             result.StudentParticipationEvidence);
     }
 
+    [Fact]
+    public async Task LegacyInfinityWindow_PresentationFallsBackToObservedTimes()
+    {
+        DateTimeOffset now =
+            DateTimeOffset.UtcNow;
+
+        DateTimeOffset observedStart =
+            now.AddMinutes(-50);
+
+        DateTimeOffset observedEnd =
+            now.AddMinutes(-20);
+
+        Session session =
+            CreateSession(
+                observedStart,
+                observedEnd);
+
+        session.ScheduledStartUtc =
+            DateTimeOffset.MinValue;
+
+        session.ScheduledEndUtc =
+            DateTimeOffset.MinValue;
+
+        session.Events.Add(
+            Event(
+                session,
+                SessionEventType.LessonShared,
+                observedStart.AddMinutes(5)));
+
+        SessionService service =
+            CreateService(
+                session);
+
+        SessionDto result =
+            Assert.Single(
+                await service.GetSessionsAsync());
+
+        Assert.Equal(
+            observedStart,
+            result.ScheduledStartUtc);
+
+        Assert.Equal(
+            observedEnd,
+            result.ScheduledEndUtc);
+
+        Assert.Equal(
+            observedEnd.AddMinutes(10),
+            result.LessonGraceEndsAtUtc);
+
+        Assert.Equal(
+            "Yes",
+            result.LessonSharedStatus);
+
+        Assert.True(
+            result.AttendanceReviewAllowed);
+    }
+
+    [Fact]
+    public async Task CreateSessionWithoutEnd_InitializesFiniteScheduledWindow()
+    {
+        DateTimeOffset startedAtUtc =
+            DateTimeOffset.UtcNow;
+
+        Session? addedSession =
+            null;
+
+        var sessions =
+            new Mock<ISessionRepository>();
+
+        sessions
+            .Setup(x =>
+                x.AddAsync(
+                    It.IsAny<Session>(),
+                    It.IsAny<CancellationToken>()))
+            .Callback<Session, CancellationToken>(
+                (session, _) =>
+                    addedSession =
+                        session)
+            .Returns(
+                Task.CompletedTask);
+
+        var unitOfWork =
+            new Mock<IUnitOfWork>();
+
+        unitOfWork
+            .Setup(x =>
+                x.SaveChangesAsync(
+                    It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                1);
+
+        var service =
+            new SessionService(
+                sessions.Object,
+                Mock.Of<ISessionEventRepository>(),
+                Mock.Of<IDeviceRepository>(),
+                new AttendanceReducer(),
+                unitOfWork.Object);
+
+        var request =
+            new CreateSessionRequest
+            {
+                TeacherId =
+                    Guid.NewGuid(),
+
+                StudentId =
+                    Guid.NewGuid(),
+
+                CourseId =
+                    Guid.NewGuid(),
+
+                DeviceId =
+                    Guid.NewGuid(),
+
+                StartedAtUtc =
+                    startedAtUtc,
+
+                EndedAtUtc =
+                    null
+            };
+
+        SessionDto result =
+            await service.CreateSessionAsync(
+                request);
+
+        Assert.NotNull(
+            addedSession);
+
+        Assert.Equal(
+            startedAtUtc,
+            addedSession!.ScheduledStartUtc);
+
+        Assert.Equal(
+            startedAtUtc,
+            addedSession.ScheduledEndUtc);
+
+        Assert.NotEqual(
+            DateTimeOffset.MinValue,
+            addedSession.ScheduledStartUtc);
+
+        Assert.NotEqual(
+            DateTimeOffset.MinValue,
+            addedSession.ScheduledEndUtc);
+
+        Assert.Equal(
+            startedAtUtc,
+            result.ScheduledStartUtc);
+
+        Assert.Equal(
+            startedAtUtc,
+            result.ScheduledEndUtc);
+    }
     private static Session CreateSession(
         DateTimeOffset start,
         DateTimeOffset end)

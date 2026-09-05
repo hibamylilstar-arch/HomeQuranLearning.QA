@@ -254,25 +254,38 @@ public sealed class DashboardQueryService
             usualTeachersByDevice,
         DateTimeOffset nowUtc)
     {
+        var (
+            scheduledStartUtc,
+            scheduledEndUtc) =
+            SessionWindowResolver.Resolve(
+                session);
+
         DateTimeOffset graceEndsAtUtc =
-            session.ScheduledEndUtc
-                .AddMinutes(10);
+            SessionWindowResolver.AddMinutesClamped(
+                scheduledEndUtc,
+                10);
 
         bool hasLessonShared =
             HasValidLessonShared(
-                session);
+                session,
+                scheduledStartUtc,
+                scheduledEndUtc);
 
         bool teacherParticipation =
             HasValidParticipationEvidence(
                 session,
                 SessionEventType
-                    .TeacherAudioParticipationObserved);
+                    .TeacherAudioParticipationObserved,
+                scheduledStartUtc,
+                scheduledEndUtc);
 
         bool studentParticipation =
             HasValidParticipationEvidence(
                 session,
                 SessionEventType
-                    .RemoteAudioParticipationObserved);
+                    .RemoteAudioParticipationObserved,
+                scheduledStartUtc,
+                scheduledEndUtc);
 
         string lessonSharedStatus =
             nowUtc <
@@ -362,10 +375,10 @@ public sealed class DashboardQueryService
                 session.AttendanceNotes,
 
             ScheduledStartUtc =
-                session.ScheduledStartUtc,
+                scheduledStartUtc,
 
             ScheduledEndUtc =
-                session.ScheduledEndUtc,
+                scheduledEndUtc,
 
             LessonGraceEndsAtUtc =
                 graceEndsAtUtc,
@@ -394,15 +407,19 @@ public sealed class DashboardQueryService
     }
 
     private static bool HasValidLessonShared(
-        Session session)
+        Session session,
+        DateTimeOffset scheduledStartUtc,
+        DateTimeOffset scheduledEndUtc)
     {
         DateTimeOffset earliest =
-            session.ScheduledStartUtc
-                .AddMinutes(-5);
+            SessionWindowResolver.AddMinutesClamped(
+                scheduledStartUtc,
+                -5);
 
         DateTimeOffset latest =
-            session.ScheduledEndUtc
-                .AddMinutes(10);
+            SessionWindowResolver.AddMinutesClamped(
+                scheduledEndUtc,
+                10);
 
         return session.Events.Any(
             e =>
@@ -416,16 +433,18 @@ public sealed class DashboardQueryService
 
     private static bool HasValidParticipationEvidence(
         Session session,
-        SessionEventType eventType)
+        SessionEventType eventType,
+        DateTimeOffset scheduledStartUtc,
+        DateTimeOffset scheduledEndUtc)
     {
         return session.Events.Any(
             e =>
                 e.EventType ==
                     eventType &&
                 e.OccurredAtUtc >=
-                    session.ScheduledStartUtc &&
+                    scheduledStartUtc &&
                 e.OccurredAtUtc <=
-                    session.ScheduledEndUtc);
+                    scheduledEndUtc);
     }
     public async Task<bool> CanAccessSessionAsync(
         Guid sessionId,

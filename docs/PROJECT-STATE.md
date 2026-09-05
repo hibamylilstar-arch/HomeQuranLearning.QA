@@ -1,5 +1,52 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_LEGACY_SESSION_INFINITY_FIX_20260906_BEGIN -->
+# LEGACY SESSION INFINITY COMPATIBILITY FIX - 2026-09-06
+
+Runtime proof after the C2C DashboardQueryService deployment found historical
+manually-created Session rows whose ScheduledStartUtc and ScheduledEndUtc were
+PostgreSQL `-infinity`.
+
+The attendance presentation path attempted date arithmetic directly on those
+sentinel values and `/api/admin/sessions` failed with
+ArgumentOutOfRangeException.
+
+The fix does not rewrite historical database rows.
+
+A shared SessionWindowResolver now:
+
+- uses the stored scheduled window when it is finite
+- falls back to StartedAtUtc / EndedAtUtc for legacy infinity sentinel rows
+- clamps invalid end-before-start fallback windows
+- performs grace/pre-window minute arithmetic without DateTime overflow
+
+Both DashboardQueryService and SessionService presentation paths use the same
+resolved window.
+
+Manual CreateSessionAsync now initializes ScheduledStartUtc and
+ScheduledEndUtc explicitly, preventing new manually-created sessions from
+being persisted with PostgreSQL infinity values. When EndedAtUtc is omitted,
+ScheduledEndUtc initially equals StartedAtUtc rather than inventing a class
+duration.
+
+Regression coverage includes:
+
+- the DashboardQueryService legacy infinity failure
+- SessionService legacy presentation
+- manual session creation without EndedAtUtc
+- full solution regression
+
+No historical Session row was changed.
+No database migration was added.
+No Agent source was changed.
+No audio, Live, QA, Recording, scheduler, or AttendanceReducer source was
+changed.
+
+Real scheduled-class attendance canary remains pending. Test Sessions remain
+owner-created manually when required.
+
+<!-- HQL_LEGACY_SESSION_INFINITY_FIX_20260906_END -->
+
 <!-- HQL_C2C_DASHBOARD_SESSION_PROJECTION_FIX_20260906_BEGIN -->
 # C2C DASHBOARD SESSION PROJECTION FIX - 2026-09-06
 

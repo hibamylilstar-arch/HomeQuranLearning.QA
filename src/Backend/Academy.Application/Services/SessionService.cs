@@ -390,6 +390,13 @@ public sealed class SessionService
         CreateSessionRequest request,
         CancellationToken cancellationToken = default)
     {
+        DateTimeOffset scheduledStartUtc =
+            request.StartedAtUtc;
+
+        DateTimeOffset scheduledEndUtc =
+            request.EndedAtUtc ??
+            request.StartedAtUtc;
+
         var session = new Session
         {
             Id = Guid.NewGuid(),
@@ -397,29 +404,33 @@ public sealed class SessionService
             StudentId = request.StudentId,
             CourseId = request.CourseId,
             DeviceId = request.DeviceId,
-            StartedAtUtc = request.StartedAtUtc,
-            EndedAtUtc = request.EndedAtUtc,
-            Status = SessionStatus.Scheduled,
-            CreatedAtUtc = DateTimeOffset.UtcNow,
-            UpdatedAtUtc = DateTimeOffset.UtcNow
+            ScheduledStartUtc =
+                scheduledStartUtc,
+            ScheduledEndUtc =
+                scheduledEndUtc,
+            StartedAtUtc =
+                request.StartedAtUtc,
+            EndedAtUtc =
+                request.EndedAtUtc,
+            Status =
+                SessionStatus.Scheduled,
+            CreatedAtUtc =
+                DateTimeOffset.UtcNow,
+            UpdatedAtUtc =
+                DateTimeOffset.UtcNow
         };
 
-        await _sessionRepository.AddAsync(session, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _sessionRepository.AddAsync(
+            session,
+            cancellationToken);
 
-        return new SessionDto
-        {
-            Id = session.Id,
-            TeacherId = session.TeacherId,
-            StudentId = session.StudentId,
-            CourseId = session.CourseId,
-            DeviceId = session.DeviceId,
-            StartedAtUtc = session.StartedAtUtc,
-            EndedAtUtc = session.EndedAtUtc,
-            Status = session.Status.ToString()
-        };
+        await _unitOfWork.SaveChangesAsync(
+            cancellationToken);
+
+        return MapSession(
+            session,
+            DateTimeOffset.UtcNow);
     }
-
     public async Task UpdateLiveKitIngressAsync(
         Guid sessionId,
         string ingressId,
@@ -532,25 +543,38 @@ public sealed class SessionService
         Session session,
         DateTimeOffset nowUtc)
     {
+        var (
+            scheduledStartUtc,
+            scheduledEndUtc) =
+            SessionWindowResolver.Resolve(
+                session);
+
         DateTimeOffset graceEndsAtUtc =
-            session.ScheduledEndUtc
-                .AddMinutes(10);
+            SessionWindowResolver.AddMinutesClamped(
+                scheduledEndUtc,
+                10);
 
         bool hasLessonShared =
             HasValidLessonShared(
-                session);
+                session,
+                scheduledStartUtc,
+                scheduledEndUtc);
 
         bool teacherParticipation =
             HasValidParticipationEvidence(
                 session,
                 SessionEventType
-                    .TeacherAudioParticipationObserved);
+                    .TeacherAudioParticipationObserved,
+                scheduledStartUtc,
+                scheduledEndUtc);
 
         bool studentParticipation =
             HasValidParticipationEvidence(
                 session,
                 SessionEventType
-                    .RemoteAudioParticipationObserved);
+                    .RemoteAudioParticipationObserved,
+                scheduledStartUtc,
+                scheduledEndUtc);
 
         string lessonSharedStatus =
             nowUtc <
@@ -627,10 +651,10 @@ public sealed class SessionService
                 session.AttendanceNotes,
 
             ScheduledStartUtc =
-                session.ScheduledStartUtc,
+                scheduledStartUtc,
 
             ScheduledEndUtc =
-                session.ScheduledEndUtc,
+                scheduledEndUtc,
 
             LessonGraceEndsAtUtc =
                 graceEndsAtUtc,
@@ -659,15 +683,19 @@ public sealed class SessionService
     }
 
     private static bool HasValidLessonShared(
-        Session session)
+        Session session,
+        DateTimeOffset scheduledStartUtc,
+        DateTimeOffset scheduledEndUtc)
     {
         DateTimeOffset earliest =
-            session.ScheduledStartUtc
-                .AddMinutes(-5);
+            SessionWindowResolver.AddMinutesClamped(
+                scheduledStartUtc,
+                -5);
 
         DateTimeOffset latest =
-            session.ScheduledEndUtc
-                .AddMinutes(10);
+            SessionWindowResolver.AddMinutesClamped(
+                scheduledEndUtc,
+                10);
 
         return session.Events.Any(
             e =>
@@ -681,15 +709,17 @@ public sealed class SessionService
 
     private static bool HasValidParticipationEvidence(
         Session session,
-        SessionEventType eventType)
+        SessionEventType eventType,
+        DateTimeOffset scheduledStartUtc,
+        DateTimeOffset scheduledEndUtc)
     {
         return session.Events.Any(
             e =>
                 e.EventType ==
                     eventType &&
                 e.OccurredAtUtc >=
-                    session.ScheduledStartUtc &&
+                    scheduledStartUtc &&
                 e.OccurredAtUtc <=
-                    session.ScheduledEndUtc);
+                    scheduledEndUtc);
     }
 }

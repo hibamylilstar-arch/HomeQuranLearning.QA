@@ -1,5 +1,115 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_ATTENDANCE_SIMPLIFICATION_20260905_BEGIN -->
+# ATTENDANCE SIMPLIFICATION - SOURCE COMPLETE / RUNTIME PENDING - 2026-09-05
+
+## Product attendance authority
+
+Attendance now follows the Owner-approved contract:
+
+- `LessonShared` is the only automatic attendance authority.
+- Valid `LessonShared` for a session means:
+  - Teacher = `Present`
+  - Student = `Present`
+  - review status = `AutoResolved`
+- lesson timestamp is NOT teacher/student arrival time.
+- automatic `Late` is not produced.
+- automatic `Absent` is not produced.
+- completed session without valid lesson evidence:
+  - Teacher = `NeedsReview`
+  - Student = `NeedsReview`
+  - review status = `Pending`
+- live session without lesson remains `Unknown / Pending`.
+- audio, call state, greeting, generic activity and communication-process
+  evidence are NOT attendance truth.
+
+Attendance source commit:
+
+`c51363b5a64d07083e5b2391f7aff46746cf23af`
+
+Commit:
+
+`feat: make lesson sharing attendance authority`
+
+Verification at that commit:
+
+- targeted AttendanceReducer tests = 30 PASS
+- full solution tests = 131 PASS
+- QA changed = NO
+- Live changed = NO
+- Recording changed = NO
+- database schema changed = NO
+
+## Student-audio attendance worker retired
+
+The dedicated Agent `StudentAudioEvidenceWorker` has been removed.
+
+Removed behavior:
+
+- 250 ms process AudioSession meter polling
+- five-second `StudentAudioDetected` emission
+- hosted-worker registration
+- Agent activity signal type
+- ClassObserver mapping for new StudentAudioDetected events
+
+Historical backend `StudentAudioDetected` enum/data compatibility is intentionally
+retained so old session evidence remains readable.
+
+Historical StudentAudioDetected events do NOT resolve attendance.
+
+Agent cleanup commit:
+
+`ca2cd772f6bdff91588786604a7ee4948a637c65`
+
+Commit:
+
+`refactor: retire student audio attendance worker`
+
+Verification:
+
+- Agent build = PASS
+- AttendanceReducer regression = 30 PASS
+- full solution = 131 PASS
+- QA changed = NO
+- Live changed = NO
+- Recording changed = NO
+- database schema changed = NO
+
+## Deployment state
+
+These attendance changes are SOURCE COMPLETE only.
+
+They are NOT runtime-certified and have NOT been deployed.
+
+- VPS attendance/API deployment = pending
+- new Agent immutable release = not built
+- Owner/teacher Agent rollout = not started
+
+Do not publish a new Agent release merely for the worker removal.
+
+Finish delayed LessonShared reconciliation first, test the combined behavior,
+then create one immutable Agent release/canary.
+
+## Remaining attendance blocker
+
+Delayed lesson reconciliation is not complete.
+
+Required workflow:
+
+- lesson may be sent substantially after class, including about one hour later
+- recent unresolved sessions must remain eligible for lesson reconciliation
+- back-to-back sessions must not cause the previous lesson target to disappear
+- multiple children/family workflows must never be silently assigned to the
+  wrong session
+- ambiguity must remain `NeedsReview` rather than guessing
+- no audio/speaker attribution may be reintroduced for attendance
+
+Current single-target Teams observation and short evidence-window behavior must
+be replaced with a bounded delayed-lesson reconciliation design.
+
+<!-- HQL_ATTENDANCE_SIMPLIFICATION_20260905_END -->
+
+
 <!-- HQL_LIVE_VIEWER_RUNTIME_CERTIFIED_20260905_BEGIN -->
 # LIVE MONITORING VIEWER ? RUNTIME CERTIFIED COMPLETE ? 2026-09-05
 

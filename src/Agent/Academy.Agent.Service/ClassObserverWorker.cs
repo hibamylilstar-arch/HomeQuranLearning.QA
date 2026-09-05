@@ -1,4 +1,4 @@
-﻿using Academy.Agent.Cloud;
+using Academy.Agent.Cloud;
 
 namespace Academy.Agent.Service;
 
@@ -429,9 +429,6 @@ public sealed class ClassObserverWorker : BackgroundService
 
             AgentActivitySignalType.TechnicalIssue =>
                 "TechnicalIssue",
-
-            AgentActivitySignalType.StudentAudioDetected =>
-                "StudentAudioDetected",
 
             // Heartbeat DeviceOnline is intentionally not persisted
             // every 30 seconds because it would flood session_events.

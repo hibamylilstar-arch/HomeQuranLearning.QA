@@ -1,4 +1,4 @@
-﻿namespace Academy.Agent.Service;
+namespace Academy.Agent.Service;
 
 public enum AgentActivitySignalType
 {
@@ -12,9 +12,5 @@ public enum AgentActivitySignalType
     CommunicationProcessStopped = 7,
     ConnectionLost = 8,
     ConnectionRestored = 9,
-    TechnicalIssue = 10,
-
-    // Non-silent system-output audio observed while a supported
-    // communication application is actively detected.
-    StudentAudioDetected = 11
+    TechnicalIssue = 10
 }

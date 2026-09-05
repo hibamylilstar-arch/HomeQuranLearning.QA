@@ -100,7 +100,6 @@ builder.Services.AddSingleton(_ =>
 builder.Services.AddHostedService<AttendanceEventDeliveryWorker>();
 builder.Services.AddHostedService<ClassObserverWorker>();
 builder.Services.AddHostedService<CommunicationProcessMonitorWorker>();
-builder.Services.AddHostedService<StudentAudioEvidenceWorker>();
 builder.Services.AddHostedService<TeamsEvidencePipeServer>();
 builder.Services.AddHostedService<TeamsEvidenceJournalWorker>();
 

@@ -1,5 +1,149 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_LIVE_VIEWER_RUNTIME_CERTIFIED_20260905_BEGIN -->
+# LIVE MONITORING VIEWER ? RUNTIME CERTIFIED COMPLETE ? 2026-09-05
+
+> This checkpoint supersedes older Live Monitoring viewer notes where adaptive stream, manual subscription management, feed-quality monitoring, automatic metadata refresh, or native mobile browser fullscreen were still active.
+>
+> Do not reopen this viewer architecture unless an observed regression or explicit Owner request requires it.
+
+## Runtime-certified application commit
+
+`fd5695033d11af9e959d55352fab3089dae9f7a5`
+
+Commit:
+
+`fix: polish live monitoring mobile ux`
+
+Stable-behavior restoration commit:
+
+`2a8f5cf98083b81f70a7bfdf17c9853c6a2e902d`
+
+VPS deployment model:
+
+- detached HEAD at exact certified commit
+- dashboard-only rebuild/recreate for dashboard-only changes
+- approved custom VPS Caddyfile must remain preserved
+
+Approved custom Caddy SHA256:
+
+`280dfe2cf855e4be0029c36fe992ae4505dd393f50b25717aa25761447338ac1`
+
+## Final LiveKit viewer contract
+
+The dashboard viewer uses LiveKit default behavior:
+
+- `new Room()`
+- `await room.connect(url, token)`
+- LiveKit owns built-in reconnect
+- `RoomEvent.Reconnecting` / `RoomEvent.Reconnected` are UI status only
+
+Removed and intentionally NOT part of the viewer:
+
+- `adaptiveStream`
+- `autoSubscribe: false`
+- manual `setSubscribed(...)`
+- custom subscription recovery
+- publisher watchdog/self-healing loops
+- connection-quality badge
+- adaptive-video overlay
+- automatic 30-second metadata refresh
+
+Manual `Retry feed` remains a user-controlled action.
+
+## Metadata contract
+
+Metadata loads initially.
+
+After initial load, metadata refresh is manual only.
+
+`Refresh now`:
+
+- is clickable
+- shows `Refreshing...`
+- refreshes Teacher / Student / Course / Session metadata
+- does NOT intentionally recreate or interrupt the LiveKit feed
+
+Expanded view also exposes a manual `Refresh` button.
+
+## Mobile fullscreen contract
+
+Desktop retains browser native fullscreen.
+
+Mobile uses dashboard-owned immersive fullscreen instead of Android Chrome native fullscreen.
+
+This avoids browser-generated IP/instruction overlays and keeps the experience inside the SaaS UI.
+
+Runtime-certified mobile behavior:
+
+- immersive fullscreen opens = PASS
+- white browser IP/instruction message = NO
+- fullscreen exit = PASS
+- portrait layout = PASS
+- landscape layout = PASS
+
+## Runtime acceptance proof
+
+Desktop:
+
+- video = PASS
+- audio = PASS
+- Listen / Mute = PASS
+- fullscreen = PASS
+
+Viewer behavior:
+
+- feed-quality badge removed = PASS
+- adaptive-video UI removed = PASS
+- Refresh now clickable = PASS
+- Refreshing text visible = PASS
+- Refresh interrupts video = NO
+- live stays connected = PASS
+- unexpected Waiting for classroom = NO
+- video freeze / black = NO
+
+Mobile:
+
+- video = PASS
+- audio = PASS
+- immersive fullscreen = PASS
+- fullscreen exit = PASS
+- portrait layout = PASS
+- landscape layout = PASS
+- expanded Refresh = PASS
+- expanded Close = PASS
+
+Audio/video synchronization is acceptable for the current use case.
+
+## Remaining audio issue ? NEXT PRIORITY
+
+The viewer itself is now stable and runtime-certified.
+
+Remaining audio defect:
+
+`AUDIO_HISS=YES`
+
+Observed characteristics:
+
+- constant `shhhhh` noise floor
+- teacher/student voices remain clear
+- no echo/repeat
+- no video freeze/black
+- audio/video context is acceptably synchronized
+- hiss is heard through both desktop and mobile monitoring
+
+Therefore do NOT reopen the dashboard viewer for this hiss unless source-isolation evidence points back to it.
+
+Next engineering task:
+
+isolate the hiss source through the existing audio pipeline, source-by-source, beginning on the Owner laptop so teacher classes are not disturbed.
+
+Priority remains:
+
+`Audio reliability / clarity > Live feed > QA > Recording`
+
+<!-- HQL_LIVE_VIEWER_RUNTIME_CERTIFIED_20260905_END -->
+
 <!-- HQL_RUNTIME_CERTIFIED_20260905_BEGIN -->
 # LATEST RUNTIME-CERTIFIED CHECKPOINT — 2026-09-05
 

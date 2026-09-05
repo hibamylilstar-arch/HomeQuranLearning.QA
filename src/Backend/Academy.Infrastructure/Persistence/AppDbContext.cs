@@ -27,6 +27,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Schedule> Schedules => Set<Schedule>();
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<SessionEvent> SessionEvents => Set<SessionEvent>();
+    public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -323,6 +324,77 @@ public sealed class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<AuditLogEntry>(entity =>
+        {
+            entity.ToTable("audit_log_entries");
+
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.ActorFullName)
+                .IsRequired()
+                .HasMaxLength(256);
+
+            entity.Property(x => x.ActorRole)
+                .IsRequired()
+                .HasMaxLength(32);
+
+            entity.Property(x => x.Action)
+                .IsRequired()
+                .HasMaxLength(64);
+
+            entity.Property(x => x.EntityType)
+                .IsRequired()
+                .HasMaxLength(128);
+
+            entity.Property(x => x.EntityId)
+                .HasMaxLength(128);
+
+            entity.Property(x => x.EntityDisplayName)
+                .IsRequired()
+                .HasMaxLength(512);
+
+            entity.Property(x => x.Summary)
+                .IsRequired()
+                .HasMaxLength(768);
+
+            entity.Property(x => x.ChangesJson)
+                .HasColumnType("jsonb");
+
+            entity.Property(x => x.RequestMethod)
+                .HasMaxLength(16);
+
+            entity.Property(x => x.RequestPath)
+                .HasMaxLength(512);
+
+            entity.Property(x => x.RequestId)
+                .HasMaxLength(128);
+
+            entity.Property(x => x.IpAddress)
+                .HasMaxLength(128);
+
+            entity.Property(x => x.UserAgent)
+                .HasMaxLength(1024);
+
+            entity.HasIndex(
+                x => x.OccurredAtUtc);
+
+            entity.HasIndex(
+                x => new
+                {
+                    x.ActorRole,
+                    x.OccurredAtUtc
+                });
+
+            entity.HasIndex(
+                x => new
+                {
+                    x.EntityType,
+                    x.OccurredAtUtc
+                });
+
+            entity.HasIndex(
+                x => x.RequestId);
+        });
         modelBuilder.Entity<SessionEvent>(entity =>
         {
             entity.ToTable("session_events");

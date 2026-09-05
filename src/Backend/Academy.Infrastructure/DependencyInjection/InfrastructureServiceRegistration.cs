@@ -18,10 +18,17 @@ public static class InfrastructureServiceRegistration
         string connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
-        services.AddDbContext<AppDbContext>(options =>
-        {
-            options.UseNpgsql(connectionString);
-        });
+        services.AddScoped<AuditSaveChangesInterceptor>();
+
+        services.AddDbContext<AppDbContext>(
+            (serviceProvider, options) =>
+            {
+                options.UseNpgsql(connectionString);
+
+                options.AddInterceptors(
+                    serviceProvider.GetRequiredService<
+                        AuditSaveChangesInterceptor>());
+            });
 
         services.AddScoped<IDeviceRepository, DeviceRepository>();
         services.AddScoped<IHeartbeatRepository, HeartbeatRepository>();
@@ -31,6 +38,7 @@ public static class InfrastructureServiceRegistration
         services.AddScoped<IQaCandidateRepository, QaCandidateRepository>();
         services.AddScoped<ITranscriptSegmentRepository, TranscriptSegmentRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<ITeacherRepository, TeacherRepository>();
         services.AddScoped<IManagerTeacherAssignmentRepository, ManagerTeacherAssignmentRepository>();
         services.AddScoped<IDeviceTeacherAssignmentRepository, DeviceTeacherAssignmentRepository>();

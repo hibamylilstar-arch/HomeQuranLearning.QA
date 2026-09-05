@@ -19,7 +19,8 @@ type IconName =
   | "schedules"
   | "sessions"
   | "attendance"
-  | "users";
+  | "users"
+  | "activity";
 
 function NavIcon({
   name,
@@ -141,6 +142,22 @@ function NavIcon({
     );
   }
 
+  if (name === "activity") {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        className={common}
+        aria-hidden="true"
+      >
+        <path d="M5 4h14v16H5z" />
+        <path d="M8 8h8M8 12h5M8 16h4" />
+        <path d="m15 14 1.5 1.5L20 12" />
+      </svg>
+    );
+  }
   if (name === "attendance") {
     return (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={common} aria-hidden="true">
@@ -273,6 +290,11 @@ export default function Sidebar({
           href: "/users",
           icon: "users" as IconName,
           roles: ownerOrAdminRoles,
+        },        {
+          name: "Activity Log",
+          href: "/activity-log",
+          icon: "activity" as IconName,
+          roles: operationalRoles,
         },
       ],
     },

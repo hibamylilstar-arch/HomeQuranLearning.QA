@@ -1,3 +1,4 @@
+using Academy.Api.Audit;
 using Academy.Infrastructure.Repositories;
 using System.Security.Claims;
 using System.Text;
@@ -22,6 +23,8 @@ const string OwnerOnlyPolicy = "OwnerOnly";
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IAuditActorContext, HttpAuditActorContext>();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<DeviceService>();
 builder.Services.AddScoped<DeviceQueryService>();
@@ -33,6 +36,7 @@ builder.Services.AddScoped<AdminUserService>();
 builder.Services.AddScoped<TeacherService>();
 builder.Services.AddScoped<ManagerAssignmentService>();
 builder.Services.AddScoped<DeviceTeacherAssignmentService>();
+builder.Services.AddScoped<ActivityLogService>();
 builder.Services.AddScoped<DashboardQueryService>();
 builder.Services.AddScoped<StudentService>();
 builder.Services.AddScoped<CourseService>();
@@ -640,6 +644,61 @@ app.MapPost("/api/worker/server-recordings/resolve-device", async (
     }
 });
 
+app.MapGet("/api/admin/activity-logs", async (
+    ClaimsPrincipal user,
+    int? page,
+    int? pageSize,
+    DateTimeOffset? fromUtc,
+    DateTimeOffset? toUtc,
+    Guid? actorUserId,
+    string? actorRole,
+    string? action,
+    string? entityType,
+    string? search,
+    ActivityLogService activityLogService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) =
+        GetUserInfo(user);
+
+    if (userId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        ActivityLogPageDto result =
+            await activityLogService
+                .GetPageAsync(
+                    new ActivityLogQuery
+                    {
+                        Page = page ?? 1,
+                        PageSize =
+                            pageSize ?? 50,
+                        FromUtc = fromUtc,
+                        ToUtc = toUtc,
+                        ActorUserId =
+                            actorUserId,
+                        ActorRole =
+                            actorRole,
+                        Action =
+                            action,
+                        EntityType =
+                            entityType,
+                        Search =
+                            search
+                    },
+                    role,
+                    cancellationToken);
+
+        return Results.Ok(result);
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return Results.Forbid();
+    }
+}).RequireAuthorization(OwnerAdminManagerPolicy);
 app.MapGet("/api/admin/devices", async (
     ClaimsPrincipal user,
     HttpRequest request,

@@ -15,6 +15,8 @@ import type {
   SessionEventListItem,
   TranscriptSegmentListItem,
   DailyAttendanceReport,
+  ActivityLogPage,
+  ActivityLogQueryOptions,
 } from "@/types";
 
 type ActionFeedbackKind =
@@ -325,6 +327,81 @@ async function proxyFetch<T>(
   }
 
   return responseBody as T;
+}
+export async function getActivityLogs(
+  options: ActivityLogQueryOptions = {}
+): Promise<ActivityLogPage> {
+  const searchParams =
+    new URLSearchParams();
+
+  if (options.page) {
+    searchParams.set(
+      "page",
+      String(options.page)
+    );
+  }
+
+  if (options.pageSize) {
+    searchParams.set(
+      "pageSize",
+      String(options.pageSize)
+    );
+  }
+
+  if (options.fromUtc) {
+    searchParams.set(
+      "fromUtc",
+      options.fromUtc
+    );
+  }
+
+  if (options.toUtc) {
+    searchParams.set(
+      "toUtc",
+      options.toUtc
+    );
+  }
+
+  if (options.actorUserId) {
+    searchParams.set(
+      "actorUserId",
+      options.actorUserId
+    );
+  }
+
+  if (options.actorRole) {
+    searchParams.set(
+      "actorRole",
+      options.actorRole
+    );
+  }
+
+  if (options.action) {
+    searchParams.set(
+      "action",
+      options.action
+    );
+  }
+
+  if (options.entityType) {
+    searchParams.set(
+      "entityType",
+      options.entityType
+    );
+  }
+
+  if (options.search) {
+    searchParams.set(
+      "search",
+      options.search
+    );
+  }
+
+  return proxyFetch<ActivityLogPage>(
+    ["activity-logs"],
+    undefined,
+    searchParams
+  );
 }
 export async function getDevices(): Promise<DeviceListItem[]> {
   return proxyFetch<DeviceListItem[]>(["devices"]);

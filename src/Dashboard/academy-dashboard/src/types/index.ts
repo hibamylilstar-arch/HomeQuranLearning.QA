@@ -221,3 +221,48 @@ export interface DailyAttendanceReport {
   unresolvedSessions: DailyAttendanceReportItem[];
   sessions: DailyAttendanceReportItem[];
 }
+
+export interface ActivityLogChange {
+  field: string;
+  before: string | null;
+  after: string | null;
+}
+
+export interface ActivityLogItem {
+  id: string;
+  occurredAtUtc: string;
+  actorUserId: string;
+  actorFullName: string;
+  actorRole: string;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  entityDisplayName: string;
+  summary: string;
+  changes: ActivityLogChange[];
+  activityGroupId: string;
+  requestMethod: string | null;
+  requestPath: string | null;
+  requestId: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+}
+
+export interface ActivityLogPage {
+  items: ActivityLogItem[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+export interface ActivityLogQueryOptions {
+  page?: number;
+  pageSize?: number;
+  fromUtc?: string;
+  toUtc?: string;
+  actorUserId?: string;
+  actorRole?: string;
+  action?: string;
+  entityType?: string;
+  search?: string;
+}

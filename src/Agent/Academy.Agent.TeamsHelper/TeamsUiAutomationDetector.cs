@@ -454,7 +454,8 @@ internal static class TeamsUiAutomationDetector
             string? attachmentName =
                 FindAttachmentName(
                     element,
-                    messageId);
+                    messageId,
+                    elements);
 
             bool hasLessonText =
                 ContainsLessonKeyword(
@@ -692,24 +693,23 @@ internal static class TeamsUiAutomationDetector
 
     private static string? FindAttachmentName(
         AutomationElement messageElement,
-        string messageId)
+        string messageId,
+        IReadOnlyList<AutomationElement> chatElements)
     {
-        AutomationElementCollection descendants;
+        string expectedAttachmentId =
+            $"attachments-{messageId}";
 
-        try
-        {
-            descendants =
-                messageElement.FindAll(
-                    TreeScope.Descendants,
-                    Condition.TrueCondition);
-        }
-        catch
-        {
-            return null;
-        }
-
+        // The Teams attachment container is commonly a sibling of
+        // message-body-<id>, not its descendant. The id itself is
+        // message-specific, so searching the bound student chat is safe.
         bool attachmentContainerFound =
-            false;
+            chatElements.Any(
+                element =>
+                    string.Equals(
+                        GetAutomationId(
+                            element),
+                        expectedAttachmentId,
+                        StringComparison.OrdinalIgnoreCase));
 
         bool imageFound =
             false;
@@ -717,34 +717,40 @@ internal static class TeamsUiAutomationDetector
         string? detectedImageName =
             null;
 
-        string expectedAttachmentId =
-            $"attachments-{messageId}";
-
-        for (
-            int i = 0;
-            i < descendants.Count;
-            i++)
+        void ScanScope(
+            AutomationElement scope)
         {
-            AutomationElement element =
-                descendants[i];
+            AutomationElementCollection descendants;
 
-            string automationId =
-                GetAutomationId(
-                    element);
-
-            if (string.Equals(
-                    automationId,
-                    expectedAttachmentId,
-                    StringComparison.OrdinalIgnoreCase))
+            try
             {
-                attachmentContainerFound =
-                    true;
+                descendants =
+                    scope.FindAll(
+                        TreeScope.Descendants,
+                        Condition.TrueCondition);
+            }
+            catch
+            {
+                return;
             }
 
-            if (GetControlType(
-                    element) ==
-                ControlType.Image)
+            for (
+                int i = 0;
+                i < descendants.Count;
+                i++)
             {
+                AutomationElement element =
+                    descendants[i];
+
+                if (
+                    GetControlType(
+                        element) !=
+                    ControlType.Image
+                )
+                {
+                    continue;
+                }
+
                 imageFound =
                     true;
 
@@ -764,13 +770,64 @@ internal static class TeamsUiAutomationDetector
             }
         }
 
-        // Product rule:
-        // Teams may expose the same shared lesson page through either
-        // the attachment container or an Image UI element.
-        //
-        // Either one is sufficient lesson-image evidence.
-        //
-        // Filename and extension are not attendance semantics.
+        // First preserve the old descendant path.
+        ScanScope(
+            messageElement);
+
+        // Real Teams often places the media thumbnail beside the
+        // message-body node inside the surrounding outgoing message card.
+        // Walk upward only a few levels and stop at the first outgoing
+        // ChatMyMessage-style container.
+        if (!imageFound)
+        {
+            try
+            {
+                AutomationElement? current =
+                    TreeWalker.RawViewWalker.GetParent(
+                        messageElement);
+
+                for (
+                    int depth = 0;
+                    current is not null &&
+                    depth < 8;
+                    depth++)
+                {
+                    string className =
+                        GetClassName(
+                            current);
+
+                    if (
+                        className.Contains(
+                            "ChatMyMessage",
+                            StringComparison.OrdinalIgnoreCase)
+                    )
+                    {
+                        ScanScope(
+                            current);
+
+                        break;
+                    }
+
+                    if (
+                        GetControlType(
+                            current) ==
+                        ControlType.Document
+                    )
+                    {
+                        break;
+                    }
+
+                    current =
+                        TreeWalker.RawViewWalker.GetParent(
+                            current);
+                }
+            }
+            catch
+            {
+                // Attachment-id search above remains authoritative.
+            }
+        }
+
         if (!IsLessonImageSignal(
                 attachmentContainerFound,
                 imageFound))

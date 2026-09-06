@@ -3244,3 +3244,23 @@ is shared.
 Backend attendance, scheduler, canonical audio, Live, Recording,
 dashboard, QA and database schema are unchanged.
 <!-- HQL_LESSON_IMAGE_TEAMS_OR_SIGNAL_20260906_END -->
+
+
+<!-- HQL_TEAMS_MESSAGE_CARD_MEDIA_20260906_BEGIN -->
+## Teams lesson media DOM/UIA shape - 2026-09-06
+
+Runtime canary proved that valid Teams Quran/Qaida page media may not
+be exposed as a descendant of `message-body-<id>`.
+
+Final detection therefore accepts either:
+
+- exact `attachments-<messageId>` anywhere inside the already-bound
+  scheduled student's Teams chat tree; or
+- an Image UIA element inside the outgoing message body or its
+  surrounding outgoing `ChatMyMessage` card.
+
+No OCR is used. Image content, filename and extension are irrelevant.
+Backend attendance/grace/audio/dashboard behavior is unchanged.
+
+Runtime re-certification pending.
+<!-- HQL_TEAMS_MESSAGE_CARD_MEDIA_20260906_END -->

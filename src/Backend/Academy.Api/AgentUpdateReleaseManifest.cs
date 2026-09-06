@@ -16,7 +16,4 @@ internal sealed class AgentUpdateReleaseManifest
     public bool RequireAuthenticode { get; init; }
 
     public string? SignerThumbprint { get; init; }
-
-    public string[]? TargetDeviceIds { get; init; } =
-        [];
 }

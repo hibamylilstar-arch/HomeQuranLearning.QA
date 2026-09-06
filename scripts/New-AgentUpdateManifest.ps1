@@ -11,8 +11,6 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$ReleaseId,
 
-    [string[]]$TargetDeviceIds = @(),
-
     [switch]$RequireAuthenticode,
 
     [string]$SignerThumbprint = "",
@@ -68,7 +66,6 @@ $manifest=[ordered]@{
     sha256=$hash
     requireAuthenticode=[bool]$RequireAuthenticode
     signerThumbprint=$SignerThumbprint
-    targetDeviceIds=@($TargetDeviceIds)
 }
 
 $manifest |
@@ -81,5 +78,4 @@ Write-Host ("RELEASE_DIRECTORY=" + $OutputDirectory)
 Write-Host ("RELEASE_ID=" + $ReleaseId)
 Write-Host ("VERSION=" + $Version)
 Write-Host ("SHA256=" + $hash)
-Write-Host ("TARGET_COUNT=" + @($TargetDeviceIds).Count)
 Write-Host "MANIFEST_READY=PASS"

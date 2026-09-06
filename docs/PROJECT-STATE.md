@@ -3291,3 +3291,29 @@ Runtime re-certification pending.
 - Actual lesson/image attendance behavior still requires one scheduled-class runtime canary.
 - Other academy laptops were not updated in this canary.
 - Cross-device attendance remains deferred.
+
+## HQL_GLOBAL_APPROVED_AGENT_RELEASE_20260907
+
+Owner-approved Agent release policy:
+
+- Per-device Agent release allowlists are not part of the product.
+- TargetDeviceIds has been removed from the Agent release generator and manifest model.
+- The Owner laptop is used only as the first canary/test device.
+- After the Owner canary passes, that Agent release is approved for all managed academy laptops.
+- Existing academy laptops may use Update Now to install the approved release.
+- New academy laptops may use the approved installer.
+- PendingAgentUpdateVersion only records an explicit Update Now request for a laptop; it is not a release allowlist.
+- No new whitelist, device eligibility restriction, rollout restriction, or similar product limitation may be introduced without explicit Owner approval first.
+
+Runtime state:
+
+- Approved Agent version: 1.0.0-c3b10ffd04a3-namegate1.
+- Owner automatic updater passed.
+- Student-name to Teams-name gate removal is installed and runtime-proven.
+- Real scheduled-class lesson image detection passed.
+- LessonShared became Yes.
+- Teacher attendance resolved Present.
+- Student attendance resolved Present.
+- Attendance resolved AutoResolved.
+- Call attempt, connected and ended lifecycle evidence was observed.
+- This Agent version is approved for academy-wide use.

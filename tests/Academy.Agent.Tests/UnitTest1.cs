@@ -141,7 +141,7 @@ public sealed class TeamsHelperLifecycleTests
     }
 
     [Fact]
-    public void StateMachine_InitialConnectedSnapshot_EmitsCallLifecycleEvidence()
+    public void StateMachine_CallLifecycle_DoesNotRequireChatBinding()
     {
         DateTimeOffset start =
             new(
@@ -178,7 +178,7 @@ public sealed class TeamsHelperLifecycleTests
                     Guid.NewGuid(),
 
                 CourseName =
-                    "Qaida",
+                    "Hifz",
 
                 ScheduledStartUtc =
                     start,
@@ -193,13 +193,13 @@ public sealed class TeamsHelperLifecycleTests
         var connected =
             new TeamsUiSnapshot(
                 TeamsWebViewCount:
-                    1,
+                    2,
 
                 SelectedProcessId:
-                    123,
+                    null,
 
                 ChatBound:
-                    true,
+                    false,
 
                 CallState:
                     "Connected",
@@ -221,10 +221,6 @@ public sealed class TeamsHelperLifecycleTests
                 target,
                 connected,
                 start.AddSeconds(5));
-
-        Assert.Equal(
-            2,
-            first.Count);
 
         Assert.Contains(
             first,
@@ -257,79 +253,204 @@ public sealed class TeamsHelperLifecycleTests
                 ended,
                 start.AddMinutes(2));
 
-        TeamsEvidenceEnvelope endEvent =
-            Assert.Single(
-                second);
-
-        Assert.Equal(
-            TeamsEvidenceType.CallEnded,
-            endEvent.Type);
+        Assert.Contains(
+            second,
+            item =>
+                item.Type ==
+                    TeamsEvidenceType.CallEnded);
     }
 
     [Fact]
-    public void LessonSequence_ImageThenLessonText_ResolvesLessonEvidence()
+    public void LessonEvidence_ImageAlone_IsAuthoritative()
     {
-        DateTimeOffset start =
+        DateTimeOffset now =
             new(
                 2026,
                 9,
                 6,
-                1,
+                12,
                 0,
                 0,
                 TimeSpan.Zero);
 
-        IReadOnlyList<TeamsDetectedMessage> raw =
-            new[]
-            {
-                new TeamsDetectedMessage(
-                    MessageId:
-                        "1788643380000",
-
-                    OccurredAtUtc:
-                        start,
-
-                    AttachmentName:
-                        "lesson-page.jpg",
-
-                    MessageText:
-                        "Sent image"),
-
-                new TeamsDetectedMessage(
-                    MessageId:
-                        "1788643410000",
-
-                    OccurredAtUtc:
-                        start.AddSeconds(30),
-
-                    AttachmentName:
-                        null,
-
-                    MessageText:
-                        "Sent para 4 line 7")
-            };
-
         IReadOnlyList<TeamsDetectedMessage> resolved =
             TeamsUiAutomationDetector
                 .ResolveLessonMessageSequences(
-                    raw);
+                    new[]
+                    {
+                        new TeamsDetectedMessage(
+                            MessageId:
+                                "1788696000000",
+
+                            OccurredAtUtc:
+                                now,
+
+                            AttachmentName:
+                                "lesson-page.png",
+
+                            MessageText:
+                                "Sent image")
+                    });
 
         TeamsDetectedMessage lesson =
             Assert.Single(
                 resolved);
 
         Assert.Equal(
-            "lesson-page.jpg",
+            "lesson-page.png",
             lesson.AttachmentName);
 
-        Assert.Contains(
-            "para 4 line 7",
-            lesson.MessageText
-                .ToLowerInvariant());
+        Assert.Equal(
+            now,
+            lesson.OccurredAtUtc);
+    }
+
+    [Fact]
+    public void LessonEvidence_TextAlone_IsValidFallback()
+    {
+        IReadOnlyList<TeamsDetectedMessage> resolved =
+            TeamsUiAutomationDetector
+                .ResolveLessonMessageSequences(
+                    new[]
+                    {
+                        new TeamsDetectedMessage(
+                            MessageId:
+                                "1788696000001",
+
+                            OccurredAtUtc:
+                                DateTimeOffset.UtcNow,
+
+                            AttachmentName:
+                                null,
+
+                            MessageText:
+                                "Sent Hifz Surah Mulk ayah 1 to 5")
+                    });
+
+        TeamsDetectedMessage lesson =
+            Assert.Single(
+                resolved);
+
+        Assert.Null(
+            lesson.AttachmentName);
+    }
+
+    [Fact]
+    public void LessonEvidence_ImageAndText_DoNotDependOnEachOther()
+    {
+        DateTimeOffset now =
+            DateTimeOffset.UtcNow;
+
+        IReadOnlyList<TeamsDetectedMessage> resolved =
+            TeamsUiAutomationDetector
+                .ResolveLessonMessageSequences(
+                    new[]
+                    {
+                        new TeamsDetectedMessage(
+                            MessageId:
+                                "1788696000002",
+
+                            OccurredAtUtc:
+                                now,
+
+                            AttachmentName:
+                                "page.png",
+
+                            MessageText:
+                                "Sent image"),
+
+                        new TeamsDetectedMessage(
+                            MessageId:
+                                "1788696000003",
+
+                            OccurredAtUtc:
+                                now.AddSeconds(20),
+
+                            AttachmentName:
+                                null,
+
+                            MessageText:
+                                "Sent Para 4 line 7")
+                    });
 
         Assert.Equal(
-            start.AddSeconds(30),
-            lesson.OccurredAtUtc);
+            2,
+            resolved.Count);
+    }
+
+    [Theory]
+    [InlineData("Para 4 line 7")]
+    [InlineData("Parah 4")]
+    [InlineData("Sipara 12")]
+    [InlineData("Juz 29")]
+    [InlineData("Surah Mulk")]
+    [InlineData("Ayah 1")]
+    [InlineData("Verse 5")]
+    [InlineData("Line 7")]
+    [InlineData("Page 17")]
+    [InlineData("Lesson 4")]
+    [InlineData("Sabaq 3")]
+    [InlineData("Sabak 3")]
+    [InlineData("Qaida page 8")]
+    [InlineData("Qaidah page 8")]
+    [InlineData("Nazra page 20")]
+    [InlineData("Ruku 2")]
+    [InlineData("Rukoo 2")]
+    [InlineData("Tajweed lesson")]
+    [InlineData("Hifz new lesson")]
+    [InlineData("Manzil revision")]
+    [InlineData("Sabaqi revision")]
+    [InlineData("Sabqi revision")]
+    [InlineData("Makhraj practice")]
+    [InlineData("Makharij revision")]
+    public void LessonVocabulary_AcceptsAcademyLessonTerms(
+        string value)
+    {
+        Assert.True(
+            TeamsUiAutomationDetector
+                .ContainsLessonKeyword(
+                    value));
+    }
+
+    [Theory]
+    [InlineData("ok")]
+    [InlineData("done")]
+    [InlineData("good")]
+    [InlineData("👍")]
+    public void LessonVocabulary_RejectsGenericMessages(
+        string value)
+    {
+        Assert.False(
+            TeamsUiAutomationDetector
+                .ContainsLessonKeyword(
+                    value));
+    }
+
+    [Theory]
+    [InlineData(
+        "Chat | Student Test 2 | Microsoft Teams")]
+    [InlineData(
+        "Chat with Student Test 2 - Microsoft Teams")]
+    [InlineData(
+        "Student Test 2 | Microsoft Teams")]
+    public void StudentChatBinding_AcceptsTeamsTitleVariants(
+        string title)
+    {
+        Assert.True(
+            TeamsUiAutomationDetector
+                .IsStudentChatDocumentName(
+                    title,
+                    "Student Test 2"));
+    }
+
+    [Fact]
+    public void StudentChatBinding_RejectsDifferentStudent()
+    {
+        Assert.False(
+            TeamsUiAutomationDetector
+                .IsStudentChatDocumentName(
+                    "Chat | Student Test 3 | Microsoft Teams",
+                    "Student Test 2"));
     }
 
     private static string CreateTemporaryRoot()

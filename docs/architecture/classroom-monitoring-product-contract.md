@@ -476,3 +476,39 @@ Implementation order after this contract is accepted:
 8. only then continue broader production hardening.
 
 Latency tuning must not be used to hide an incorrect audio-source selection.
+
+
+<!-- HQL_LESSON_EVIDENCE_IMAGE_OR_TEXT_20260906_BEGIN -->
+## Final lesson evidence contract - 2026-09-06
+
+LessonShared is OR-based, not pairing-based.
+
+Primary evidence:
+- an outgoing lesson page/image in the correct scheduled student's
+  Teams chat during the class window or ten-minute lesson grace
+  immediately counts as LessonShared;
+- no lesson text is required with the image;
+- filename and extension are not attendance semantics.
+
+Fallback evidence:
+- if no image/page is sent, recognized outgoing lesson wording can
+  independently count as LessonShared;
+- accepted academy terms include Para/Parah/Sipara, Juz, Surah,
+  Ayah/Verse, Line, Page, Lesson, Sabaq/Sabak, Qaida/Qaidah,
+  Nazra, Ruku/Rukoo, Tajweed, Hifz, Manzil, Sabaqi/Sabqi,
+  Revision and Makhraj/Makharij;
+- generic ok/done/good messages and emoji alone do not count.
+
+Correct scheduled-student chat ownership is mandatory.
+
+LessonShared immediately resolves Teacher Present + Student Present
++ AutoResolved. Grace waits only while LessonShared is absent.
+
+Call lifecycle scanning is independent of Teams chat-document
+visibility because call controls can live in another Teams WebView.
+
+Backend attendance logic, dashboard, scheduler, canonical audio,
+Live transport, Recording, QA and database schema are unchanged.
+
+Runtime certification remains required on the Owner Agent.
+<!-- HQL_LESSON_EVIDENCE_IMAGE_OR_TEXT_20260906_END -->

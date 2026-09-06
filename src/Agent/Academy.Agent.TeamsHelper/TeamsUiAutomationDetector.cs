@@ -40,18 +40,21 @@ internal static class TeamsUiAutomationDetector
             @"line|lines|" +
             @"page|pages|" +
             @"lesson|lessons|" +
-            @"sabaq|" +
-            @"qaida|" +
+            @"sabaq|sabak|" +
+            @"qaida|qaidah|" +
             @"nazra|" +
-            @"ruku|" +
-            @"tajweed" +
+            @"ruku|rukoo|" +
+            @"tajweed|" +
+            @"hifz|" +
+            @"manzil|" +
+            @"sabaqi|sabqi|" +
+            @"revision|" +
+            @"makhraj|makharij" +
             @")\b",
             RegexOptions.IgnoreCase |
             RegexOptions.CultureInvariant);
 
-    private static readonly TimeSpan LessonMessageSequenceWindow =
-        TimeSpan.FromMinutes(3);
-public static TeamsUiSnapshot Scan(
+    public static TeamsUiSnapshot Scan(
         string studentName,
         string? teacherName)
     {
@@ -78,6 +81,9 @@ public static TeamsUiSnapshot Scan(
         var selectedCandidates =
             new List<ProcessElements>();
 
+        var allElements =
+            new List<AutomationElement>();
+
         foreach (int processId in webViewPids)
         {
             IReadOnlyList<AutomationElement> elements =
@@ -89,28 +95,21 @@ public static TeamsUiSnapshot Scan(
                 continue;
             }
 
-            bool exactActiveChat =
+            allElements.AddRange(
+                elements);
+
+            bool activeStudentChat =
                 elements.Any(
                     element =>
-                    {
-                        string name =
+                        GetControlType(
+                            element) ==
+                            ControlType.Document &&
+                        IsStudentChatDocumentName(
                             GetName(
-                                element);
+                                element),
+                            studentName));
 
-                        ControlType? controlType =
-                            GetControlType(
-                                element);
-
-                        return
-                            controlType ==
-                                ControlType.Document &&
-                            string.Equals(
-                                name,
-                                $"Chat | {studentName} | Microsoft Teams",
-                                StringComparison.OrdinalIgnoreCase);
-                    });
-
-            if (!exactActiveChat)
+            if (!activeStudentChat)
             {
                 continue;
             }
@@ -124,42 +123,19 @@ public static TeamsUiSnapshot Scan(
         ProcessElements? selected =
             selectedCandidates
                 .OrderByDescending(
-                    x => x.Elements.Count)
+                    item =>
+                        item.Elements.Count)
                 .FirstOrDefault();
 
-        if (selected is null)
-        {
-            return new TeamsUiSnapshot(
-                TeamsWebViewCount:
-                    webViewPids.Count,
-
-                SelectedProcessId:
-                    null,
-
-                ChatBound:
-                    false,
-
-                CallState:
-                    "Unknown",
-
-                CallingControlsVisible:
-                    false,
-
-                MicrophoneControlVisible:
-                    false,
-
-                Greetings:
-                    Array.Empty<TeamsDetectedMessage>(),
-
-                Lessons:
-                    Array.Empty<TeamsDetectedMessage>());
-        }
-
         IReadOnlyList<AutomationElement> selectedElements =
-            selected.Elements;
+            selected?.Elements ??
+            Array.Empty<AutomationElement>();
+
+        IReadOnlyList<AutomationElement> callElements =
+            allElements;
 
         bool callingControls =
-            selectedElements.Any(
+            callElements.Any(
                 element =>
                 {
                     string name =
@@ -167,18 +143,19 @@ public static TeamsUiSnapshot Scan(
                             element);
 
                     return
-                        string.Equals(
-                            name,
+                        name.Contains(
                             "Calling controls",
                             StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(
-                            name,
+                        name.Contains(
                             "Calling indicators",
+                            StringComparison.OrdinalIgnoreCase) ||
+                        name.Contains(
+                            "Call controls",
                             StringComparison.OrdinalIgnoreCase);
                 });
 
         bool microphoneControl =
-            selectedElements.Any(
+            callElements.Any(
                 element =>
                     string.Equals(
                         GetAutomationId(
@@ -187,27 +164,50 @@ public static TeamsUiSnapshot Scan(
                         StringComparison.OrdinalIgnoreCase));
 
         bool studentInCall =
-            selectedElements.Any(
+            callElements.Any(
                 element =>
-                    string.Equals(
+                {
+                    string name =
                         GetName(
-                            element),
-                        $"{studentName} In a call",
-                        StringComparison.OrdinalIgnoreCase));
+                            element);
+
+                    return
+                        ContainsStudentName(
+                            name,
+                            studentName) &&
+                        (
+                            name.Contains(
+                                "In a call",
+                                StringComparison.OrdinalIgnoreCase) ||
+                            name.Contains(
+                                "In call",
+                                StringComparison.OrdinalIgnoreCase)
+                        );
+                });
 
         bool studentAvailable =
-            selectedElements.Any(
+            callElements.Any(
                 element =>
-                    string.Equals(
+                {
+                    string name =
                         GetName(
-                            element),
-                        $"{studentName} Available",
-                        StringComparison.OrdinalIgnoreCase));
+                            element);
+
+                    return
+                        ContainsStudentName(
+                            name,
+                            studentName) &&
+                        name.Contains(
+                            "Available",
+                            StringComparison.OrdinalIgnoreCase);
+                });
 
         string callState;
 
-        if (studentInCall &&
-            callingControls)
+        if (
+            studentInCall &&
+            callingControls
+        )
         {
             callState =
                 "Connected";
@@ -229,24 +229,28 @@ public static TeamsUiSnapshot Scan(
         }
 
         List<TeamsDetectedMessage> greetings =
-            DetectMessages(
-                selectedElements,
-                MessageKind.Greeting);
+            selected is null
+                ? new List<TeamsDetectedMessage>()
+                : DetectMessages(
+                    selectedElements,
+                    MessageKind.Greeting);
 
         List<TeamsDetectedMessage> lessons =
-            DetectMessages(
-                selectedElements,
-                MessageKind.Lesson);
+            selected is null
+                ? new List<TeamsDetectedMessage>()
+                : DetectMessages(
+                    selectedElements,
+                    MessageKind.Lesson);
 
         return new TeamsUiSnapshot(
             TeamsWebViewCount:
                 webViewPids.Count,
 
             SelectedProcessId:
-                selected.ProcessId,
+                selected?.ProcessId,
 
             ChatBound:
-                true,
+                selected is not null,
 
             CallState:
                 callState,
@@ -296,28 +300,18 @@ public static TeamsUiSnapshot Scan(
                 continue;
             }
 
-            bool exactActiveChat =
+            bool activeStudentChat =
                 elements.Any(
                     element =>
-                    {
-                        string name =
+                        GetControlType(
+                            element) ==
+                            ControlType.Document &&
+                        IsStudentChatDocumentName(
                             GetName(
-                                element);
+                                element),
+                            studentName));
 
-                        ControlType? controlType =
-                            GetControlType(
-                                element);
-
-                        return
-                            controlType ==
-                                ControlType.Document &&
-                            string.Equals(
-                                name,
-                                $"Chat | {studentName} | Microsoft Teams",
-                                StringComparison.OrdinalIgnoreCase);
-                    });
-
-            if (!exactActiveChat)
+            if (!activeStudentChat)
             {
                 continue;
             }
@@ -335,8 +329,8 @@ public static TeamsUiSnapshot Scan(
 
         return result.Values
             .OrderBy(
-                x =>
-                    x.OccurredAtUtc ??
+                message =>
+                    message.OccurredAtUtc ??
                     DateTimeOffset.MinValue)
             .ToList();
     }
@@ -502,144 +496,60 @@ public static TeamsUiSnapshot Scan(
         ArgumentNullException.ThrowIfNull(
             messages);
 
-        List<TeamsDetectedMessage> candidates =
-            messages
-                .Where(
-                    message =>
-                        !string.IsNullOrWhiteSpace(
-                            message.MessageId))
-                .OrderBy(
-                    message =>
-                        message.OccurredAtUtc ??
-                        DateTimeOffset.MinValue)
-                .ToList();
-
-        var result =
-            new Dictionary<string, TeamsDetectedMessage>(
-                StringComparer.Ordinal);
-
-        // Existing SOP remains valid:
-        // one outgoing message contains both lesson text and image.
-        foreach (
-            TeamsDetectedMessage message in
-            candidates)
-        {
-            if (
-                message.AttachmentName is not null &&
-                ContainsLessonKeyword(
-                    message.MessageText)
-            )
-            {
-                result[message.MessageId] =
-                    message;
-            }
-        }
-
-        // Real academy SOP:
-        // teacher may send the lesson image first and then send
-        // para/page/line/lesson text as a separate nearby message.
-        foreach (
-            TeamsDetectedMessage imageMessage in
-            candidates.Where(
+        // Final product rule:
+        //
+        // IMAGE/PAGE alone = LessonShared.
+        //
+        // Recognized lesson text alone = LessonShared fallback.
+        //
+        // Pairing is never required.
+        return messages
+            .Where(
                 message =>
-                    message.AttachmentName is not null &&
-                    !ContainsLessonKeyword(
-                        message.MessageText) &&
-                    message.OccurredAtUtc.HasValue))
-        {
-            DateTimeOffset imageTime =
-                imageMessage.OccurredAtUtc!.Value;
-
-            var match =
-                candidates
-                    .Where(
-                        message =>
-                            message.MessageId !=
-                                imageMessage.MessageId &&
-                            message.OccurredAtUtc.HasValue &&
-                            ContainsLessonKeyword(
-                                message.MessageText))
-                    .Select(
-                        message =>
-                            new
-                            {
-                                Message =
-                                    message,
-
-                                DistanceSeconds =
-                                    Math.Abs(
-                                        (
-                                            message.OccurredAtUtc!.Value -
-                                            imageTime
-                                        ).TotalSeconds)
-                            })
-                    .Where(
-                        item =>
-                            item.DistanceSeconds <=
-                            LessonMessageSequenceWindow
-                                .TotalSeconds)
-                    .OrderBy(
-                        item =>
-                            item.Message.OccurredAtUtc!.Value >=
-                                imageTime
-                                ? 0
-                                : 1)
-                    .ThenBy(
-                        item =>
-                            item.DistanceSeconds)
-                    .FirstOrDefault();
-
-            if (match is null)
-            {
-                continue;
-            }
-
-            DateTimeOffset textTime =
-                match.Message
-                    .OccurredAtUtc!.Value;
-
-            DateTimeOffset completedAt =
-                textTime >= imageTime
-                    ? textTime
-                    : imageTime;
-
-            string sequenceId =
-                $"{imageMessage.MessageId}-{match.Message.MessageId}";
-
-            string combinedText =
-                string.Join(
-                    " ",
-                    new[]
-                    {
-                        imageMessage.MessageText,
-                        match.Message.MessageText
-                    }
-                    .Where(
-                        value =>
-                            !string.IsNullOrWhiteSpace(
-                                value)));
-
-            result[sequenceId] =
-                new TeamsDetectedMessage(
-                    MessageId:
-                        sequenceId,
-
-                    OccurredAtUtc:
-                        completedAt,
-
-                    AttachmentName:
-                        imageMessage.AttachmentName,
-
-                    MessageText:
-                        combinedText);
-        }
-
-        return result.Values
+                    !string.IsNullOrWhiteSpace(
+                        message.MessageId) &&
+                    (
+                        message.AttachmentName is not null ||
+                        ContainsLessonKeyword(
+                            message.MessageText)
+                    ))
             .OrderBy(
                 message =>
                     message.OccurredAtUtc ??
                     DateTimeOffset.MinValue)
             .ToList();
+    }
+
+    internal static bool IsStudentChatDocumentName(
+        string? documentName,
+        string? studentName)
+    {
+        if (
+            string.IsNullOrWhiteSpace(
+                documentName) ||
+            string.IsNullOrWhiteSpace(
+                studentName)
+        )
+        {
+            return false;
+        }
+
+        if (!ContainsStudentName(
+                documentName,
+                studentName))
+        {
+            return false;
+        }
+
+        // Teams title formatting may change between releases.
+        // Full student-name ownership remains mandatory.
+        return
+            documentName.Contains(
+                "Chat",
+                StringComparison.OrdinalIgnoreCase) ||
+            documentName.Contains(
+                "Microsoft Teams",
+                StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsOutgoingMessageContainer(

@@ -57,6 +57,16 @@ internal sealed class TeamsEvidenceStateMachine
         var output =
             new List<TeamsEvidenceEnvelope>();
 
+        // Calls may temporarily move outside the active chat
+        // document in Teams. Observe call lifecycle first.
+        AddCallEvidence(
+            target,
+            snapshot,
+            nowUtc,
+            output);
+
+        // Greeting and lesson messages still require exact
+        // scheduled-student chat ownership.
         if (!snapshot.ChatBound)
         {
             return output;
@@ -74,12 +84,6 @@ internal sealed class TeamsEvidenceStateMachine
             snapshot.Lessons,
             TeamsEvidenceType.LessonShared,
             "lesson",
-            output);
-
-        AddCallEvidence(
-            target,
-            snapshot,
-            nowUtc,
             output);
 
         return output;

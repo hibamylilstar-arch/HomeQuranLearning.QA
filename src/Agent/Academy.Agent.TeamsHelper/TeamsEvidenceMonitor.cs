@@ -101,28 +101,10 @@ internal sealed class TeamsEvidenceMonitor
                             current.StudentFullName,
                             current.TeacherFullName);
 
-                    // When a previous lesson grace target also exists,
-                    // a lesson message must identify the current student
-                    // before it may resolve the current session.
-                    //
-                    // This prevents one sibling's delayed lesson from
-                    // being silently attached to the next sibling.
-                    if (lessonGrace is not null)
-                    {
-                        snapshot =
-                            snapshot with
-                            {
-                                Lessons =
-                                    snapshot.Lessons
-                                        .Where(
-                                            message =>
-                                                TeamsUiAutomationDetector
-                                                    .ContainsStudentName(
-                                                        message.MessageText,
-                                                        current.StudentFullName))
-                                        .ToArray()
-                            };
-                    }
+                    // The UI snapshot is already bound to the
+                    // scheduled current student's chat.
+                    // Do not require the student's name to appear
+                    // inside an image or lesson-text message.
 
                     evidence.AddRange(
                         _currentStateMachine.Evaluate(

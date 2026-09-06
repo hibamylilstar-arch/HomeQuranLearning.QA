@@ -450,7 +450,7 @@ export default function LiveVideo({
       className={
         isMobileImmersive
           ? "fixed inset-0 z-[100] flex h-[100dvh] w-screen flex-col bg-black p-2"
-          : "space-y-2"
+          : "space-y-1.5"
       }
     >
       <div
@@ -559,60 +559,67 @@ export default function LiveVideo({
       <div
         className={
           isMobileImmersive
-            ? "flex shrink-0 flex-row items-center justify-between gap-2 border-t border-slate-800 bg-black px-1 py-2"
-            : "flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+            ? "flex shrink-0 items-center gap-1.5 border-t border-slate-800 bg-black px-1 py-2"
+            : "flex items-center gap-1.5"
         }
       >
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              void toggleAudio();
-            }}
-            disabled={
-              connectionState !== "live" ||
-              !hasAudio
-            }
-            className={
-              "min-h-10 rounded-lg px-4 text-xs font-semibold transition " +
-              (isAudible
-                ? "bg-rose-600 text-white hover:bg-rose-500"
-                : "bg-emerald-600 text-white hover:bg-emerald-500") +
-              " disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
-            }
-          >
-            {isAudible
-              ? "Mute"
-              : hasAudio
-                ? "Listen"
-                : "Audio waiting"}
-          </button>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            void toggleAudio();
+          }}
+          disabled={
+            connectionState !== "live" ||
+            !hasAudio
+          }
+          className={
+            "min-h-9 min-w-0 flex-1 rounded-md px-2.5 text-[11px] font-semibold transition sm:text-xs " +
+            (isAudible
+              ? "bg-rose-600 text-white hover:bg-rose-500"
+              : "bg-emerald-600 text-white hover:bg-emerald-500") +
+            " disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
+          }
+        >
+          {isAudible
+            ? "Mute"
+            : hasAudio
+              ? "Listen"
+              : "Audio waiting"}
+        </button>
 
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              void toggleFullscreen();
-            }}
-            disabled={!hasVideo}
-            className="min-h-10 rounded-lg border border-slate-700 bg-slate-900 px-4 text-xs font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {isFullscreen || isMobileImmersive
-              ? "Exit fullscreen"
-              : "Fullscreen"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            void toggleFullscreen();
+          }}
+          disabled={!hasVideo}
+          className="min-h-9 min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-[11px] font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 sm:text-xs"
+        >
+          {isFullscreen || isMobileImmersive
+            ? "Exit"
+            : "Fullscreen"}
+        </button>
 
         <div
-          className="text-[10px] font-medium text-slate-500"
+          className={
+            "shrink-0 rounded-md border px-2 py-2 text-[9px] font-bold uppercase leading-none tracking-wide " +
+            (connectionState === "live" && hasVideo
+              ? "border-slate-700 bg-slate-900 text-slate-300"
+              : stateClass(connectionState, hasVideo))
+          }
           aria-live="polite"
         >
-          {connectionState === "live" && hasVideo
-            ? hasAudio
-              ? "Video + audio available"
-              : "Video live • audio waiting"
-            : feedLabel}
+          {connectionState === "live"
+            ? hasVideo
+              ? hasAudio
+                ? "A/V Live"
+                : "Video"
+              : "Waiting"
+            : connectionState === "reconnecting"
+              ? "Reconnect"
+              : feedLabel}
         </div>
       </div>
 

@@ -116,15 +116,15 @@ function DeviceLiveCard({
       className={
         expanded
           ? "fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden border-0 bg-slate-950 shadow-2xl sm:inset-4 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl sm:border sm:border-emerald-500/40 lg:inset-x-[7vw] lg:inset-y-[5vh]"
-          : "min-w-0 overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl transition-colors duration-200 hover:border-emerald-500/40"
+          : "min-w-0 overflow-hidden rounded-xl border border-slate-800/90 bg-slate-950 shadow-lg shadow-slate-950/30 transition-colors duration-200 hover:border-emerald-500/40"
       }
     >
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 bg-slate-900/95 px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-800/80 bg-slate-900/90 px-3 py-2.5 sm:px-3.5">
         <div className="min-w-0">
-          <h3 className="truncate text-sm font-bold text-white sm:text-base">
+          <h3 className="truncate text-sm font-bold leading-tight text-white">
             {laptopName}
           </h3>
-          <p className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+          <p className="mt-0.5 truncate text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
             {device.deviceName}
           </p>
         </div>
@@ -135,8 +135,8 @@ function DeviceLiveCard({
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
             </span>
-            <span className="text-[10px] font-bold tracking-wider text-emerald-400">
-              DEVICE ONLINE
+            <span className="text-[9px] font-bold tracking-wider text-emerald-400 sm:text-[10px]">
+              ONLINE
             </span>
           </div>
 
@@ -167,7 +167,7 @@ function DeviceLiveCard({
       </div>
 
       <div
-        className={expanded ? "min-h-0 flex-1 overflow-y-auto bg-slate-950 p-2 sm:p-4" : "bg-slate-950 p-2"}
+        className={expanded ? "min-h-0 flex-1 overflow-y-auto bg-slate-950 p-2 sm:p-4" : "bg-slate-950 p-1.5 sm:p-2"}
         onClick={expanded ? undefined : onExpand}
         role={expanded ? undefined : "button"}
         tabIndex={expanded ? undefined : 0}
@@ -218,63 +218,61 @@ function DeviceLiveCard({
           </div>
         ) : null}
 
-        <div className="mt-2 rounded-lg border border-slate-800 bg-slate-900/90 px-3 py-3 sm:px-4">
-        {session ? (
-          <div className="grid min-w-0 gap-2 text-xs sm:grid-cols-2 xl:grid-cols-4">
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Teacher
-              </p>
-              <p className="truncate font-semibold text-slate-100">
-                {session.teacherFullName}
-              </p>
-            </div>
+        <div className="mt-1.5 rounded-lg border border-slate-800/90 bg-slate-900/80 px-3 py-2.5">
+          {session ? (
+            <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2">
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                  Teacher
+                </p>
+                <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-slate-100 sm:text-xs">
+                  {session.teacherFullName}
+                </p>
+              </div>
 
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Student
-              </p>
-              <p className="truncate font-semibold text-slate-100">
-                {session.studentFullName}
-              </p>
-            </div>
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                  Student
+                </p>
+                <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-slate-100 sm:text-xs">
+                  {session.studentFullName}
+                </p>
+              </div>
 
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Course
-              </p>
-              <p className="truncate font-semibold text-slate-100">
-                {session.courseName}
-              </p>
-            </div>
+              <div className="min-w-0 border-t border-slate-800/70 pt-2">
+                <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                  Course
+                </p>
+                <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-slate-100 sm:text-xs">
+                  {session.courseName}
+                </p>
+              </div>
 
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Class
-              </p>
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="shrink-0 rounded border border-emerald-800 bg-emerald-950/60 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-                  LIVE
-                </span>
-                <span className="truncate font-semibold text-slate-200">
-                  {classTiming}
-                </span>
+              <div className="min-w-0 border-t border-slate-800/70 pt-2">
+                <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                  Class
+                </p>
+                <div className="mt-0.5 flex min-w-0 items-start gap-1.5">
+                  <span className="shrink-0 rounded border border-emerald-800/80 bg-emerald-950/60 px-1.5 py-0.5 text-[9px] font-bold leading-none text-emerald-300">
+                    LIVE
+                  </span>
+                  <span className="min-w-0 text-[10px] font-semibold leading-tight text-slate-300 sm:text-[11px]">
+                    {classTiming}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-300">No Active Class</p>
-              <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
-                Live monitoring remains available
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-xs font-semibold text-slate-400">
+                No active class
               </p>
+
+              <span className="shrink-0 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                Standby
+              </span>
             </div>
-            <span className="shrink-0 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Standby
-            </span>
-          </div>
-        )}
+          )}
         </div>
       </div>
     </article>
@@ -376,14 +374,17 @@ export default function LiveMonitoringPage() {
   );
 
   return (
-    <div className="min-w-0 space-y-5 sm:space-y-6">
-      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-white">
-            Live Monitoring
-          </h2>
-          <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Live video stays connected - refresh class metadata manually when needed
+    <div className="min-w-0 space-y-3 sm:space-y-4">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+          </span>
+
+          <p className="truncate text-xs font-semibold text-slate-400">
+            {onlineDevices.length} online{" "}
+            {onlineDevices.length === 1 ? "classroom" : "classrooms"}
           </p>
         </div>
 
@@ -391,9 +392,9 @@ export default function LiveMonitoringPage() {
           type="button"
           disabled={refreshingMetadata}
           onClick={() => void refreshMetadata()}
-          className="min-w-[108px] rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-900 disabled:cursor-wait disabled:opacity-60"
+          className="shrink-0 rounded-md border border-slate-700 bg-slate-900/60 px-3 py-1.5 text-[11px] font-semibold text-slate-300 transition hover:border-slate-600 hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60 sm:text-xs"
         >
-          {refreshingMetadata ? "Refreshing..." : "Refresh now"}
+          {refreshingMetadata ? "Refreshing..." : "Refresh"}
         </button>
       </div>
 
@@ -427,7 +428,7 @@ export default function LiveMonitoringPage() {
           </p>
         </div>
       ) : (
-        <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 xl:gap-5">
+        <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 xl:gap-4">
           {onlineDevices.map((device) => {
             const activeSession =
               sessions.find((session) => session.deviceId === device.id) ?? null;

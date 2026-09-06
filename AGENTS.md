@@ -2333,3 +2333,19 @@ Runtime re-certification pending.
 - Backend, database, dashboard, audio pipeline, live streaming, QA and recording are unchanged.
 - Cross-device Laptop 5 -> Laptop 7 portable attendance and explicit TeamsChatIdentity scheduling are deferred to a later phase.
 - This milestone is not runtime-certified until the new Agent build is installed on a classroom laptop.
+
+## HQL_OWNER_NAMEGATE_AUTOUPDATE_CANARY_20260907
+
+- Owner automatic Agent update transport is runtime-proven on device 82f9b22d-2d5b-46b2-b372-ef864219e383 (Abdul Wahid / DESKTOP-PUFUU3U).
+- Agent source commit: c3b10ffd04a39addc75c9358dc3eda906a42f667.
+- Installed Agent version: 1.0.0-c3b10ffd04a3-namegate1.
+- Dashboard Update Now successfully queued the Owner device and AgentAutoUpdate completed with UPDATE_SUCCESS.
+- Installer completed with INSTALL_SUCCESS.
+- Runtime architecture clarification: Classroom Agent is launched by Scheduled Task HomeQuranLearning.ClassroomAgent, not by a Windows Service.
+- Teams attendance helper is launched by Scheduled Task AcademyAgent.TeamsHelper.
+- Both Academy.Agent.Service.exe and Academy.Agent.TeamsHelper.exe remained running through the post-update stability check.
+- Recording.Enabled=False and LiveStreaming.Enabled=True after update.
+- Student-name to Teams-name attendance gate is removed on the Owner device.
+- Actual lesson/image attendance behavior still requires one scheduled-class runtime canary.
+- Other academy laptops were not updated in this canary.
+- Cross-device attendance remains deferred.

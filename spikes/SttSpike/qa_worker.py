@@ -50,8 +50,8 @@ DOWNLOAD_TIMEOUT_SECONDS = int(
 _model = None
 
 EXPECTED_AUDIO_LAYOUT_VERSION = 1
-EXPECTED_TEACHER_AUDIO_TRACK_TITLE = (
-    "Academy Teacher Microphone QA v1"
+EXPECTED_CLASSROOM_AUDIO_TRACK_TITLE = (
+    "Academy Class Mixed Audio"
 )
 
 
@@ -207,48 +207,48 @@ def get_model():
     return _model
 
 
-def validate_teacher_audio_metadata(recording):
+def validate_classroom_audio_metadata(recording):
     layout_version = recording.get(
         "audioLayoutVersion"
     )
 
     track_index = recording.get(
-        "teacherAudioTrackIndex"
+        "classroomAudioTrackIndex"
     )
 
-    provenance_status = str(
+    track_title = str(
         recording.get(
-            "teacherAudioProvenanceStatus",
+            "classroomAudioTrackTitle",
             "",
         )
-    ).strip().lower()
+    ).strip()
 
     if layout_version != EXPECTED_AUDIO_LAYOUT_VERSION:
         raise ValueError(
-            "Recording has no supported teacher-audio layout."
+            "Recording has no supported classroom-audio layout."
         )
 
     if (
         isinstance(track_index, bool)
         or not isinstance(track_index, int)
-        or track_index < 0
+        or track_index != 0
     ):
         raise ValueError(
-            "Recording has no valid teacher-audio track index."
+            "Recording has no valid canonical classroom-audio track index."
         )
 
-    if provenance_status != "proven":
+    if track_title != EXPECTED_CLASSROOM_AUDIO_TRACK_TITLE:
         raise ValueError(
-            "Teacher-audio provenance is not complete."
+            "Recording classroom-audio track identity is invalid."
         )
 
     return track_index
 
 
-def extract_teacher_audio(
+def extract_classroom_audio(
     input_path,
     output_path,
-    teacher_audio_track_index,
+    classroom_audio_track_index,
 ):
     import av
 
@@ -261,26 +261,26 @@ def extract_teacher_audio(
             if stream.type == "audio"
         ]
 
-        if teacher_audio_track_index >= len(
+        if classroom_audio_track_index >= len(
             audio_streams
         ):
             raise ValueError(
-                "Declared teacher-audio track is missing."
+                "Canonical classroom-audio track is missing."
             )
 
-        teacher_stream = audio_streams[
-            teacher_audio_track_index
+        classroom_stream = audio_streams[
+            classroom_audio_track_index
         ]
 
         labels = {
             str(value).strip()
-            for key, value in teacher_stream.metadata.items()
+            for key, value in classroom_stream.metadata.items()
             if key.lower() in {"title", "handler_name"}
         }
 
-        if EXPECTED_TEACHER_AUDIO_TRACK_TITLE not in labels:
+        if EXPECTED_CLASSROOM_AUDIO_TRACK_TITLE not in labels:
             raise ValueError(
-                "Declared teacher-audio track identity is invalid."
+                "Canonical classroom-audio track identity is invalid."
             )
 
         resampler = av.AudioResampler(
@@ -295,7 +295,7 @@ def extract_teacher_audio(
             output.setframerate(16000)
 
             for packet in container.demux(
-                teacher_stream
+                classroom_stream
             ):
                 for frame in packet.decode():
                     for converted in resampler.resample(
@@ -312,7 +312,7 @@ def extract_teacher_audio(
 
     if sample_count <= 0:
         raise ValueError(
-            "Teacher-audio track contains no decodable samples."
+            "Classroom-audio track contains no decodable samples."
         )
 
     return sample_count
@@ -536,8 +536,8 @@ def process_recording(recording):
         recording["startedAtUtc"]
     )
 
-    teacher_audio_track_index = (
-        validate_teacher_audio_metadata(recording)
+    classroom_audio_track_index = (
+        validate_classroom_audio_metadata(recording)
     )
 
     suffix = os.path.splitext(file_name)[1] or ".mp4"
@@ -549,9 +549,9 @@ def process_recording(recording):
 
     os.close(descriptor)
 
-    audio_descriptor, teacher_audio_file = (
+    audio_descriptor, classroom_audio_file = (
         tempfile.mkstemp(
-            prefix="academy-qa-teacher-",
+            prefix="academy-qa-classroom-",
             suffix=".wav",
         )
     )
@@ -568,16 +568,16 @@ def process_recording(recording):
             local_file,
         )
 
-        extract_teacher_audio(
+        extract_classroom_audio(
             local_file,
-            teacher_audio_file,
-            teacher_audio_track_index,
+            classroom_audio_file,
+            classroom_audio_track_index,
         )
 
         model = get_model()
 
         segment_generator, info = model.transcribe(
-            teacher_audio_file
+            classroom_audio_file
         )
 
         segments = list(segment_generator)
@@ -648,7 +648,7 @@ def process_recording(recording):
             create_candidate(
                 recording_id,
                 match["ruleId"],
-                teacher_audio_track_index,
+                classroom_audio_track_index,
                 trigger_start,
                 trigger_end,
                 context_text,
@@ -683,8 +683,8 @@ def process_recording(recording):
         if os.path.exists(local_file):
             os.remove(local_file)
 
-        if os.path.exists(teacher_audio_file):
-            os.remove(teacher_audio_file)
+        if os.path.exists(classroom_audio_file):
+            os.remove(classroom_audio_file)
 
 
 def run_self_test():
@@ -778,22 +778,22 @@ def run_self_test():
         whatsapp["offsetSeconds"],
     ) == "2026-08-27T06:00:09.250000Z"
 
-    assert validate_teacher_audio_metadata(
+    assert validate_classroom_audio_metadata(
         {
             "audioLayoutVersion": 1,
-            "teacherAudioTrackIndex": 1,
-            "teacherAudioProvenanceStatus": "Proven",
+            "classroomAudioTrackIndex": 0,
+            "classroomAudioTrackTitle":
+                "Academy Class Mixed Audio",
         }
-    ) == 1
+    ) == 0
 
     try:
-        validate_teacher_audio_metadata(
+        validate_classroom_audio_metadata(
             {
                 "audioLayoutVersion": 0,
-                "teacherAudioTrackIndex": None,
-                "teacherAudioProvenanceStatus": (
-                    "LegacyUnknown"
-                ),
+                "classroomAudioTrackIndex": 0,
+                "classroomAudioTrackTitle":
+                    "Academy Class Mixed Audio",
             }
         )
     except ValueError:
@@ -839,7 +839,7 @@ def run_self_test():
     # never the final-alert endpoint, and marking processed is last.
     original_functions = {
         "download_file": download_file,
-        "extract_teacher_audio": extract_teacher_audio,
+        "extract_classroom_audio": extract_classroom_audio,
         "get_model": get_model,
         "persist_transcript_segments": persist_transcript_segments,
         "get_active_rules": get_active_rules,
@@ -862,7 +862,7 @@ def run_self_test():
 
     try:
         globals()["download_file"] = lambda _url, path: (calls.append("download"), open(path, "wb").write(b"x"))
-        globals()["extract_teacher_audio"] = lambda _source, _target, _index: calls.append("extract")
+        globals()["extract_classroom_audio"] = lambda _source, _target, _index: calls.append("extract")
         globals()["get_model"] = lambda: FakeModel()
         globals()["persist_transcript_segments"] = lambda *_args: calls.append("persist")
         globals()["get_active_rules"] = lambda: [{"id": "rule-parent", "phrase": "mother", "isActive": True}]
@@ -874,15 +874,16 @@ def run_self_test():
             "startedAtUtc": "2026-08-29T00:00:00Z",
             "presignedUrl": "https://example.invalid/proof.mp4",
             "audioLayoutVersion": 1,
-            "teacherAudioTrackIndex": 1,
-            "teacherAudioProvenanceStatus": "Proven",
+            "classroomAudioTrackIndex": 0,
+            "classroomAudioTrackTitle":
+                "Academy Class Mixed Audio",
         })
     finally:
         globals().update(original_functions)
 
     assert calls == [
         "download", "extract", "persist",
-        ("candidate", "rule-parent", 1, 2.0, 5.0), "processed",
+        ("candidate", "rule-parent", 0, 2.0, 5.0), "processed",
     ]
 
     print("QA_WORKER_TRANSCRIPT_INDEX_OK")
@@ -891,7 +892,7 @@ def run_self_test():
     print("QA_WORKER_TIMESTAMP_ALIGNMENT_OK")
     print("QA_WORKER_SEGMENT_PAYLOAD_OK")
     print("QA_WORKER_UNICODE_OUTPUT_OK")
-    print("QA_WORKER_TEACHER_AUDIO_PROVENANCE_OK")
+    print("QA_WORKER_CLASSROOM_AUDIO_SOURCE_OK")
     print("QA_WORKER_CANDIDATE_ONLY_ORDER_OK")
     print("QA_WORKER_SELF_TEST_OK")
 

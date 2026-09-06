@@ -14,7 +14,7 @@ public sealed class PendingQaRecordingDto
 
     public int AudioLayoutVersion { get; init; }
 
-    public int TeacherAudioTrackIndex { get; init; }
+    public int ClassroomAudioTrackIndex { get; init; }
 
-    public string TeacherAudioProvenanceStatus { get; init; } = string.Empty;
+    public string ClassroomAudioTrackTitle { get; init; } = string.Empty;
 }

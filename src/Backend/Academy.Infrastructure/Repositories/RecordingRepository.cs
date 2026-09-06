@@ -47,9 +47,7 @@ public sealed class RecordingRepository : IRecordingRepository
             .Where(x =>
                 x.Status == RecordingStatus.Uploaded &&
                 x.QaProcessedAtUtc == null &&
-                x.AudioLayoutVersion == 1 &&
-                x.TeacherAudioProvenanceStatus ==
-                    TeacherAudioProvenanceStatus.Proven)
+                x.AudioLayoutVersion == 1)
             .OrderByDescending(x => x.StartedAtUtc)
             .ToListAsync(cancellationToken);
     }

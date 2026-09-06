@@ -42,7 +42,7 @@ public sealed class QaCandidateService
             cancellationToken)
             ?? throw new InvalidOperationException("Recording not found.");
 
-        ValidateProvenance(request, recording);
+        ValidateClassroomAudioSource(request, recording);
 
         double duration = Math.Max(0, recording.Duration.TotalSeconds);
         ValidateOffset(request.TriggerStartSeconds, nameof(request.TriggerStartSeconds));
@@ -173,17 +173,18 @@ public sealed class QaCandidateService
         return ToDto(candidate);
     }
 
-    private static void ValidateProvenance(
+    private static void ValidateClassroomAudioSource(
         CreateQaCandidateRequest request,
         Recording recording)
     {
+        const int CanonicalClassroomAudioTrackIndex = 0;
+
         if (request.AudioLayoutVersion != 1 ||
-            request.SourceTrackIndex != recording.TeacherAudioTrackIndex ||
-            recording.AudioLayoutVersion != 1 ||
-            recording.TeacherAudioProvenanceStatus != TeacherAudioProvenanceStatus.Proven)
+            request.SourceTrackIndex != CanonicalClassroomAudioTrackIndex ||
+            recording.AudioLayoutVersion != 1)
         {
             throw new InvalidOperationException(
-                "Candidates require a proven layout-1 teacher audio track.");
+                "Candidates require the canonical layout-1 classroom mixed audio track.");
         }
     }
 

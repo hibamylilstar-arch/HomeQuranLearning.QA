@@ -11,7 +11,7 @@ public sealed class TeacherAudioProvenanceIntegrationTests :
     IntegrationTestBase
 {
     [Fact]
-    public async Task ProvenRecording_IsQaEligible_WhilePartialRecordingIsNot()
+    public async Task MixedClassroomAudio_IsQaEligible_RegardlessOfTeacherProvenance()
     {
         var device = new Device
         {
@@ -90,14 +90,32 @@ public sealed class TeacherAudioProvenanceIntegrationTests :
         IReadOnlyList<PendingQaRecordingDto> pendingDtos =
             await service.GetPendingQaRecordingsAsync();
 
-        Assert.Single(pending);
-        Assert.Equal(proven.Id, pending[0].Id);
-        Assert.Single(pendingDtos);
-        Assert.Equal(1, pendingDtos[0].AudioLayoutVersion);
-        Assert.Equal(1, pendingDtos[0].TeacherAudioTrackIndex);
-        Assert.Equal(
-            "Proven",
-            pendingDtos[0].TeacherAudioProvenanceStatus);
+        Assert.Equal(2, pending.Count);
+        Assert.Contains(
+            pending,
+            x => x.Id == proven.Id);
+        Assert.Contains(
+            pending,
+            x => x.Id == partial.Id);
+
+        Assert.Equal(2, pendingDtos.Count);
+
+        Assert.All(
+            pendingDtos,
+            item =>
+            {
+                Assert.Equal(
+                    1,
+                    item.AudioLayoutVersion);
+
+                Assert.Equal(
+                    0,
+                    item.ClassroomAudioTrackIndex);
+
+                Assert.Equal(
+                    "Academy Class Mixed Audio",
+                    item.ClassroomAudioTrackTitle);
+            });
         Assert.Equal(
             TeacherAudioProvenanceStatus.Proven,
             proven.TeacherAudioProvenanceStatus);

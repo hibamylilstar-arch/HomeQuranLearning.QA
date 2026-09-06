@@ -512,10 +512,9 @@ public sealed class RecordingService
                 PresignedUrl = presignedUrl,
                 StartedAtUtc = recording.StartedAtUtc,
                 AudioLayoutVersion = recording.AudioLayoutVersion,
-                TeacherAudioTrackIndex =
-                    recording.TeacherAudioTrackIndex!.Value,
-                TeacherAudioProvenanceStatus =
-                    recording.TeacherAudioProvenanceStatus.ToString()
+                ClassroomAudioTrackIndex = 0,
+                ClassroomAudioTrackTitle =
+                    "Academy Class Mixed Audio"
             });
         }
 

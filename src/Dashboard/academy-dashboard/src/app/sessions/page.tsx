@@ -154,7 +154,7 @@ function SessionDeviceHint({
   );
 }
 export default function SessionsPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
 
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [teachers, setTeachers] = useState<TeacherListItem[]>([]);
@@ -215,8 +215,6 @@ export default function SessionsPage() {
   const evidenceSectionRef =
     useRef<HTMLElement | null>(null);
 
-  const reviewSectionRef =
-    useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
     if (!evidenceSession) {
@@ -235,25 +233,7 @@ export default function SessionsPage() {
     };
   }, [evidenceSession]);
 
-  useEffect(() => {
-    if (!selectedSession) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      reviewSectionRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [selectedSession]);
-  const canCreateSession =
-    user?.role === "Owner" ||
-    user?.role === "Admin";
+  const canCreateSession = false;
 
   const selectedDevice =
     useMemo(
@@ -704,11 +684,11 @@ export default function SessionsPage() {
       ) : (
         <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 px-5 py-4">
           <p className="text-xs font-semibold text-indigo-800">
-            Manager attendance view
+            Schedule-driven sessions
           </p>
 
           <p className="mt-1 text-xs text-indigo-700">
-            Only sessions for teachers assigned to your manager account are shown.
+            Sessions are created automatically from Schedules. This page is for class history, evidence, and attendance review.
           </p>
         </div>
       )}
@@ -1188,11 +1168,24 @@ export default function SessionsPage() {
       )}
 
       {selectedSession && (
-        <form
-          ref={reviewSectionRef}
-          onSubmit={handleAttendanceReview}
-          className="scroll-mt-24 min-w-0 space-y-5 rounded-xl border border-indigo-200 bg-white p-4 shadow-sm sm:p-6"
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Attendance review"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
         >
+          <button
+            type="button"
+            aria-label="Close attendance review"
+            disabled={reviewSaving}
+            onClick={closeAttendanceReview}
+            className="absolute inset-0 bg-slate-950/60"
+          />
+
+          <form
+            onSubmit={handleAttendanceReview}
+            className="relative z-10 max-h-[90vh] w-full max-w-3xl space-y-5 overflow-y-auto rounded-xl border border-indigo-200 bg-white p-4 shadow-2xl sm:p-6"
+          >
           <div className="flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h3 className="text-sm font-semibold text-slate-900">
@@ -1312,7 +1305,8 @@ export default function SessionsPage() {
               Cancel
             </button>
           </div>
-        </form>
+          </form>
+        </div>
       )}
     </div>
   );

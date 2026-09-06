@@ -577,11 +577,11 @@ public sealed class SessionService
                 scheduledEndUtc);
 
         string lessonSharedStatus =
-            nowUtc <
-                graceEndsAtUtc
-                ? "Pending"
-                : hasLessonShared
-                    ? "Yes"
+            hasLessonShared
+                ? "Yes"
+                : nowUtc <
+                    graceEndsAtUtc
+                    ? "Pending"
                     : "No";
 
         bool attendanceReviewAllowed =

@@ -10,7 +10,7 @@ namespace Academy.UnitTests;
 public sealed class SessionPresentationStatusTests
 {
     [Fact]
-    public async Task DuringGrace_LessonStatusRemainsPending_EvenWhenLessonExists()
+    public async Task DuringGrace_ExistingLessonStatusIsYesImmediately()
     {
         DateTimeOffset now =
             DateTimeOffset.UtcNow;
@@ -34,7 +34,7 @@ public sealed class SessionPresentationStatusTests
                 await service.GetSessionsAsync());
 
         Assert.Equal(
-            "Pending",
+            "Yes",
             result.LessonSharedStatus);
 
         Assert.False(

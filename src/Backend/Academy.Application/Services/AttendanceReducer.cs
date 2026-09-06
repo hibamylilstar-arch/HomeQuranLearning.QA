@@ -409,7 +409,11 @@ public sealed class AttendanceReducer
                         x.EventType ==
                             SessionEventType.CommunicationDetected ||
                         x.EventType ==
-                            SessionEventType.StudentCallConnected)
+                            SessionEventType.StudentCallConnected ||
+                        x.EventType ==
+                            SessionEventType.TeacherAudioParticipationObserved ||
+                        x.EventType ==
+                            SessionEventType.RemoteAudioParticipationObserved)
                 .ToList();
 
         var stopEvents =
@@ -482,9 +486,25 @@ public sealed class AttendanceReducer
         bool remoteAudioParticipation,
         DateTimeOffset nowUtc)
     {
-        // Attendance remains deliberately unresolved for the complete
-        // ten-minute lesson grace, even if lesson/audio evidence has
-        // already arrived.
+        // Valid LessonShared evidence is authoritative immediately.
+        // The ten-minute grace exists only to wait for a missing lesson,
+        // not to delay a lesson that has already been proven.
+        if (lessonShared)
+        {
+            session.TeacherAttendanceStatus =
+                AttendanceStatus.Present;
+
+            session.StudentAttendanceStatus =
+                AttendanceStatus.Present;
+
+            session.AttendanceReviewStatus =
+                AttendanceReviewStatus.AutoResolved;
+
+            return;
+        }
+
+        // If no lesson has arrived yet, keep attendance unresolved only
+        // until the lesson grace expires.
         if (
             !IsLessonGraceExpired(
                 session,
@@ -499,21 +519,6 @@ public sealed class AttendanceReducer
 
             session.AttendanceReviewStatus =
                 AttendanceReviewStatus.Pending;
-
-            return;
-        }
-
-        // LessonShared is the strongest proof after grace expiry.
-        if (lessonShared)
-        {
-            session.TeacherAttendanceStatus =
-                AttendanceStatus.Present;
-
-            session.StudentAttendanceStatus =
-                AttendanceStatus.Present;
-
-            session.AttendanceReviewStatus =
-                AttendanceReviewStatus.AutoResolved;
 
             return;
         }
@@ -546,27 +551,19 @@ public sealed class AttendanceReducer
         var notes =
             new List<string>();
 
-        if (
+        if (lessonShared)
+        {
+            notes.Add(
+                "Lesson Shared: Yes. Attendance auto-resolved immediately from valid LessonShared evidence; lesson timing is not treated as arrival time.");
+        }
+        else if (
             !IsLessonGraceExpired(
                 session,
                 nowUtc)
         )
         {
-            if (lessonShared)
-            {
-                notes.Add(
-                    "Lesson Shared: Yes. Attendance remains pending until the 10-minute lesson grace expires.");
-            }
-            else
-            {
-                notes.Add(
-                    "Lesson Shared: Pending. Attendance is awaiting LessonShared during the 10-minute grace.");
-            }
-        }
-        else if (lessonShared)
-        {
             notes.Add(
-                "Lesson Shared: Yes. Attendance auto-resolved from valid LessonShared evidence; lesson timing is not treated as arrival time.");
+                "Lesson Shared: Pending. Attendance is awaiting LessonShared during the 10-minute grace.");
         }
         else
         {

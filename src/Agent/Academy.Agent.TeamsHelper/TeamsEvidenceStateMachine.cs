@@ -211,6 +211,48 @@ internal sealed class TeamsEvidenceStateMachine
             _previousCallState =
                 currentState;
 
+            if (
+                string.Equals(
+                    currentState,
+                    "Attempting",
+                    StringComparison.Ordinal)
+            )
+            {
+                BeginCallCycle(
+                    nowUtc);
+
+                AddCallEvent(
+                    target,
+                    TeamsEvidenceType.CallAttempted,
+                    "attempt",
+                    nowUtc,
+                    output);
+            }
+            else if (
+                string.Equals(
+                    currentState,
+                    "Connected",
+                    StringComparison.Ordinal)
+            )
+            {
+                BeginCallCycle(
+                    nowUtc);
+
+                AddCallEvent(
+                    target,
+                    TeamsEvidenceType.CallAttempted,
+                    "attempt",
+                    nowUtc,
+                    output);
+
+                AddCallEvent(
+                    target,
+                    TeamsEvidenceType.StudentCallConnected,
+                    "connected",
+                    nowUtc,
+                    output);
+            }
+
             return;
         }
 

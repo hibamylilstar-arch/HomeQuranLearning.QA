@@ -1,5 +1,43 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_ATTENDANCE_FAST_FINISH_20260906_BEGIN -->
+## Attendance / Sessions fast-finish source milestone - 2026-09-06
+
+The first real schedule-driven canary proved:
+- weekly Schedule -> automatic Live Session creation;
+- automatic ScheduledEnd completion;
+- teacher audio participation evidence;
+- remote/student audio participation evidence;
+- LessonShared evidence inside the ten-minute post-class grace;
+- grace finalization to Teacher Present + Student Present + AutoResolved.
+
+This source milestone closes the remaining canary gaps:
+- manual dashboard Session creation is removed from the product workflow and
+  the manual POST /api/admin/sessions endpoint is retired;
+- Sessions is history/evidence/review, while Schedules is the operational
+  source of truth;
+- valid LessonShared evidence changes Lesson Shared to Yes immediately and
+  auto-resolves both attendance sides immediately;
+- the ten-minute grace now waits only when LessonShared is still missing;
+- explicit teacher/student participation evidence provides an ActiveSeconds
+  fallback instead of leaving proven classes at Active 0m;
+- the first observed Teams Connected snapshot emits call-attempt and
+  call-connected evidence instead of silently becoming baseline only;
+- lesson evidence supports both same-message image+lesson text and the real
+  academy image -> nearby para/page/line/lesson-text sequence;
+- lesson-grace scanning binds to the exact active student chat instead of
+  requiring the student's name inside the lesson message;
+- manual attendance review opens in a modal instead of jumping to the bottom
+  of the Sessions page.
+
+The scheduler, schedule recurrence, canonical audio capture, Live transport,
+Recording pipeline, QA pipeline and database schema are unchanged.
+
+Runtime recertification is still required after deployment and Owner Agent
+update.
+<!-- HQL_ATTENDANCE_FAST_FINISH_20260906_END -->
+
+
 <!-- HQL_LEGACY_SESSION_INFINITY_RUNTIME_VERIFIED_20260906_BEGIN -->
 # LEGACY SESSION INFINITY FIX - RUNTIME VERIFIED - 2026-09-06
 

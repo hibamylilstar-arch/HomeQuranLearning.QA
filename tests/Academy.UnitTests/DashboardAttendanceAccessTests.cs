@@ -196,7 +196,7 @@ public sealed class DashboardAttendanceAccessTests
     }
 
     [Fact]
-    public async Task GetVisibleSessions_Owner_DuringGrace_ProjectsPendingLessonAndBlocksReview()
+    public async Task GetVisibleSessions_Owner_DuringGrace_ProjectsExistingLessonImmediately()
     {
         DateTimeOffset now =
             DateTimeOffset.UtcNow;
@@ -277,7 +277,7 @@ public sealed class DashboardAttendanceAccessTests
             item.LessonGraceEndsAtUtc);
 
         Assert.Equal(
-            "Pending",
+            "Yes",
             item.LessonSharedStatus);
 
         Assert.False(

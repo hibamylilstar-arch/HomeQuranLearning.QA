@@ -2120,24 +2120,6 @@ app.MapGet("/api/admin/live-sessions", async (
     return Results.Ok(sessions);
 }).RequireAuthorization();
 
-app.MapPost("/api/admin/sessions", async (
-    ClaimsPrincipal user,
-    HttpRequest request,
-    SessionService sessionService,
-    CancellationToken cancellationToken) =>
-{
-    var body = await request.ReadFromJsonAsync<CreateSessionRequest>(
-        jsonOptions,
-        cancellationToken);
-
-    if (body is null)
-    {
-        return Results.BadRequest("Session data is required.");
-    }
-
-    var session = await sessionService.CreateSessionAsync(body, cancellationToken);
-    return Results.Ok(session);
-}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPost("/api/admin/livekit/token", async (
     ClaimsPrincipal user,

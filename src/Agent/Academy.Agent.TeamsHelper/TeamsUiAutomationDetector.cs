@@ -48,6 +48,9 @@ internal static class TeamsUiAutomationDetector
             @")\b",
             RegexOptions.IgnoreCase |
             RegexOptions.CultureInvariant);
+
+    private static readonly TimeSpan LessonMessageSequenceWindow =
+        TimeSpan.FromMinutes(3);
 public static TeamsUiSnapshot Scan(
         string studentName,
         string? teacherName)
@@ -293,19 +296,38 @@ public static TeamsUiSnapshot Scan(
                 continue;
             }
 
+            bool exactActiveChat =
+                elements.Any(
+                    element =>
+                    {
+                        string name =
+                            GetName(
+                                element);
+
+                        ControlType? controlType =
+                            GetControlType(
+                                element);
+
+                        return
+                            controlType ==
+                                ControlType.Document &&
+                            string.Equals(
+                                name,
+                                $"Chat | {studentName} | Microsoft Teams",
+                                StringComparison.OrdinalIgnoreCase);
+                    });
+
+            if (!exactActiveChat)
+            {
+                continue;
+            }
+
             foreach (
                 TeamsDetectedMessage message in
                 DetectMessages(
                     elements,
                     MessageKind.Lesson))
             {
-                if (!ContainsStudentName(
-                        message.MessageText,
-                        studentName))
-                {
-                    continue;
-                }
-
                 result[message.MessageId] =
                     message;
             }
@@ -323,6 +345,12 @@ public static TeamsUiSnapshot Scan(
         IReadOnlyList<AutomationElement> elements,
         MessageKind kind)
     {
+        if (kind == MessageKind.Lesson)
+        {
+            return DetectLessonMessages(
+                elements);
+        }
+
         var result =
             new Dictionary<string, TeamsDetectedMessage>(
                 StringComparer.Ordinal);
@@ -359,22 +387,69 @@ public static TeamsUiSnapshot Scan(
                 continue;
             }
 
-            bool matches =
-                kind switch
-                {
-                    MessageKind.Greeting =>
-                        IsGreetingText(
-                            name),
+            if (!IsGreetingText(
+                    name))
+            {
+                continue;
+            }
 
-                    MessageKind.Lesson =>
-                        ContainsLessonKeyword(
-                            name),
+            string messageId =
+                idMatch.Groups[1].Value;
 
-                    _ =>
-                        false
-                };
+            result[messageId] =
+                new TeamsDetectedMessage(
+                    MessageId:
+                        messageId,
 
-            if (!matches)
+                    OccurredAtUtc:
+                        TryParseMessageTimestamp(
+                            messageId),
+
+                    AttachmentName:
+                        null,
+
+                    MessageText:
+                        name);
+        }
+
+        return result.Values
+            .OrderBy(
+                x =>
+                    x.OccurredAtUtc ??
+                    DateTimeOffset.MinValue)
+            .ToList();
+    }
+
+    private static List<TeamsDetectedMessage>
+        DetectLessonMessages(
+            IReadOnlyList<AutomationElement> elements)
+    {
+        var raw =
+            new Dictionary<string, TeamsDetectedMessage>(
+                StringComparer.Ordinal);
+
+        foreach (AutomationElement element in elements)
+        {
+            string automationId =
+                GetAutomationId(
+                    element);
+
+            Match idMatch =
+                MessageIdRegex.Match(
+                    automationId);
+
+            if (!idMatch.Success)
+            {
+                continue;
+            }
+
+            string name =
+                GetName(
+                    element);
+
+            if (!IsOutgoingMessageContainer(
+                    element,
+                    name))
             {
                 continue;
             }
@@ -383,23 +458,23 @@ public static TeamsUiSnapshot Scan(
                 idMatch.Groups[1].Value;
 
             string? attachmentName =
-                kind == MessageKind.Lesson
-                    ? FindAttachmentName(
-                        element,
-                        messageId)
-                    : null;
+                FindAttachmentName(
+                    element,
+                    messageId);
+
+            bool hasLessonText =
+                ContainsLessonKeyword(
+                    name);
 
             if (
-                kind == MessageKind.Lesson &&
-                attachmentName is null
+                attachmentName is null &&
+                !hasLessonText
             )
             {
-                // SOP completion evidence requires the lesson
-                // to include an attachment/image.
                 continue;
             }
 
-            result[messageId] =
+            raw[messageId] =
                 new TeamsDetectedMessage(
                     MessageId:
                         messageId,
@@ -415,10 +490,154 @@ public static TeamsUiSnapshot Scan(
                         name);
         }
 
+        return ResolveLessonMessageSequences(
+                raw.Values)
+            .ToList();
+    }
+
+    internal static IReadOnlyList<TeamsDetectedMessage>
+        ResolveLessonMessageSequences(
+            IEnumerable<TeamsDetectedMessage> messages)
+    {
+        ArgumentNullException.ThrowIfNull(
+            messages);
+
+        List<TeamsDetectedMessage> candidates =
+            messages
+                .Where(
+                    message =>
+                        !string.IsNullOrWhiteSpace(
+                            message.MessageId))
+                .OrderBy(
+                    message =>
+                        message.OccurredAtUtc ??
+                        DateTimeOffset.MinValue)
+                .ToList();
+
+        var result =
+            new Dictionary<string, TeamsDetectedMessage>(
+                StringComparer.Ordinal);
+
+        // Existing SOP remains valid:
+        // one outgoing message contains both lesson text and image.
+        foreach (
+            TeamsDetectedMessage message in
+            candidates)
+        {
+            if (
+                message.AttachmentName is not null &&
+                ContainsLessonKeyword(
+                    message.MessageText)
+            )
+            {
+                result[message.MessageId] =
+                    message;
+            }
+        }
+
+        // Real academy SOP:
+        // teacher may send the lesson image first and then send
+        // para/page/line/lesson text as a separate nearby message.
+        foreach (
+            TeamsDetectedMessage imageMessage in
+            candidates.Where(
+                message =>
+                    message.AttachmentName is not null &&
+                    !ContainsLessonKeyword(
+                        message.MessageText) &&
+                    message.OccurredAtUtc.HasValue))
+        {
+            DateTimeOffset imageTime =
+                imageMessage.OccurredAtUtc!.Value;
+
+            var match =
+                candidates
+                    .Where(
+                        message =>
+                            message.MessageId !=
+                                imageMessage.MessageId &&
+                            message.OccurredAtUtc.HasValue &&
+                            ContainsLessonKeyword(
+                                message.MessageText))
+                    .Select(
+                        message =>
+                            new
+                            {
+                                Message =
+                                    message,
+
+                                DistanceSeconds =
+                                    Math.Abs(
+                                        (
+                                            message.OccurredAtUtc!.Value -
+                                            imageTime
+                                        ).TotalSeconds)
+                            })
+                    .Where(
+                        item =>
+                            item.DistanceSeconds <=
+                            LessonMessageSequenceWindow
+                                .TotalSeconds)
+                    .OrderBy(
+                        item =>
+                            item.Message.OccurredAtUtc!.Value >=
+                                imageTime
+                                ? 0
+                                : 1)
+                    .ThenBy(
+                        item =>
+                            item.DistanceSeconds)
+                    .FirstOrDefault();
+
+            if (match is null)
+            {
+                continue;
+            }
+
+            DateTimeOffset textTime =
+                match.Message
+                    .OccurredAtUtc!.Value;
+
+            DateTimeOffset completedAt =
+                textTime >= imageTime
+                    ? textTime
+                    : imageTime;
+
+            string sequenceId =
+                $"{imageMessage.MessageId}-{match.Message.MessageId}";
+
+            string combinedText =
+                string.Join(
+                    " ",
+                    new[]
+                    {
+                        imageMessage.MessageText,
+                        match.Message.MessageText
+                    }
+                    .Where(
+                        value =>
+                            !string.IsNullOrWhiteSpace(
+                                value)));
+
+            result[sequenceId] =
+                new TeamsDetectedMessage(
+                    MessageId:
+                        sequenceId,
+
+                    OccurredAtUtc:
+                        completedAt,
+
+                    AttachmentName:
+                        imageMessage.AttachmentName,
+
+                    MessageText:
+                        combinedText);
+        }
+
         return result.Values
             .OrderBy(
-                x =>
-                    x.OccurredAtUtc ??
+                message =>
+                    message.OccurredAtUtc ??
                     DateTimeOffset.MinValue)
             .ToList();
     }

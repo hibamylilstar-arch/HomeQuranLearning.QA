@@ -10,7 +10,7 @@ public sealed class AttendanceGraceFinalizationTests
         new();
 
     [Fact]
-    public void WithinGrace_EvenWithLessonAndAudio_RemainsPending()
+    public void WithinGrace_ValidLesson_AutoResolvesImmediately()
     {
         Session session =
             CreateSession();
@@ -40,15 +40,15 @@ public sealed class AttendanceGraceFinalizationTests
             session.ScheduledEndUtc.AddMinutes(5));
 
         Assert.Equal(
-            AttendanceStatus.Unknown,
+            AttendanceStatus.Present,
             session.TeacherAttendanceStatus);
 
         Assert.Equal(
-            AttendanceStatus.Unknown,
+            AttendanceStatus.Present,
             session.StudentAttendanceStatus);
 
         Assert.Equal(
-            AttendanceReviewStatus.Pending,
+            AttendanceReviewStatus.AutoResolved,
             session.AttendanceReviewStatus);
 
         Assert.Contains(
@@ -299,6 +299,39 @@ public sealed class AttendanceGraceFinalizationTests
         Assert.Equal(
             AttendanceReviewStatus.Pending,
             session.AttendanceReviewStatus);
+    }
+
+    [Fact]
+    public void ParticipationEvidence_ProvidesNonZeroActiveDuration()
+    {
+        Session session =
+            CreateSession();
+
+        IReadOnlyList<SessionEvent> events =
+            new[]
+            {
+                Event(
+                    session,
+                    SessionEventType.TeacherAudioParticipationObserved,
+                    session.ScheduledStartUtc.AddMinutes(5)),
+
+                Event(
+                    session,
+                    SessionEventType.RemoteAudioParticipationObserved,
+                    session.ScheduledStartUtc.AddMinutes(6))
+            };
+
+        _reducer.Reduce(
+            session,
+            events,
+            session.ScheduledEndUtc);
+
+        Assert.True(
+            session.ActiveSeconds > 0);
+
+        Assert.Equal(
+            25 * 60,
+            session.ActiveSeconds);
     }
 
     [Fact]

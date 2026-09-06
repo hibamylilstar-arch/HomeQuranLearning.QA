@@ -674,6 +674,22 @@ internal static class TeamsUiAutomationDetector
                 StringComparison.Ordinal);
     }
 
+    internal static bool IsLessonImageSignal(
+        bool attachmentContainerFound,
+        bool imageFound)
+    {
+        // Teams may expose a shared Quran/Qaida page as either:
+        //
+        // - the message attachment container, or
+        // - an Image UI Automation element.
+        //
+        // Either signal is sufficient. Requiring both caused valid
+        // lesson pages to be missed in real Teams.
+        return
+            attachmentContainerFound ||
+            imageFound;
+    }
+
     private static string? FindAttachmentName(
         AutomationElement messageElement,
         string messageId)
@@ -748,15 +764,16 @@ internal static class TeamsUiAutomationDetector
             }
         }
 
-        // Business rule:
-        // same outgoing Teams message must contain an attachment
-        // container plus an actual image UI element.
+        // Product rule:
+        // Teams may expose the same shared lesson page through either
+        // the attachment container or an Image UI element.
+        //
+        // Either one is sufficient lesson-image evidence.
         //
         // Filename and extension are not attendance semantics.
-        if (
-            !attachmentContainerFound ||
-            !imageFound
-        )
+        if (!IsLessonImageSignal(
+                attachmentContainerFound,
+                imageFound))
         {
             return null;
         }

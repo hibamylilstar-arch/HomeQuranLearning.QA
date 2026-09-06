@@ -3220,3 +3220,27 @@ Live transport, Recording, QA and database schema are unchanged.
 
 Runtime certification remains required on the Owner Agent.
 <!-- HQL_LESSON_EVIDENCE_IMAGE_OR_TEXT_20260906_END -->
+
+
+<!-- HQL_LESSON_IMAGE_TEAMS_OR_SIGNAL_20260906_BEGIN -->
+## Teams lesson-image detection - 2026-09-06
+
+For the correct scheduled student's outgoing Teams message during the
+class/lesson-grace evidence window, either Teams media signal is
+sufficient to prove a shared lesson page:
+
+- `attachments-<messageId>` attachment container; OR
+- a descendant UI Automation `Image` control.
+
+The two signals are not required together.
+
+Once either signal is present, the message is treated as lesson-image
+evidence. Image filename, extension and OCR/content recognition are not
+attendance semantics.
+
+Recognized lesson text remains an independent fallback when no image
+is shared.
+
+Backend attendance, scheduler, canonical audio, Live, Recording,
+dashboard, QA and database schema are unchanged.
+<!-- HQL_LESSON_IMAGE_TEAMS_OR_SIGNAL_20260906_END -->

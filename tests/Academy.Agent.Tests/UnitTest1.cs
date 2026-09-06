@@ -260,6 +260,34 @@ public sealed class TeamsHelperLifecycleTests
                     TeamsEvidenceType.CallEnded);
     }
 
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void LessonImageSignal_AcceptsEitherTeamsMediaSignal(
+        bool attachmentContainerFound,
+        bool imageFound)
+    {
+        Assert.True(
+            TeamsUiAutomationDetector
+                .IsLessonImageSignal(
+                    attachmentContainerFound,
+                    imageFound));
+    }
+
+    [Fact]
+    public void LessonImageSignal_RejectsWhenNeitherSignalExists()
+    {
+        Assert.False(
+            TeamsUiAutomationDetector
+                .IsLessonImageSignal(
+                    attachmentContainerFound:
+                        false,
+
+                    imageFound:
+                        false));
+    }
+
     [Fact]
     public void LessonEvidence_ImageAlone_IsAuthoritative()
     {

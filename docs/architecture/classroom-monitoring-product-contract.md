@@ -556,3 +556,14 @@ Backend attendance/grace/audio/dashboard behavior is unchanged.
 
 Runtime re-certification pending.
 <!-- HQL_TEAMS_MESSAGE_CARD_MEDIA_20260906_END -->
+
+## HQL_TEAMS_STUDENT_NAME_GATE_REMOVED_20260907
+
+- Temporary attendance stabilization decision: the Windows Teams detector no longer requires Academy Student.FullName to match the visible Microsoft Teams chat/account name.
+- The currently scheduled laptop/session remains the attendance ownership boundary.
+- Active Teams document selection is structural rather than student-name based.
+- Connected-call detection uses Teams calling controls plus microphone control rather than the scheduled student's display name.
+- LessonShared semantics are unchanged: an outgoing lesson/page image alone OR recognized lesson text remains sufficient.
+- Backend, database, dashboard, audio pipeline, live streaming, QA and recording are unchanged.
+- Cross-device Laptop 5 -> Laptop 7 portable attendance and explicit TeamsChatIdentity scheduling are deferred to a later phase.
+- This milestone is not runtime-certified until the new Agent build is installed on a classroom laptop.

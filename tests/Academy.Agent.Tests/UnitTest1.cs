@@ -461,24 +461,22 @@ public sealed class TeamsHelperLifecycleTests
         "Chat with Student Test 2 - Microsoft Teams")]
     [InlineData(
         "Student Test 2 | Microsoft Teams")]
-    public void StudentChatBinding_AcceptsTeamsTitleVariants(
+    public void TeamsChatBinding_AcceptsTeamsTitleVariants(
         string title)
     {
         Assert.True(
             TeamsUiAutomationDetector
-                .IsStudentChatDocumentName(
-                    title,
-                    "Student Test 2"));
+                .IsTeamsChatDocumentName(
+                    title));
     }
 
     [Fact]
-    public void StudentChatBinding_RejectsDifferentStudent()
+    public void TeamsChatBinding_DoesNotRequireAcademyStudentName()
     {
-        Assert.False(
+        Assert.True(
             TeamsUiAutomationDetector
-                .IsStudentChatDocumentName(
-                    "Chat | Student Test 3 | Microsoft Teams",
-                    "Student Test 2"));
+                .IsTeamsChatDocumentName(
+                    "Chat | Abdul Samad | Microsoft Teams"));
     }
 
     private static string CreateTemporaryRoot()

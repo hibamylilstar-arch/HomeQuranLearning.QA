@@ -104,10 +104,9 @@ internal static class TeamsUiAutomationDetector
                         GetControlType(
                             element) ==
                             ControlType.Document &&
-                        IsStudentChatDocumentName(
+                        IsTeamsChatDocumentName(
                             GetName(
-                                element),
-                            studentName));
+                                element)));
 
             if (!activeStudentChat)
             {
@@ -163,50 +162,11 @@ internal static class TeamsUiAutomationDetector
                         "microphone-button",
                         StringComparison.OrdinalIgnoreCase));
 
-        bool studentInCall =
-            callElements.Any(
-                element =>
-                {
-                    string name =
-                        GetName(
-                            element);
-
-                    return
-                        ContainsStudentName(
-                            name,
-                            studentName) &&
-                        (
-                            name.Contains(
-                                "In a call",
-                                StringComparison.OrdinalIgnoreCase) ||
-                            name.Contains(
-                                "In call",
-                                StringComparison.OrdinalIgnoreCase)
-                        );
-                });
-
-        bool studentAvailable =
-            callElements.Any(
-                element =>
-                {
-                    string name =
-                        GetName(
-                            element);
-
-                    return
-                        ContainsStudentName(
-                            name,
-                            studentName) &&
-                        name.Contains(
-                            "Available",
-                            StringComparison.OrdinalIgnoreCase);
-                });
-
         string callState;
 
         if (
-            studentInCall &&
-            callingControls
+            callingControls &&
+            microphoneControl
         )
         {
             callState =
@@ -217,7 +177,7 @@ internal static class TeamsUiAutomationDetector
             callState =
                 "Attempting";
         }
-        else if (studentAvailable)
+        else if (selected is not null)
         {
             callState =
                 "Available";
@@ -306,10 +266,9 @@ internal static class TeamsUiAutomationDetector
                         GetControlType(
                             element) ==
                             ControlType.Document &&
-                        IsStudentChatDocumentName(
+                        IsTeamsChatDocumentName(
                             GetName(
-                                element),
-                            studentName));
+                                element)));
 
             if (!activeStudentChat)
             {
@@ -521,36 +480,22 @@ internal static class TeamsUiAutomationDetector
             .ToList();
     }
 
-    internal static bool IsStudentChatDocumentName(
-        string? documentName,
-        string? studentName)
+    internal static bool IsTeamsChatDocumentName(
+        string? documentName)
     {
-        if (
-            string.IsNullOrWhiteSpace(
-                documentName) ||
-            string.IsNullOrWhiteSpace(
-                studentName)
-        )
+        if (string.IsNullOrWhiteSpace(
+                documentName))
         {
             return false;
         }
 
-        if (!ContainsStudentName(
-                documentName,
-                studentName))
-        {
-            return false;
-        }
-
-        // Teams title formatting may change between releases.
-        // Full student-name ownership remains mandatory.
-        return
-            documentName.Contains(
-                "Chat",
-                StringComparison.OrdinalIgnoreCase) ||
-            documentName.Contains(
-                "Microsoft Teams",
-                StringComparison.OrdinalIgnoreCase);
+        // Temporary operational rule:
+        // the active scheduled laptop/session owns the evidence.
+        // Academy Student.FullName is NOT required to match
+        // the visible Microsoft Teams chat/account name.
+        return documentName.Contains(
+            "Microsoft Teams",
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsOutgoingMessageContainer(

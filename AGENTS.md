@@ -1,5 +1,758 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_QA_PHASE1_ACTIVE_20260908_BEGIN -->
+
+# CURRENT ACTIVE STATE — QA PHASE 1 RESTRICTED-WORD ALERTS — 2026-09-08
+
+> **NEW AI / DEVELOPER: READ THIS BLOCK FIRST.**
+>
+> This block supersedes older QA next-step instructions below it.
+>
+> Do not restart old QA architecture work.
+> Do not reopen Off-topic Conversation work.
+> Do not assume QA Candidates are the current priority.
+> Do not treat old pre-session garbage Candidates as proof that the latest
+> session-scoped worker is still broken.
+>
+> Current Owner decision:
+>
+> **Finish QA Phase 1 first: Restricted Words -> verified Alert -> direct audio evidence.**
+>
+> **Phase 2 Off-topic / semantic QA / Candidates is PENDING and must be feature-level OFF.**
+
+## 1. Repository / functional runtime checkpoint
+
+Repository:
+
+`C:\Dev\HomeQuranLearning.QA`
+
+GitHub:
+
+`hibamylilstar-arch/HomeQuranLearning.QA`
+
+Branch:
+
+`codex/local-development-mode`
+
+Latest functional source and deployed application checkpoint before this
+documentation-only update:
+
+`746593ad537cd033b280de452c3de1c8702ac0a2`
+
+Commit:
+
+`fix: scope QA analysis to scheduled sessions`
+
+Parent functional checkpoint:
+
+`15aa97ba2f52f3fcc3cd6d8b164776cab4a9ea68`
+
+`15aa97` made server archive recordings canonical-audio ready.
+
+Documentation commits after `746593a` do NOT mean the production application
+code changed. Always distinguish docs HEAD from the latest functional/deployed
+application commit.
+
+## 2. VPS runtime / protected infrastructure
+
+VPS:
+
+`158.220.90.195`
+
+Application root:
+
+`/opt/homequranlearning`
+
+Production compose files:
+
+- `infrastructure/docker/docker-compose.prod.yml`
+- `infrastructure/docker/docker-compose.relay-production.yml`
+
+Production env:
+
+`infrastructure/docker/.env.production`
+
+Protected custom VPS file:
+
+`infrastructure/docker/Caddyfile`
+
+Required SHA256:
+
+`280dfe2cf855e4be0029c36fe992ae4505dd393f50b25717aa25761447338ac1`
+
+Never overwrite, reset or replace the custom Caddyfile.
+
+Deployment of `746593a` was surgical.
+
+Changed runtime components:
+
+- academy-api
+- academy-qa-worker
+
+Explicitly untouched:
+
+- Dashboard
+- Owner Agent
+- LiveKit
+- LiveKit Ingress
+- ingress-manager
+- MediaMTX relay
+- archive recorder
+- archive registrar
+- Caddy
+- PostgreSQL schema
+
+No migration was required by `746593a`.
+
+Production runtime proof after deployment showed no-session recordings were
+skipped without transcription.
+
+## 3. Owner device / Agent baseline
+
+Owner durable DeviceId:
+
+`82f9b22d-2d5b-46b2-b372-ef864219e383`
+
+Physical Windows device:
+
+`DESKTOP-PUFUU3U`
+
+Friendly Laptop Name:
+
+`Abdul Wahid`
+
+Installed Agent version:
+
+`1.0.0-c3b10ffd04a3-namegate1`
+
+Installed Agent source commit:
+
+`c3b10ffd04a39addc75c9358dc3eda906a42f667`
+
+Important:
+
+- Owner Agent remains VPS-connected.
+- Live streaming remains enabled.
+- Owner local Agent recording remains `Recording.Enabled=False`.
+- Do NOT enable local Agent recording for current QA work.
+- Do NOT restart/update Owner Agent unless source evidence proves an Agent
+  change is actually required.
+- Do NOT update other academy laptops during Owner QA development.
+
+## 4. Canonical classroom audio contract
+
+Physical classroom audio is captured once through the effective communication
+routes:
+
+- effective teacher microphone
+- effective communication render/playback
+
+These are combined into one canonical classroom mixed audio timeline.
+
+Canonical audio is consumed by:
+
+- Live
+- server Recording
+- QA/STT
+
+QA canonical identity:
+
+- AudioLayoutVersion = 1
+- ClassroomAudioTrackIndex = 0
+- title = `Academy Class Mixed Audio`
+
+Do not create a separate teacher-only QA capture chain.
+
+Do not add speaker identification.
+
+USB, Bluetooth, wired and internal devices are valid only when they are the
+effective Teams/Zoom communication endpoints.
+
+User has listened to the relevant real recording and reports that the voice is
+clear. Do not assume capture/microphone failure without new contradictory
+evidence.
+
+## 5. Schedule / Session authority
+
+Existing Schedule -> Session lifecycle is authoritative.
+
+Product model:
+
+**Recording = continuous evidence**
+
+**Session = class boundary and provenance authority**
+
+**QA = session-scoped analysis**
+
+Always-on server recording may begin before a class and continue after it.
+
+QA must determine class scope from:
+
+- DeviceId
+- recording timestamps
+- eligible Session timestamps
+
+Eligible session statuses:
+
+- Live
+- Completed
+
+Current `746593a` behavior:
+
+- no session overlap -> QA skip without STT
+- one valid overlap -> analyze exact Session window
+- exact SessionId is sent/persisted
+- provenance is validated against exact Session/device/time
+- friendly LaptopName uses RecordingDisplayName fallback DeviceName
+- physical DeviceName remains technical provenance
+- overlapping QA windows are rejected as ambiguous
+
+Do NOT return to:
+
+`Recording.SessionId != null`
+
+as the QA class-boundary rule.
+
+## 6. Real Owner English QA canary
+
+Exact Session:
+
+`1c06347c-8f29-4364-b56c-49a60631380e`
+
+Runtime result:
+
+- Status = Completed
+- Teacher = Abdul Wahid
+- Student = Student Test 1
+- Course = Qaida
+- Laptop = Abdul Wahid
+- ScheduledStart = 2026-09-07 20:59:00 UTC
+- ScheduledEnd = 2026-09-07 21:10:00 UTC
+
+Exact overlapping recording:
+
+`5fe08e46-c409-4cec-9ee9-f8da635de052`
+
+File:
+
+`server-1788814361.mp4`
+
+Recording:
+
+- Start = 2026-09-07 20:52:41 UTC
+- End = 2026-09-07 21:07:42.090042 UTC
+- AudioLayoutVersion = 1
+
+QA Session window inside this recording:
+
+`+379.000s -> +901.090s`
+
+Active Restricted Rule:
+
+`Whatsapp`
+
+Severity:
+
+`High`
+
+Active:
+
+`true`
+
+Worker proved:
+
+- exact scheduled Session window selected
+- language detected `en`
+- session transcript generated
+- Rule matches = 0
+- `TRANSCRIPT_WHATSAPP_MATCHES=0`
+- exact-session Alert count = 0
+- exact-session Candidate count = 0
+- recording marked QA processed
+
+Therefore:
+
+**The English canary did NOT prove an Alert persistence/backend bug.**
+
+The restricted phrase was not recognized by STT, so the Alert engine never
+received a confirmed `Whatsapp` match.
+
+## 7. Old Candidate row is stale evidence
+
+Old dashboard Candidate example:
+
+`server-1788811103.mp4`
+
+Observed old row:
+
+- transcript = `you`
+- ASR confidence around 0.18
+- Unknown teacher
+- OffTopicConversation Candidate
+
+Do NOT use this row as evidence that the current exact-session canary still
+creates garbage Candidates.
+
+The decisive new Owner session produced:
+
+`SESSION_CANDIDATE_COUNT=0`
+
+The `746593a` low-confidence/session-scope protections behaved correctly in
+that canary.
+
+## 8. STT benchmark evidence already completed
+
+Do not repeat these benchmarks without a reason.
+
+### Whole exact Session audio
+
+Direct audio:
+
+- mean volume approximately `-36.5 dB`
+- max volume approximately `-5.5 dB`
+
+Normalized audio:
+
+- mean volume approximately `-29.6 dB`
+- max volume approximately `-3.0 dB`
+
+Current production default model:
+
+`base`
+
+Whole-session `base` result was poor/hallucinated.
+
+Examples included:
+
+- `You`
+- repeated generic phrases
+- repeated `Okay`
+
+Normalized audio materially improved semantic recovery.
+
+It recovered content similar to:
+
+- market
+- planning
+- continue
+
+But:
+
+`WhatsApp = NOT RECOGNIZED`
+
+### Short 100-second known-speech region
+
+Probe relative Session start:
+
+`145 seconds`
+
+Probe duration:
+
+`100 seconds`
+
+Normalized short audio:
+
+- mean approximately `-25.5 dB`
+- max approximately `-3.0 dB`
+
+`base`, no VAD:
+
+- partially recovered semantics
+- still missed WhatsApp
+
+Default VAD:
+
+- removed almost all useful speech
+
+More-sensitive VAD:
+
+- still performed poorly
+
+Conclusion:
+
+Aggressive current VAD is not appropriate for this sample.
+
+### Stronger model benchmark on same exact audio
+
+`small`:
+
+- poor/hallucinated recognition
+- only `continue` among expected controlled vocabulary
+- WhatsApp = NO
+
+`medium`:
+
+- worse on this sample
+- transcript essentially `Thank you very much.`
+- WhatsApp = NO
+
+The Hugging Face warning:
+
+`You are sending unauthenticated requests to the HF Hub`
+
+was NOT a QA/STT-quality failure.
+
+It only means model downloads were unauthenticated and may receive lower rate
+limits.
+
+The models loaded successfully.
+
+## 9. Current root-cause conclusion
+
+Current blocker is:
+
+**Restricted-word speech recognition quality / detection strategy**
+
+It is NOT currently proven to be:
+
+- QaAlert persistence
+- QA database schema
+- Session scoping
+- canonical track identity
+- Owner provenance
+- missing active Whatsapp rule
+- HF authentication
+- simple lack of RAM
+- simple lack of CPU
+
+Do not blindly increase Whisper model size again.
+
+Do not patch Alert storage before restricted-word detection actually produces a
+reliable match.
+
+For Phase 1, a finite restricted-vocabulary / keyword-oriented detector may be
+more appropriate than requiring perfect free-form transcription of an entire
+class.
+
+## 10. Owner product decision — QA PHASE 1 ACTIVE
+
+Owner decision dated 2026-09-08:
+
+Finish Phase 1 first.
+
+Required flow:
+
+`Scheduled Session`
+`-> canonical classroom audio`
+`-> restricted-word detection`
+`-> reliable confirmation`
+`-> QA Alert`
+`-> direct audio evidence/player`
+
+Only Restricted Rule QA is the current active QA product scope.
+
+### Phase-1 QA Alert should show
+
+- exact restricted word/phrase
+- Teacher
+- Student
+- Course
+- friendly Laptop Name
+- date/time
+- Open / Reviewed status
+- direct `Play Audio`
+- audio evidence around the trigger
+- optional transcript for technical/debug context only
+
+Primary human-review evidence:
+
+**audio**
+
+not free-form transcript.
+
+### Commercial audio evidence target
+
+- 10 seconds before restricted word
+- 20 seconds after restricted word
+- clamp safely to Session/recording boundaries
+
+## 11. Phase-1 acceptance criteria
+
+Phase 1 is NOT complete until all of these pass on a real scheduled Owner class:
+
+1. restricted word clearly spoken
+2. detector reliably recognizes it
+3. exactly one Restricted Rule Alert created
+4. correct exact SessionId
+5. correct Teacher
+6. correct Student
+7. correct Course
+8. friendly Laptop = `Abdul Wahid`
+9. direct audio evidence plays from QA Alerts
+10. evidence target approximately 10 sec before + 20 sec after
+11. no Session -> no QA finding
+12. garbage/low-confidence audio -> no Alert
+13. Phase-2 Off-topic/Candidate generation produces no new findings while OFF
+
+## 12. QA PHASE 2 — PENDING / OFF
+
+Phase 2 includes:
+
+- Off-topic Conversation semantic classification
+- AllowedLesson
+- Uncertain
+- OffTopic
+- Off-topic second-pass classification
+- QA Candidate generation
+- Candidate review workflow
+
+Owner has explicitly placed Phase 2 on hold.
+
+Do NOT delete or rollback:
+
+- code
+- database schema
+- migrations
+- repositories/services
+- historical Candidate rows
+
+Preserve them for future reactivation.
+
+Desired feature state:
+
+- Restricted QA = ON
+- Off-topic QA = OFF
+- QA Candidates = OFF
+
+### IMPORTANT IMPLEMENTATION STATUS
+
+The product decision is final, but the Phase-2 feature-level OFF patch has
+**NOT YET BEEN IMPLEMENTED OR DEPLOYED** at this checkpoint.
+
+Current deployed worker still contains existing Off-topic/Candidate code.
+
+Future AI must NOT falsely report:
+
+`PHASE_2_DISABLED=PASS`
+
+until source tests and runtime prove the actual gate.
+
+## 13. Exact NEXT engineering task
+
+Continue Phase 1 only.
+
+Sequence:
+
+1. Inspect the current `746593a` worker orchestration.
+2. Implement a small explicit feature-level gate:
+   - Restricted path ON
+   - Off-topic path OFF
+   - Candidate creation OFF
+3. Preserve all Phase-2 source/schema/history.
+4. Add targeted tests proving:
+   - Restricted processing still executes
+   - Off-topic processing does not execute
+   - Candidate creation does not execute
+   - no-session skip remains working
+5. No Agent change for this gate.
+6. No Live change.
+7. No recording-capture change.
+8. No migration unless source inspection proves one is genuinely required.
+9. Then continue restricted-word recognition work on the existing Owner real
+   recording before requesting unnecessary new real classes.
+10. Prefer finite-vocabulary restricted-word/phrase detection strategies over
+    whole-class semantic transcription where technically stronger.
+11. Once recognition is reliable, prove actual Restricted Rule Alert creation.
+12. Then implement/verify direct inline 10-before / 20-after audio playback on
+    the QA Alerts page.
+13. Close Phase 1 only after the full real Owner acceptance criteria pass.
+
+Do not resume Phase 2 unless Owner explicitly starts it after Phase 1 closure.
+
+## 14. Candidate rollback rule
+
+Do NOT perform a destructive QA Candidate rollback.
+
+Keep:
+
+- Candidate schema
+- Candidate migrations
+- Candidate code
+- Candidate history
+- future reactivation capability
+
+Feature-level inactivity is sufficient for Phase 1.
+
+Do not rewrite/delete old Candidate production history merely to make the
+dashboard visually clean unless Owner explicitly requests cleanup.
+
+## 15. QA evidence/provenance already built
+
+Commercial QA evidence schema already supports:
+
+- RecordingId
+- SessionId
+- DeviceId
+- TeacherId
+- StudentId
+- CourseId
+- friendly LaptopName
+- physical ActualDeviceName
+- TeacherName
+- StudentName
+- CourseName
+- DetectionReason
+- MatchedPhrase
+- Transcript
+- TriggerStartSeconds
+- TriggerEndSeconds
+- EvidenceStartSeconds
+- EvidenceEndSeconds
+- review metadata
+
+Applied QA migrations:
+
+1. `20260907101637_AddQaCommercialEvidenceProvenance`
+2. `20260907104318_AddQaCandidateMatchedPhrase`
+
+Do not regenerate or rewrite them.
+
+## 16. Archive-recorder observation
+
+During the English Owner canary audit, recorder logs contained repeated:
+
+`Independent archive reader disconnected exit=1; retrying`
+
+However:
+
+- the Owner recording was registered
+- canonical layout 1 was present
+- exact Session overlap was found
+- QA processed the Session window
+
+Therefore the disconnect/retry behavior is NOT proven as the reason for the
+current restricted-word miss.
+
+Track it separately as a reliability observation.
+
+Do not derail Phase 1 into a broad recording/relay redesign without direct
+evidence.
+
+If surgical Owner archive-reader rotation is required:
+
+- identify exactly one Owner reader
+- do not print its stream key
+- do not restart the whole recorder stack unnecessarily
+
+## 17. Protected project invariants
+
+Never:
+
+- enable Owner local Agent recording for current QA work
+- print `.env.production`
+- print LiveKit stream keys
+- print Agent secrets
+- print MinIO credentials
+- print API keys
+- overwrite/reset Caddy
+- use `docker compose down` for routine scoped work
+- use `--remove-orphans` casually
+- restart LiveKit/Ingress/MediaMTX without affected-boundary evidence
+- update other academy Agents before Owner canary proof
+- invent a second Session/class-active mechanism
+- add speaker-ID as a prerequisite
+- backfill layout-0 recordings to layout-1 without media verification
+- use destructive Git operations without explicit approval
+
+Always:
+
+- preserve continuous server recording
+- use Schedule-driven Session authority
+- show friendly LaptopName in user-facing QA evidence
+- preserve ActualDeviceName only as technical provenance
+- keep Live/Recording independent from STT waiting
+
+## 18. Existing system baseline to preserve
+
+Already-established product/runtime areas include:
+
+- ASP.NET Core .NET 10 backend
+- PostgreSQL
+- Redis
+- MinIO
+- Next.js / TypeScript dashboard
+- Windows .NET Agent
+- FFmpeg
+- NAudio / WASAPI
+- LiveKit
+- LiveKit Ingress
+- MediaMTX
+- server recording + registrar
+- Live Monitoring
+- schedules
+- automatic Sessions
+- attendance
+- teachers/students/courses
+- RBAC
+- Manager visibility
+- Activity Log
+- Laptop Name
+- Usual Teachers
+- Agent auto-update
+- canonical mixed classroom audio
+
+Accepted Live path:
+
+`Windows H264/AAC RTMP -> MediaMTX -> LiveKit Ingress -> LiveKit -> Dashboard WebRTC`
+
+Accepted approximate monitoring latency:
+
+- audio 1–2 sec
+- video 4–5 sec
+
+Do not reopen accepted Live/viewer architecture absent an observed regression.
+
+## 19. Scale direction
+
+Live and Recording must NOT wait for QA/STT.
+
+Future scale should use:
+
+- independent media pipeline
+- queued QA jobs
+- bounded Session/chunk processing
+- one or more QA workers as capacity requires
+
+Larger CPU/RAM increases throughput but does not automatically fix recognition
+accuracy.
+
+Current blocker is Phase-1 detection accuracy, not premature fleet-scale
+optimization.
+
+## 20. Owner Control Panel
+
+Correct product name:
+
+`Owner Control Panel`
+
+It remains deferred to the final product phase.
+
+Do not treat Owner Control Panel as a current dependency or roadmap blocker.
+
+## 21. Engineering rules for every future AI
+
+- Inspect real source/runtime before guessing.
+- Preserve proven architecture.
+- User is product authority.
+- Improve implementation quality without inventing product restrictions.
+- Do not repeatedly ask questions already answered by source/runtime/user.
+- Distinguish harness/script mistakes from product bugs.
+- Stop diagnosing once the failing boundary is sufficiently proven.
+- Make the smallest production-quality change.
+- Run targeted verification appropriate to the change.
+- Do not fake green.
+- Preserve unrelated work.
+- Use exact Git staging.
+- Runtime-affecting Agent work must prove on Owner before teacher-laptop rollout.
+- Backend/dashboard-only changes do not require an Agent release.
+- Owner is the first canary, not a permanent device capability restriction.
+
+Core principle:
+
+`User intent first. Inspect real state. Preserve proven architecture. Make the smallest correct change. Prove it.`
+
+<!-- HQL_QA_PHASE1_ACTIVE_20260908_END -->
+
 <!-- HQL_QA3_PART3C_SOURCE_CLOSED_20260907_BEGIN -->
 ## QA-3 Part 3C final source regression gate - SOURCE CLOSED - 2026-09-07
 

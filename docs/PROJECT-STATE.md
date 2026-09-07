@@ -1,5 +1,61 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_QA_PHASE2_RUNTIME_OFF_20260908_BEGIN -->
+
+## CURRENT QA RUNTIME OVERRIDE — PHASE 2 OFF — 2026-09-08
+
+This block supersedes older QA status below that says Phase 2 OFF is not yet
+implemented or deployed.
+
+Latest functional source and VPS runtime checkpoint:
+
+`64b511a8157125724bf63b673b9e1eb72bef314e`
+
+Commit:
+
+`fix: disable QA phase 2 worker paths`
+
+Runtime-certified state:
+
+- Restricted Rule QA = ON
+- Off-topic Conversation QA = OFF
+- QA Candidate creation = OFF
+- Phase-2 source code = preserved
+- Phase-2 database schema/migrations = preserved
+- historical Candidates = preserved
+
+Deployment proof:
+
+- only `academy-qa-worker` rebuilt/recreated
+- API unchanged
+- Dashboard unchanged
+- Agent unchanged
+- Live unchanged
+- Recording unchanged
+- database unchanged
+- Caddy preserved
+- protected container IDs unchanged
+
+Runtime worker startup proved:
+
+- `Restricted Rule QA: ENABLED`
+- `Off-topic QA: DISABLED`
+- `QA Candidates: DISABLED`
+
+No further Phase-2 feature development is in current scope.
+
+Current engineering priority:
+
+`QA Phase 1 Restricted Word Detection -> Restricted Alert -> direct 10s-before / 20s-after audio evidence`
+
+Current Phase-1 blocker remains restricted-word recognition accuracy on real
+canonical classroom audio.
+
+Do not reopen Off-topic semantic QA or Candidate workflow unless the Owner
+explicitly starts Phase 2 after Phase 1 is complete.
+
+<!-- HQL_QA_PHASE2_RUNTIME_OFF_20260908_END -->
+
 <!-- HQL_QA_PHASE1_ACTIVE_20260908_BEGIN -->
 
 # CURRENT ACTIVE STATE — QA PHASE 1 RESTRICTED-WORD ALERTS — 2026-09-08

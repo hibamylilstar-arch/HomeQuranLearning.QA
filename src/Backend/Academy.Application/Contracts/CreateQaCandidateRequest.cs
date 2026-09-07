@@ -22,7 +22,10 @@ public sealed class CreateQaCandidateRequest
 
     public string LanguageFamily { get; init; } = string.Empty;
 
+    // Legacy compatibility field retained during QA-3 migration.
     public string IntentCategory { get; init; } = string.Empty;
+
+    public string DetectionReason { get; init; } = string.Empty;
 
     public double? TriggerConfidence { get; init; }
 

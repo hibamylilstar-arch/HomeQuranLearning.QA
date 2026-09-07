@@ -100,7 +100,20 @@ public sealed class AppDbContext : DbContext
         {
             entity.ToTable("qa_alerts");
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.MatchedPhrase).IsRequired().HasMaxLength(512);
+            entity.Property(x => x.MatchedPhrase).HasMaxLength(512);
+            entity.Property(x => x.DetectionReason).HasMaxLength(64);
+            entity.Property(x => x.Transcript).HasMaxLength(4096);
+            entity.Property(x => x.PolicyVersion).HasMaxLength(128);
+            entity.Property(x => x.AnalysisVersion).HasMaxLength(128);
+            entity.Property(x => x.AnalysisIdempotencyKey).HasMaxLength(512);
+            entity.Property(x => x.LaptopName).HasMaxLength(256);
+            entity.Property(x => x.ActualDeviceName).HasMaxLength(256);
+            entity.Property(x => x.TeacherName).HasMaxLength(256);
+            entity.Property(x => x.StudentName).HasMaxLength(256);
+            entity.Property(x => x.CourseName).HasMaxLength(256);
+            entity.Property(x => x.ReviewNote).HasMaxLength(2048);
+            entity.Property(x => x.ReviewVersion).IsConcurrencyToken();
+            entity.HasIndex(x => x.AnalysisIdempotencyKey).IsUnique();
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
 
             entity.HasOne(x => x.Recording)
@@ -123,6 +136,12 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.Transcript).IsRequired().HasMaxLength(4096);
             entity.Property(x => x.LanguageFamily).IsRequired().HasMaxLength(64);
             entity.Property(x => x.IntentCategory).IsRequired().HasMaxLength(128);
+            entity.Property(x => x.DetectionReason).HasMaxLength(64);
+            entity.Property(x => x.LaptopName).HasMaxLength(256);
+            entity.Property(x => x.ActualDeviceName).HasMaxLength(256);
+            entity.Property(x => x.TeacherName).HasMaxLength(256);
+            entity.Property(x => x.StudentName).HasMaxLength(256);
+            entity.Property(x => x.CourseName).HasMaxLength(256);
             entity.Property(x => x.AnalysisIdempotencyKey).IsRequired().HasMaxLength(512);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
             entity.Property(x => x.ReviewReason).HasMaxLength(2048);

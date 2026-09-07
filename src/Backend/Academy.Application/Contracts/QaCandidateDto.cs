@@ -8,11 +8,21 @@ public sealed class QaCandidateDto
 
     public string RecordingFileName { get; init; } = string.Empty;
 
+    public Guid? DeviceId { get; init; }
+    public string? LaptopName { get; init; }
+    public string? ActualDeviceName { get; init; }
+
     public Guid? SessionId { get; init; }
 
     public Guid? TeacherId { get; init; }
 
     public string TeacherName { get; init; } = string.Empty;
+
+    public Guid? StudentId { get; init; }
+    public string? StudentName { get; init; }
+
+    public Guid? CourseId { get; init; }
+    public string? CourseName { get; init; }
 
     public Guid? QaRuleId { get; init; }
 
@@ -36,11 +46,21 @@ public sealed class QaCandidateDto
 
     public double ContextEndSeconds { get; init; }
 
+    public double? EvidenceStartSeconds { get; init; }
+
+    public double? EvidenceEndSeconds { get; init; }
+
+    public DateTimeOffset? ObservedAtUtc { get; init; }
+
+    public double? ObservedOffsetSeconds { get; init; }
+
     public string Transcript { get; init; } = string.Empty;
 
     public string LanguageFamily { get; init; } = string.Empty;
 
     public string IntentCategory { get; init; } = string.Empty;
+
+    public string? DetectionReason { get; init; }
 
     public double? TriggerConfidence { get; init; }
 

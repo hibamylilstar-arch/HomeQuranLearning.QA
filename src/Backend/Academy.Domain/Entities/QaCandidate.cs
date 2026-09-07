@@ -34,11 +34,17 @@ public sealed class QaCandidate
 
     public double ContextEndSeconds { get; set; }
 
+    public double? EvidenceStartSeconds { get; set; }
+
+    public double? EvidenceEndSeconds { get; set; }
+
     public string Transcript { get; set; } = string.Empty;
 
     public string LanguageFamily { get; set; } = string.Empty;
 
     public string IntentCategory { get; set; } = string.Empty;
+
+    public string? DetectionReason { get; set; }
 
     public double? TriggerConfidence { get; set; }
 
@@ -47,6 +53,18 @@ public sealed class QaCandidate
     public double? IntentConfidence { get; set; }
 
     public string AnalysisIdempotencyKey { get; set; } = string.Empty;
+
+    public Guid? DeviceId { get; set; }
+    public Guid? SessionId { get; set; }
+    public Guid? TeacherId { get; set; }
+    public Guid? StudentId { get; set; }
+    public Guid? CourseId { get; set; }
+
+    public string? LaptopName { get; set; }
+    public string? ActualDeviceName { get; set; }
+    public string? TeacherName { get; set; }
+    public string? StudentName { get; set; }
+    public string? CourseName { get; set; }
 
     public QaCandidateStatus Status { get; set; } = QaCandidateStatus.Pending;
 

@@ -71,6 +71,31 @@ OFF_TOPIC_ANALYSIS_VERSION = (
 # still use their independent second-pass verification.
 MIN_UNCERTAIN_ASR_CONFIDENCE = 0.45
 
+# QA Phase 1 is the active product scope.
+#
+# Phase 2 remains preserved in source/schema/history, but
+# Off-topic semantic QA and Candidate persistence are OFF
+# by default until the Owner explicitly reopens Phase 2.
+QA_OFF_TOPIC_ENABLED = (
+    os.environ.get(
+        "QA_ENABLE_OFF_TOPIC",
+        "false",
+    )
+    .strip()
+    .lower()
+    in {"1", "true", "yes", "on"}
+)
+
+QA_CANDIDATES_ENABLED = (
+    os.environ.get(
+        "QA_ENABLE_CANDIDATES",
+        "false",
+    )
+    .strip()
+    .lower()
+    in {"1", "true", "yes", "on"}
+)
+
 
 def configure_utf8_stream(stream):
     reconfigure = getattr(stream, "reconfigure", None)
@@ -1170,6 +1195,14 @@ def process_off_topic_detection(
             else primary.language_family
         )
 
+        if not QA_CANDIDATES_ENABLED:
+            print(
+                "QA PHASE 2: Candidate persistence "
+                "disabled; review finding suppressed."
+            )
+
+            continue
+
         create_candidate(
             recording_id,
             None,
@@ -2007,6 +2040,14 @@ def process_recording(recording):
 
                     continue
 
+                if not QA_CANDIDATES_ENABLED:
+                    print(
+                        "QA PHASE 2 OFF: unverified "
+                        "Restricted Rule Candidate suppressed."
+                    )
+
+                    continue
+
                 create_candidate(
                     recording_id,
                     match["ruleId"],
@@ -2032,6 +2073,14 @@ def process_recording(recording):
                     "confirmed by second pass; "
                     "QA candidate created."
                 )
+
+            if not QA_OFF_TOPIC_ENABLED:
+                print(
+                    "QA PHASE 2 OFF: "
+                    "Off-topic Conversation analysis skipped."
+                )
+
+                continue
 
             off_topic_counts = (
                 process_off_topic_detection(
@@ -2829,6 +2878,28 @@ def main():
     print(f"Backend URL: {BACKEND_BASE_URL}")
     print(
         f"Polling every {POLL_INTERVAL_SECONDS} seconds..."
+    )
+
+    print(
+        "Restricted Rule QA: ENABLED"
+    )
+
+    print(
+        "Off-topic QA: "
+        + (
+            "ENABLED"
+            if QA_OFF_TOPIC_ENABLED
+            else "DISABLED"
+        )
+    )
+
+    print(
+        "QA Candidates: "
+        + (
+            "ENABLED"
+            if QA_CANDIDATES_ENABLED
+            else "DISABLED"
+        )
     )
 
     while True:

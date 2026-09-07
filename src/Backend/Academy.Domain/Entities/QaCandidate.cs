@@ -14,6 +14,10 @@ public sealed class QaCandidate
 
     public QaRule? QaRule { get; set; }
 
+    // Immutable phrase snapshot for Restricted Rule evidence.
+    // Null for Off-topic Conversation.
+    public string? MatchedPhrase { get; set; }
+
     public Guid? ConfirmedQaAlertId { get; set; }
 
     public QaAlert? ConfirmedQaAlert { get; set; }

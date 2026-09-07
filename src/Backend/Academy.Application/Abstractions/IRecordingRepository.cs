@@ -9,6 +9,10 @@ public interface IRecordingRepository
     Task<IReadOnlyList<Recording>> GetAllWithDeviceAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Recording>> GetPendingQaAsync(CancellationToken cancellationToken = default);
     Task<Recording?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    Task<Recording?> GetByIdWithQaProvenanceAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
     Task<Recording?> GetByDeviceAndFileNameAsync(
         Guid deviceId,
         string fileName,

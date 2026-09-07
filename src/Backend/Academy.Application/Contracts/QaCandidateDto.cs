@@ -28,6 +28,8 @@ public sealed class QaCandidateDto
 
     public string? RulePhrase { get; init; }
 
+    public string? MatchedPhrase { get; init; }
+
     public Guid? ConfirmedQaAlertId { get; init; }
 
     public string PolicyVersion { get; init; } = string.Empty;

@@ -17,9 +17,8 @@ public sealed class QaAlertRepository : IQaAlertRepository
     public async Task<IReadOnlyList<QaAlert>> GetAllAsync(
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.QaAlerts
+        return await Query()
             .AsNoTracking()
-            .Include(x => x.QaRule)
             .ToListAsync(cancellationToken);
     }
 
@@ -27,17 +26,58 @@ public sealed class QaAlertRepository : IQaAlertRepository
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.QaAlerts
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        return await Query()
+            .FirstOrDefaultAsync(
+                x => x.Id == id,
+                cancellationToken);
     }
 
-    public async Task AddAsync(QaAlert alert, CancellationToken cancellationToken = default)
+    public async Task<QaAlert?> GetByAnalysisIdempotencyKeyAsync(
+        string analysisIdempotencyKey,
+        CancellationToken cancellationToken = default)
     {
-        await _dbContext.QaAlerts.AddAsync(alert, cancellationToken);
+        return await Query()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x =>
+                    x.AnalysisIdempotencyKey ==
+                    analysisIdempotencyKey,
+                cancellationToken);
+    }
+
+    public async Task AddAsync(
+        QaAlert alert,
+        CancellationToken cancellationToken = default)
+    {
+        await _dbContext.QaAlerts.AddAsync(
+            alert,
+            cancellationToken);
     }
 
     public void Update(QaAlert alert)
     {
         _dbContext.QaAlerts.Update(alert);
+    }
+
+    private IQueryable<QaAlert> Query()
+    {
+        return _dbContext.QaAlerts
+            .Include(x => x.QaRule)
+            .Include(x => x.Recording)
+                .ThenInclude(x => x!.Device)
+            .Include(x => x.Recording)
+                .ThenInclude(x => x!.Teacher)
+            .Include(x => x.Recording)
+                .ThenInclude(x => x!.Session)
+                    .ThenInclude(x => x!.Teacher)
+            .Include(x => x.Recording)
+                .ThenInclude(x => x!.Session)
+                    .ThenInclude(x => x!.Student)
+            .Include(x => x.Recording)
+                .ThenInclude(x => x!.Session)
+                    .ThenInclude(x => x!.Course)
+            .Include(x => x.Recording)
+                .ThenInclude(x => x!.Session)
+                    .ThenInclude(x => x!.Device);
     }
 }

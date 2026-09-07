@@ -27,5 +27,5 @@ public sealed class CreateQaAlertRequest
 
     public double? TriggerEndSeconds { get; init; }
 
-    public string AnalysisIdempotencyKey { get; init; } = string.Empty;
+    public string? AnalysisIdempotencyKey { get; init; }
 }

@@ -60,6 +60,26 @@ public sealed class RecordingRepository : IRecordingRepository
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
+    public async Task<Recording?> GetByIdWithQaProvenanceAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Recordings
+            .Include(x => x.Device)
+            .Include(x => x.Teacher)
+            .Include(x => x.Session)
+                .ThenInclude(x => x!.Teacher)
+            .Include(x => x.Session)
+                .ThenInclude(x => x!.Student)
+            .Include(x => x.Session)
+                .ThenInclude(x => x!.Course)
+            .Include(x => x.Session)
+                .ThenInclude(x => x!.Device)
+            .FirstOrDefaultAsync(
+                x => x.Id == id,
+                cancellationToken);
+    }
+
     public async Task<Recording?> GetByDeviceAndFileNameAsync(
         Guid deviceId,
         string fileName,

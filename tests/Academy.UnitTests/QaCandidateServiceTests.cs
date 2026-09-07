@@ -21,10 +21,12 @@ public sealed class QaCandidateServiceTests
         candidates.Setup(x => x.GetByAnalysisIdempotencyKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((QaCandidate?)null);
         var recordings = new Mock<IRecordingRepository>();
         recordings.Setup(x => x.GetByIdAsync(recording.Id, It.IsAny<CancellationToken>())).ReturnsAsync(recording);
+
+        recordings.Setup(x => x.GetByIdWithQaProvenanceAsync(recording.Id, It.IsAny<CancellationToken>())).ReturnsAsync(recording);
         var alerts = new Mock<IQaAlertRepository>();
         alerts.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Array.Empty<QaAlert>());
         var unit = new Mock<IUnitOfWork>();
-        var service = new QaCandidateService(candidates.Object, recordings.Object, new QaAlertService(alerts.Object, unit.Object), unit.Object);
+        var service = new QaCandidateService(candidates.Object, recordings.Object, new QaAlertService(alerts.Object, recordings.Object, unit.Object), unit.Object);
         return (service, candidates, recordings, alerts, unit, recording);
     }
 
@@ -37,6 +39,8 @@ public sealed class QaCandidateServiceTests
         SourceTrackIndex = sourceTrackIndex, AudioLayoutVersion = 1,
         TriggerStartSeconds = 12, TriggerEndSeconds = 14, Transcript = "Fee?",
         LanguageFamily = "ur-en-ar", IntentCategory = "off-lesson",
+
+        DetectionReason = "Off-topic Conversation",
         AnalysisIdempotencyKey = key, AsrConfidence = .91
     };
 

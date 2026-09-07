@@ -6,6 +6,8 @@ public sealed class CreateQaCandidateRequest
 
     public Guid? QaRuleId { get; init; }
 
+    public string? MatchedPhrase { get; init; }
+
     public string PolicyVersion { get; init; } = string.Empty;
 
     public string AnalysisVersion { get; init; } = string.Empty;

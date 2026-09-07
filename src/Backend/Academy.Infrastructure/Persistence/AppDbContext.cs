@@ -131,6 +131,7 @@ public sealed class AppDbContext : DbContext
         {
             entity.ToTable("qa_candidates");
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.MatchedPhrase).HasMaxLength(512);
             entity.Property(x => x.PolicyVersion).IsRequired().HasMaxLength(128);
             entity.Property(x => x.AnalysisVersion).IsRequired().HasMaxLength(128);
             entity.Property(x => x.Transcript).IsRequired().HasMaxLength(4096);

@@ -135,14 +135,118 @@ public sealed class DashboardQueryService
 
         return alerts
             .OrderByDescending(x => x.TimestampUtc)
-            .Select(x => new QaAlertDto
+            .Select(x =>
             {
-                Id = x.Id,
-                RecordingId = x.RecordingId,
-                MatchedPhrase = x.MatchedPhrase,
-                TimestampUtc = x.TimestampUtc,
-                Status = x.Status.ToString(),
-                RulePhrase = x.QaRule?.Phrase
+                Recording? recording =
+                    x.Recording;
+
+                Session? session =
+                    recording?.Session;
+
+                Device? device =
+                    recording?.Device ??
+                    session?.Device;
+
+                Guid? teacherId =
+                    x.TeacherId ??
+                    recording?.TeacherId ??
+                    session?.TeacherId;
+
+                string? laptopName =
+                    x.LaptopName ??
+                    (!string.IsNullOrWhiteSpace(
+                        device?.RecordingDisplayName)
+                        ? device!.RecordingDisplayName
+                        : device?.DeviceName);
+
+                double? observedOffset =
+                    x.TriggerStartSeconds;
+
+                if (!observedOffset.HasValue &&
+                    recording is not null)
+                {
+                    observedOffset =
+                        (x.TimestampUtc -
+                         recording.StartedAtUtc)
+                        .TotalSeconds;
+                }
+
+                return new QaAlertDto
+                {
+                    Id = x.Id,
+                    RecordingId = x.RecordingId,
+                    QaRuleId = x.QaRuleId,
+                    MatchedPhrase = x.MatchedPhrase,
+                    RulePhrase = x.QaRule?.Phrase,
+                    DetectionReason =
+                        x.DetectionReason,
+                    Transcript = x.Transcript,
+                    TimestampUtc = x.TimestampUtc,
+                    ObservedAtUtc =
+                        x.TimestampUtc,
+                    ObservedOffsetSeconds =
+                        observedOffset,
+                    PolicyVersion =
+                        x.PolicyVersion,
+                    AnalysisVersion =
+                        x.AnalysisVersion,
+                    SourceTrackIndex =
+                        x.SourceTrackIndex,
+                    AudioLayoutVersion =
+                        x.AudioLayoutVersion,
+                    TriggerStartSeconds =
+                        x.TriggerStartSeconds,
+                    TriggerEndSeconds =
+                        x.TriggerEndSeconds,
+                    EvidenceStartSeconds =
+                        x.EvidenceStartSeconds,
+                    EvidenceEndSeconds =
+                        x.EvidenceEndSeconds,
+                    AnalysisIdempotencyKey =
+                        x.AnalysisIdempotencyKey,
+                    DeviceId =
+                        x.DeviceId ??
+                        recording?.DeviceId,
+                    SessionId =
+                        x.SessionId ??
+                        recording?.SessionId,
+                    TeacherId =
+                        teacherId,
+                    StudentId =
+                        x.StudentId ??
+                        session?.StudentId,
+                    CourseId =
+                        x.CourseId ??
+                        session?.CourseId,
+                    LaptopName =
+                        laptopName,
+                    ActualDeviceName =
+                        x.ActualDeviceName ??
+                        device?.DeviceName,
+                    TeacherName =
+                        x.TeacherName ??
+                        recording?.Teacher?.FullName ??
+                        session?.Teacher?.FullName,
+                    StudentName =
+                        x.StudentName ??
+                        session?.Student?.FullName,
+                    CourseName =
+                        x.CourseName ??
+                        session?.Course?.Name,
+                    Status = x.Status.ToString(),
+                    ReviewedByUserId =
+                        x.ReviewedByUserId,
+                    ReviewedAtUtc =
+                        x.ReviewedAtUtc,
+                    ReviewNote =
+                        x.ReviewNote,
+                    ReviewVersion =
+                        x.ReviewVersion,
+                    CreatedAtUtc =
+                        x.CreatedAtUtc,
+                    UpdatedAtUtc =
+                        x.UpdatedAtUtc
+                };
             })
             .ToList();
     }
@@ -731,43 +835,146 @@ public sealed class DashboardQueryService
         return assignments.Select(x => x.TeacherId).ToHashSet();
     }
 
-    private static QaCandidateDto ToCandidateDto(QaCandidate candidate)
+    private static QaCandidateDto ToCandidateDto(
+        QaCandidate candidate)
     {
+        Recording? recording =
+            candidate.Recording;
+
+        Session? session =
+            recording?.Session;
+
+        Device? device =
+            recording?.Device ??
+            session?.Device;
+
+        Guid? teacherId =
+            candidate.TeacherId ??
+            recording?.TeacherId ??
+            session?.TeacherId;
+
+        string? laptopName =
+            candidate.LaptopName ??
+            (!string.IsNullOrWhiteSpace(
+                device?.RecordingDisplayName)
+                ? device!.RecordingDisplayName
+                : device?.DeviceName);
+
+        DateTimeOffset? observedAtUtc =
+            recording is null
+                ? null
+                : recording.StartedAtUtc
+                    .AddSeconds(
+                        candidate.TriggerStartSeconds);
+
+        string detectionReason =
+            !string.IsNullOrWhiteSpace(
+                candidate.DetectionReason)
+                ? candidate.DetectionReason
+                : candidate.QaRuleId.HasValue
+                    ? "Restricted Rule"
+                    : "Off-topic Conversation";
+
         return new QaCandidateDto
         {
             Id = candidate.Id,
-            RecordingId = candidate.RecordingId,
-            RecordingFileName = candidate.Recording?.FileName ?? string.Empty,
-            SessionId = candidate.Recording?.SessionId,
-            TeacherId = candidate.Recording?.TeacherId,
-            TeacherName = candidate.Recording?.Teacher?.FullName ?? string.Empty,
-            QaRuleId = candidate.QaRuleId,
-            RulePhrase = candidate.QaRule?.Phrase,
-            ConfirmedQaAlertId = candidate.ConfirmedQaAlertId,
-            PolicyVersion = candidate.PolicyVersion,
-            AnalysisVersion = candidate.AnalysisVersion,
-            SourceTrackIndex = candidate.SourceTrackIndex,
-            AudioLayoutVersion = candidate.AudioLayoutVersion,
-            TriggerStartSeconds = candidate.TriggerStartSeconds,
-            TriggerEndSeconds = candidate.TriggerEndSeconds,
-            ContextStartSeconds = candidate.ContextStartSeconds,
-            ContextEndSeconds = candidate.ContextEndSeconds,
-            Transcript = candidate.Transcript,
-            LanguageFamily = candidate.LanguageFamily,
-            IntentCategory = candidate.IntentCategory,
-            TriggerConfidence = candidate.TriggerConfidence,
-            AsrConfidence = candidate.AsrConfidence,
-            IntentConfidence = candidate.IntentConfidence,
-            AnalysisIdempotencyKey = candidate.AnalysisIdempotencyKey,
-            Status = candidate.Status.ToString(),
-            ReviewedByUserId = candidate.ReviewedByUserId,
-            ReviewedAtUtc = candidate.ReviewedAtUtc,
-            ReviewReason = candidate.ReviewReason,
-            CreatedAtUtc = candidate.CreatedAtUtc,
-            UpdatedAtUtc = candidate.UpdatedAtUtc
+            RecordingId =
+                candidate.RecordingId,
+            RecordingFileName =
+                recording?.FileName ??
+                string.Empty,
+            DeviceId =
+                candidate.DeviceId ??
+                recording?.DeviceId,
+            LaptopName =
+                laptopName,
+            ActualDeviceName =
+                candidate.ActualDeviceName ??
+                device?.DeviceName,
+            SessionId =
+                candidate.SessionId ??
+                recording?.SessionId,
+            TeacherId =
+                teacherId,
+            TeacherName =
+                candidate.TeacherName ??
+                recording?.Teacher?.FullName ??
+                session?.Teacher?.FullName ??
+                string.Empty,
+            StudentId =
+                candidate.StudentId ??
+                session?.StudentId,
+            StudentName =
+                candidate.StudentName ??
+                session?.Student?.FullName,
+            CourseId =
+                candidate.CourseId ??
+                session?.CourseId,
+            CourseName =
+                candidate.CourseName ??
+                session?.Course?.Name,
+            QaRuleId =
+                candidate.QaRuleId,
+            RulePhrase =
+                candidate.QaRule?.Phrase,
+            MatchedPhrase =
+                candidate.MatchedPhrase,
+            ConfirmedQaAlertId =
+                candidate.ConfirmedQaAlertId,
+            PolicyVersion =
+                candidate.PolicyVersion,
+            AnalysisVersion =
+                candidate.AnalysisVersion,
+            SourceTrackIndex =
+                candidate.SourceTrackIndex,
+            AudioLayoutVersion =
+                candidate.AudioLayoutVersion,
+            TriggerStartSeconds =
+                candidate.TriggerStartSeconds,
+            TriggerEndSeconds =
+                candidate.TriggerEndSeconds,
+            ContextStartSeconds =
+                candidate.ContextStartSeconds,
+            ContextEndSeconds =
+                candidate.ContextEndSeconds,
+            EvidenceStartSeconds =
+                candidate.EvidenceStartSeconds,
+            EvidenceEndSeconds =
+                candidate.EvidenceEndSeconds,
+            ObservedAtUtc =
+                observedAtUtc,
+            ObservedOffsetSeconds =
+                candidate.TriggerStartSeconds,
+            Transcript =
+                candidate.Transcript,
+            LanguageFamily =
+                candidate.LanguageFamily,
+            IntentCategory =
+                candidate.IntentCategory,
+            DetectionReason =
+                detectionReason,
+            TriggerConfidence =
+                candidate.TriggerConfidence,
+            AsrConfidence =
+                candidate.AsrConfidence,
+            IntentConfidence =
+                candidate.IntentConfidence,
+            AnalysisIdempotencyKey =
+                candidate.AnalysisIdempotencyKey,
+            Status =
+                candidate.Status.ToString(),
+            ReviewedByUserId =
+                candidate.ReviewedByUserId,
+            ReviewedAtUtc =
+                candidate.ReviewedAtUtc,
+            ReviewReason =
+                candidate.ReviewReason,
+            CreatedAtUtc =
+                candidate.CreatedAtUtc,
+            UpdatedAtUtc =
+                candidate.UpdatedAtUtc
         };
     }
-
     private static bool IsOwnerOrAdmin(string role)
     {
         return role == UserRole.Owner.ToString() ||

@@ -1,5 +1,222 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_QA3_PART3B_CLOSED_20260907_BEGIN -->
+## QA-3 Part 3B API + Worker commercial evidence wiring - CLOSED - 2026-09-07
+
+Latest functional source checkpoint:
+
+`df6e426b17b8e7a04e12efe45245fbc281a6d647`
+
+Commit:
+
+`qa: wire worker commercial evidence payloads`
+
+Previous functional source checkpoint:
+
+`4984eb550ced524c66f2d017b0e8dfbbb56cb64e`
+
+### Worker Alert API
+
+`POST /api/worker/qa-alerts` now passes the full
+`CreateQaAlertRequest` into the enriched QaAlertService path.
+
+The worker endpoint no longer imposes the old blanket rule:
+
+`MatchedPhrase is required`
+
+Validation now belongs to the enriched backend service contract.
+
+Backend semantics remain:
+
+Restricted Rule:
+- DetectionReason = `Restricted Rule`
+- QaRuleId required
+- exact MatchedPhrase required
+
+Off-topic Conversation:
+- DetectionReason = `Off-topic Conversation`
+- QaRuleId = null
+- MatchedPhrase = null
+
+The worker Alert endpoint maps:
+- argument validation failures to HTTP 400
+- invalid/conflicting recording/evidence state to HTTP 409
+
+### Worker direct Alert payload
+
+Direct Alert payloads now include:
+
+- RecordingId
+- QaRuleId
+- nullable MatchedPhrase
+- DetectionReason
+- Transcript
+- PolicyVersion
+- AnalysisVersion
+- SourceTrackIndex
+- AudioLayoutVersion
+- TriggerStartSeconds
+- TriggerEndSeconds
+- TimestampUtc
+- AnalysisIdempotencyKey
+
+Restricted Rule direct Alert:
+- exact verified restricted phrase is sent as MatchedPhrase
+- verified second-pass trigger interval is sent
+- second-pass verification transcript is preferred as evidence transcript
+- original context transcript is the fallback
+
+Off-topic direct Alert:
+- MatchedPhrase is null
+- DetectionReason is `Off-topic Conversation`
+- verified second-pass conversation interval is sent
+- verified transcript is preferred, with primary conversation text fallback
+
+### Stable idempotency
+
+Alert payloads reuse the existing shared
+`analysis_idempotency_key(...)` implementation.
+
+The key is deterministically derived from:
+
+- recording
+- rule identity when applicable
+- policy version
+- analysis version
+- canonical source track
+- trigger start/end interval
+
+No new ad-hoc Alert key format was introduced.
+
+### Worker Candidate payload
+
+Candidate payloads now additionally send:
+
+- DetectionReason
+- nullable MatchedPhrase
+
+Restricted Rule Candidate:
+- exact detected rule phrase is snapshotted
+- DetectionReason = `Restricted Rule`
+
+Off-topic Candidate:
+- MatchedPhrase = null
+- DetectionReason = `Off-topic Conversation`
+
+`IntentCategory` is still sent temporarily only for backend compatibility.
+
+It is not the long-term user-facing QA reason model.
+
+### Preserved QA orchestration
+
+QA-2A / QA-2B processing order remains unchanged:
+
+1. Restricted Rule detection and second-pass verification
+2. confirmed Restricted Rule intervals retained
+3. Off-topic conversation analysis
+4. overlapping duplicate direct Off-topic alert suppression
+5. human-review Candidate when required
+6. recording marked QA processed only after persistence work completes
+
+Restricted Rule remains higher priority for overlapping incidents.
+
+### Verification windows unchanged
+
+Part 3B did NOT change classifier/verification audio windows.
+
+Restricted/default verification still uses the existing nominal 10-second
+padding.
+
+Off-topic second-pass verification still uses the existing 3-second padding.
+
+These classifier verification windows remain separate from the commercial
+persisted evidence contract:
+
+- 10 seconds before
+- 20 seconds after
+- clamped to recording boundaries
+
+Do not change verification WAV padding merely to imitate persisted commercial
+evidence windows.
+
+### Verification
+
+QA-3 Part 3B passed:
+
+- exact two-file source scope
+- git diff check
+- Python compile
+- Off-topic classifier self-test
+- QA worker self-test
+- worker commercial Alert payload self-tests
+- worker commercial Candidate payload self-tests
+- Off-topic null MatchedPhrase self-test
+- Restricted two-pass Alert orchestration test
+- unverified Restricted Candidate orchestration test
+- full solution build
+- full Unit tests
+- full Integration tests
+- exact commit
+- remote push verification
+
+### Explicitly unchanged
+
+Part 3B did NOT:
+
+- apply a database migration
+- deploy to VPS
+- deploy the QA worker
+- update the Owner Agent
+- modify Agent audio capture
+- modify canonical classroom audio
+- modify Live
+- modify Recording generation
+- modify Attendance
+- modify classifier vocabulary/policy
+- modify verification window padding
+
+### Next exact phase
+
+`QA-3 Part 3C - final regression, API behavioral coverage, migration readiness and real-canary gate`
+
+Part 3C must finish source-level closure before real runtime testing.
+
+Required final coverage includes:
+
+- direct Restricted Alert exact MatchedPhrase
+- direct Off-topic Alert nullable MatchedPhrase
+- Candidate Restricted exact MatchedPhrase
+- Candidate Off-topic nullable MatchedPhrase
+- confirmed Candidate -> Alert semantics
+- Alert and Candidate commercial evidence -10/+20 with boundary clamping
+- legacy Candidate context remains -10/+10
+- authoritative backend provenance snapshots
+- LaptopName / ActualDeviceName semantics
+- Student / Course provenance
+- stable direct Alert idempotency
+- duplicate retry behavior
+- canonical track 0 / layout 1 rejection regression
+- manager visibility / RBAC regression
+- worker processing-order regression
+- API worker endpoint behavioral regression
+- full Unit / Integration / Python regression
+
+After source-level Part 3C passes:
+
+1. deliberately apply the pending QA migrations to the controlled local/runtime
+   database required for the canary
+2. deploy/restart only the required QA backend/worker components
+3. run Owner-laptop real QA canary
+4. verify real Alert/Candidate evidence in Dashboard
+5. verify recording deep-link and audible evidence
+6. close QA-3 only after runtime canary proof
+
+No production-wide rollout should occur before the controlled Owner-laptop
+canary passes.
+
+QA-3 Part 3B is SOURCE CLOSED.
+<!-- HQL_QA3_PART3B_CLOSED_20260907_END -->
+
 <!-- HQL_QA3_PART3A_CLOSED_20260907_BEGIN -->
 ## QA-3 Part 3A backend commercial evidence wiring - CLOSED - 2026-09-07
 

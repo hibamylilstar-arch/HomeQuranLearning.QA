@@ -1,5 +1,270 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_QA3_PART3A_CLOSED_20260907_BEGIN -->
+## QA-3 Part 3A backend commercial evidence wiring - CLOSED - 2026-09-07
+
+Latest functional source checkpoint:
+
+`4984eb550ced524c66f2d017b0e8dfbbb56cb64e`
+
+Commit:
+
+`qa: wire commercial evidence backend`
+
+Parent handoff checkpoint:
+
+`d16f9156ec74082e277400ceeab9b76a68aa1532`
+
+### Part 3A implemented
+
+Backend QA evidence/provenance wiring is now source-complete for this phase.
+
+Recording repository now has a dedicated QA provenance load path rather than
+globally changing ordinary Recording GetById semantics.
+
+QA provenance loading includes the authoritative graph needed by QA:
+
+- Recording -> Device
+- Recording -> Teacher
+- Recording -> Session
+- Session -> Teacher
+- Session -> Student
+- Session -> Course
+- Session -> Device
+
+QaAlertRepository and QaCandidateRepository now expose the loaded QA graph
+needed for enriched projections and legacy fallbacks.
+
+QaAlertRepository also supports lookup by AnalysisIdempotencyKey.
+
+### Candidate immutable matched-phrase snapshot
+
+QA-3 Part 3A found an important schema gap:
+
+a Restricted Rule Candidate could later be human-confirmed, but the Candidate
+did not retain the exact restricted phrase detected at analysis time.
+
+A new nullable Candidate MatchedPhrase snapshot was therefore added.
+
+Semantics:
+
+- Restricted Rule Candidate -> exact matched restricted phrase
+- Off-topic Conversation Candidate -> null
+
+This prevents Candidate confirmation from reconstructing historical evidence
+from a later-edited QaRule phrase.
+
+Follow-up additive migration:
+
+`20260907104318_AddQaCandidateMatchedPhrase`
+
+Migration Up() audit:
+
+- exactly one AddColumn operation
+- target: qa_candidates.MatchedPhrase
+- nullable
+- no destructive Up() operation
+
+The migration has NOT been applied to a database.
+
+The already-closed QA-3 Part 2 migration was NOT rewritten.
+
+### QaCandidateService
+
+New Candidate creation now:
+
+- requires the canonical classroom audio source:
+  - SourceTrackIndex = 0
+  - AudioLayoutVersion = 1
+- validates the clean user-facing DetectionReason
+- accepts only:
+  - `Restricted Rule`
+  - `Off-topic Conversation`
+- requires QaRuleId + MatchedPhrase for Restricted Rule
+- requires QaRuleId null + MatchedPhrase null for Off-topic Conversation
+- persists detection-time MatchedPhrase snapshot
+- resolves provenance from backend Recording / Device / Session data
+- preserves legacy classifier ContextStartSeconds / ContextEndSeconds as
+  nominal -10 / +10
+- persists commercial EvidenceStartSeconds / EvidenceEndSeconds as
+  nominal -10 / +20, clamped to recording boundaries
+- exposes ObservedAtUtc / ObservedOffsetSeconds through DTO projection
+- preserves Candidate analysis idempotency behavior
+
+Candidate confirmation no longer abuses the full Transcript as MatchedPhrase.
+
+Confirmed Candidate -> Alert now preserves:
+
+- actual Candidate Transcript as transcript evidence
+- Candidate MatchedPhrase snapshot for Restricted Rule
+- null MatchedPhrase for Off-topic Conversation
+- policy / analysis versions
+- canonical source track/layout
+- trigger offsets
+- evidence offsets
+- detection-time provenance snapshots
+
+### QaAlertService
+
+A new enriched CreateQaAlertRequest service path now supports:
+
+- DetectionReason
+- nullable MatchedPhrase
+- Transcript
+- PolicyVersion / AnalysisVersion
+- SourceTrackIndex / AudioLayoutVersion
+- TriggerStartSeconds / TriggerEndSeconds
+- EvidenceStartSeconds / EvidenceEndSeconds
+- AnalysisIdempotencyKey
+- backend-resolved provenance snapshots
+
+Commercial Alert evidence is nominally:
+
+- 10 seconds before trigger
+- 20 seconds after trigger
+- clamped to recording boundaries
+
+Off-topic direct Alert semantics are now supported by the backend:
+
+- DetectionReason = `Off-topic Conversation`
+- QaRuleId = null
+- MatchedPhrase = null
+
+Restricted Rule semantics:
+
+- DetectionReason = `Restricted Rule`
+- QaRuleId required
+- exact MatchedPhrase required
+
+Blank optional Alert AnalysisIdempotencyKey is normalized to null rather than
+persisting an empty unique key.
+
+The old/manual CreateAlertAsync overload is retained temporarily for API
+compatibility until Part 3B rewires Program.cs.
+
+### QA provenance naming
+
+QA snapshots use existing dashboard/device naming semantics:
+
+LaptopName:
+
+`RecordingDisplayName` when nonblank, otherwise `DeviceName`
+
+ActualDeviceName:
+
+the physical Windows `DeviceName`
+
+Worker payloads are not trusted to supply provenance names or entity IDs.
+
+### DashboardQueryService
+
+QA Alert and Candidate projections now expose enriched commercial evidence
+metadata including:
+
+- detection reason
+- matched phrase snapshot
+- transcript
+- policy / analysis versions
+- canonical track/layout
+- trigger offsets
+- evidence offsets
+- observed time / recording offset
+- device/session/teacher/student/course IDs
+- laptop / physical device name
+- teacher/student/course names
+- review metadata
+
+Legacy rows can still use the loaded Recording / Session graph as a
+presentation fallback.
+
+Existing QA visibility/RBAC filtering was preserved.
+
+### Important substitution note
+
+Do not invent new teacher/device substitution semantics in Part 3B.
+
+The current QA snapshot follows existing Recording / Session provenance
+semantics used by the recording pipeline.
+
+Session.ActualTeacherId / ActualDeviceId are separate substitution fields and
+are not independently resolved by this Part 3A implementation.
+
+If effective-substitution identity needs to become a QA requirement later,
+inspect the authoritative Session substitution workflow first and implement it
+as a deliberate follow-up rather than guessing in the worker/API layer.
+
+### Verification
+
+QA-3 Part 3A passed:
+
+- git diff --check
+- solution build
+- full Unit test suite
+- full Integration test suite
+- migration audit
+- exact 17-file source scope
+- exact source commit
+- remote push verification
+
+Source commit:
+
+`4984eb550ced524c66f2d017b0e8dfbbb56cb64e`
+
+### Explicitly unchanged
+
+Part 3A did NOT change:
+
+- spikes/SttSpike/qa_worker.py
+- worker direct-alert payload behavior
+- worker Candidate payload behavior
+- Program.cs QA worker endpoints
+- Agent
+- canonical audio capture
+- Live pipeline
+- Recording generation
+- attendance pipeline
+- VPS runtime
+
+No database migration was applied.
+
+No VPS deployment was performed.
+
+### Next exact phase
+
+`QA-3 Part 3B - API + Worker commercial evidence wiring`
+
+Part 3B must:
+
+1. Rewire POST /api/worker/qa-alerts to pass the full CreateQaAlertRequest to
+   the enriched QaAlertService path.
+2. Remove the old API requirement that every Alert must have MatchedPhrase.
+3. Keep Restricted Rule MatchedPhrase exact.
+4. Send Off-topic direct Alerts with MatchedPhrase = null.
+5. Enrich worker direct Alert payloads with:
+   - DetectionReason
+   - Transcript
+   - PolicyVersion
+   - AnalysisVersion
+   - SourceTrackIndex
+   - AudioLayoutVersion
+   - TriggerStartSeconds
+   - TriggerEndSeconds
+   - stable AnalysisIdempotencyKey
+6. Enrich Candidate payloads with:
+   - DetectionReason
+   - MatchedPhrase for Restricted Rule
+   - null MatchedPhrase for Off-topic Conversation
+7. Preserve QA-2A restricted-rule-first processing.
+8. Preserve QA-2B two-pass OffTopic confirmation behavior.
+9. Preserve mark-processed ordering.
+10. Do not alter verification WAV padding merely because persisted commercial
+    evidence is -10/+20; verification windows and commercial evidence windows
+    are separate concerns.
+11. Add worker/API regression tests before Part 3 is considered closed.
+
+QA-3 Part 3A is SOURCE CLOSED.
+<!-- HQL_QA3_PART3A_CLOSED_20260907_END -->
+
 <!-- HQL_QA3_PART2_CLOSED_20260907_BEGIN -->
 ## QA-3 Part 2 commercial evidence/provenance schema - CLOSED - 2026-09-07
 

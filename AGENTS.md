@@ -1,5 +1,161 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_QA3_PART2_CLOSED_20260907_BEGIN -->
+## QA-3 Part 2 commercial evidence/provenance schema - CLOSED - 2026-09-07
+
+Latest functional source checkpoint:
+
+`859b206af8aa0326e8abc628d10285f96cdb6aa7`
+
+Commit:
+
+`qa: add commercial evidence provenance schema`
+
+Previous QA milestones:
+
+- QA-2A restricted-rule hardening closed at `b6553e67949cd3a97326490390246a3dd0cbb931`
+- QA-2B off-topic classifier + worker integration closed at `cc064452ae50db53ee6be298fa221150a6708981`
+- QA-3 Part 2 schema/evidence/provenance foundation closed at `859b206af8aa0326e8abc628d10285f96cdb6aa7`
+
+### QA-3 Part 2 implemented
+
+QaAlert now supports commercial QA evidence metadata including:
+
+- DetectionReason
+- Transcript
+- PolicyVersion / AnalysisVersion
+- SourceTrackIndex / AudioLayoutVersion
+- TriggerStartSeconds / TriggerEndSeconds
+- EvidenceStartSeconds / EvidenceEndSeconds
+- AnalysisIdempotencyKey
+- Device / Session / Teacher / Student / Course provenance snapshots
+- LaptopName / ActualDeviceName
+- TeacherName / StudentName / CourseName
+- ReviewedByUserId / ReviewedAtUtc / ReviewNote / ReviewVersion
+
+QaCandidate now additionally supports:
+
+- DetectionReason
+- EvidenceStartSeconds / EvidenceEndSeconds
+- Device / Session / Teacher / Student / Course provenance snapshots
+- LaptopName / ActualDeviceName
+- TeacherName / StudentName / CourseName
+
+`IntentCategory` is intentionally retained temporarily for backward compatibility.
+It is compatibility debt, not the long-term user-facing QA category model.
+
+### Product-facing detection reasons
+
+The clean user-facing reasons are:
+
+- `Restricted Rule`
+- `Off-topic Conversation`
+
+`MatchedPhrase` is nullable.
+
+For Restricted Rule findings it represents the configured/verified restricted phrase.
+
+For Off-topic Conversation findings it must not be populated with the whole transcript merely to satisfy the old schema.
+
+### Evidence contract
+
+Target evidence context remains nominally:
+
+- 10 seconds before the trigger
+- 20 seconds after the trigger/event
+- clamped to recording boundaries
+
+Exact recording playback deep-link already exists through:
+
+`/recordings/{recordingId}/player?start=<seconds>`
+
+### Migration
+
+Generated migration:
+
+`20260907101637_AddQaCommercialEvidenceProvenance`
+
+Migration audit passed:
+
+- qa_alerts: 25 additive columns
+- qa_candidates: 13 additive columns
+- MatchedPhrase nullable alteration only
+- QaAlert AnalysisIdempotencyKey unique index
+- no destructive Up() operation
+- no table drop
+- no column drop
+- no rename
+- no delete-data operation
+
+The migration has NOT been applied to a database yet.
+
+### Verification
+
+QA-3 Part 2 verification passed:
+
+- solution build PASS
+- 148 Unit tests PASS
+- 6 Integration tests PASS
+- git diff check PASS
+- migration operation audit PASS
+
+### Explicitly unchanged in QA-3 Part 2
+
+- QA worker behavior
+- QaAlertService
+- QaCandidateService
+- DashboardQueryService
+- QA repositories
+- Dashboard/UI
+- Agent
+- Live monitoring
+- canonical classroom audio
+- Recording pipeline
+- attendance pipeline
+- VPS runtime
+
+No VPS deployment was performed.
+
+No database update was performed.
+
+### Canonical QA/audio product contract remains unchanged
+
+Physical classroom audio is captured once and the canonical classroom mixed audio
+is the source consumed by Live, Recording and QA/STT.
+
+Do not introduce a separate teacher-only QA capture prerequisite.
+
+No speaker identification is required.
+
+The product question is whether policy-relevant/off-topic conversation occurred
+during the class; owner/admin/manager can review the evidence.
+
+### Next exact phase
+
+`QA-3 Part 3 - service / repository / worker wiring`
+
+Part 3 must:
+
+- populate the new schema from authoritative backend Recording/Session provenance
+- enrich Alert and Candidate repository loading/projections
+- use the same laptop naming semantics as existing dashboard/session presentation
+- wire Restricted Rule alerts with exact matched phrase
+- wire Off-topic alerts with nullable MatchedPhrase
+- persist transcript and evidence offsets
+- change new Candidate evidence target from legacy -10/+10 to -10/+20
+- fix Candidate confirmation so Transcript is not abused as MatchedPhrase
+- preserve QA-2A restricted-rule priority
+- preserve QA-2B two-pass off-topic behavior
+- preserve manager visibility/RBAC
+- preserve canonical classroom audio track 0/layout 1
+- add regression tests before any deployment
+
+Do NOT redesign QA-1, QA-2A or QA-2B when starting Part 3.
+Read this handoff, the product contract and current source first.
+
+QA-3 Part 2 is SOURCE CLOSED.
+<!-- HQL_QA3_PART2_CLOSED_20260907_END -->
+
 <!-- HQL_ATTENDANCE_FAST_FINISH_20260906_BEGIN -->
 ## Attendance / Sessions fast-finish source milestone - 2026-09-06
 

@@ -498,30 +498,111 @@ public sealed class RecordingService
     public async Task<IReadOnlyList<PendingQaRecordingDto>> GetPendingQaRecordingsAsync(
         CancellationToken cancellationToken = default)
     {
-        var recordings = await _recordingRepository.GetPendingQaAsync(cancellationToken);
+        var recordings =
+            await _recordingRepository.GetPendingQaAsync(
+                cancellationToken);
 
-        var result = new List<PendingQaRecordingDto>();
+        var result =
+            new List<PendingQaRecordingDto>();
 
         foreach (var recording in recordings)
         {
-            string presignedUrl = await _storageService.GetPresignedUrlAsync(
-                _bucketName,
-                recording.StorageKey,
-                TimeSpan.FromMinutes(10),
-                cancellationToken);
+            var sessions =
+                await _sessionRepository
+                    .GetClassWindowSessionsForDeviceAsync(
+                        recording.DeviceId,
+                        recording.StartedAtUtc,
+                        recording.EndedAtUtc,
+                        cancellationToken);
 
-            result.Add(new PendingQaRecordingDto
+            var qaSessionWindows =
+                new List<PendingQaSessionWindowDto>();
+
+            foreach (Session session in sessions
+                .Where(x =>
+                    x.Status == SessionStatus.Live ||
+                    x.Status == SessionStatus.Completed))
             {
-                RecordingId = recording.Id,
-                FileName = recording.FileName,
-                StorageKey = recording.StorageKey,
-                PresignedUrl = presignedUrl,
-                StartedAtUtc = recording.StartedAtUtc,
-                AudioLayoutVersion = recording.AudioLayoutVersion,
-                ClassroomAudioTrackIndex = 0,
-                ClassroomAudioTrackTitle =
-                    "Academy Class Mixed Audio"
-            });
+                var (
+                    sessionStartUtc,
+                    sessionEndUtc) =
+                    SessionWindowResolver.Resolve(
+                        session);
+
+                DateTimeOffset overlapStartUtc =
+                    sessionStartUtc >
+                    recording.StartedAtUtc
+                        ? sessionStartUtc
+                        : recording.StartedAtUtc;
+
+                DateTimeOffset overlapEndUtc =
+                    sessionEndUtc <
+                    recording.EndedAtUtc
+                        ? sessionEndUtc
+                        : recording.EndedAtUtc;
+
+                if (overlapEndUtc <= overlapStartUtc)
+                {
+                    continue;
+                }
+
+                qaSessionWindows.Add(
+                    new PendingQaSessionWindowDto
+                    {
+                        SessionId = session.Id,
+
+                        StartSeconds =
+                            Math.Max(
+                                0,
+                                (overlapStartUtc -
+                                 recording.StartedAtUtc)
+                                .TotalSeconds),
+
+                        EndSeconds =
+                            Math.Max(
+                                0,
+                                (overlapEndUtc -
+                                 recording.StartedAtUtc)
+                                .TotalSeconds)
+                    });
+            }
+
+            qaSessionWindows =
+                qaSessionWindows
+                    .OrderBy(x => x.StartSeconds)
+                    .ThenBy(x => x.EndSeconds)
+                    .ToList();
+
+            // No eligible class window means the worker does not
+            // need a media URL: it will mark the recording QA
+            // processed without downloading/transcribing it.
+            string presignedUrl =
+                qaSessionWindows.Count == 0
+                    ? string.Empty
+                    : await _storageService
+                        .GetPresignedUrlAsync(
+                            _bucketName,
+                            recording.StorageKey,
+                            TimeSpan.FromMinutes(10),
+                            cancellationToken);
+
+            result.Add(
+                new PendingQaRecordingDto
+                {
+                    RecordingId = recording.Id,
+                    FileName = recording.FileName,
+                    StorageKey = recording.StorageKey,
+                    PresignedUrl = presignedUrl,
+                    StartedAtUtc =
+                        recording.StartedAtUtc,
+                    AudioLayoutVersion =
+                        recording.AudioLayoutVersion,
+                    ClassroomAudioTrackIndex = 0,
+                    ClassroomAudioTrackTitle =
+                        "Academy Class Mixed Audio",
+                    QaSessionWindows =
+                        qaSessionWindows
+                });
         }
 
         return result;

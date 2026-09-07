@@ -8,6 +8,10 @@ public interface ISessionRepository
         Guid id,
         CancellationToken cancellationToken = default);
 
+    Task<Session?> GetByIdWithDetailsAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Session>> GetAllWithDetailsAsync(
         CancellationToken cancellationToken = default);
 

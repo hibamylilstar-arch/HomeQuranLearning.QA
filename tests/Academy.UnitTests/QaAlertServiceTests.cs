@@ -120,6 +120,7 @@ public sealed class QaAlertServiceTests
             new QaAlertService(
                 alerts.Object,
                 recordings.Object,
+                Mock.Of<ISessionRepository>(),
                 unit.Object);
 
         return (

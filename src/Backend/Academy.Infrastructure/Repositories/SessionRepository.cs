@@ -23,6 +23,21 @@ public sealed class SessionRepository : ISessionRepository
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
+    public async Task<Session?> GetByIdWithDetailsAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Sessions
+            .AsNoTracking()
+            .Include(x => x.Teacher)
+            .Include(x => x.Student)
+            .Include(x => x.Course)
+            .Include(x => x.Device)
+            .FirstOrDefaultAsync(
+                x => x.Id == id,
+                cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Session>> GetAllWithDetailsAsync(
         CancellationToken cancellationToken = default)
     {

@@ -15,15 +15,18 @@ public sealed class QaAlertService
 
     private readonly IQaAlertRepository _alertRepository;
     private readonly IRecordingRepository _recordingRepository;
+    private readonly ISessionRepository _sessionRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public QaAlertService(
         IQaAlertRepository alertRepository,
         IRecordingRepository recordingRepository,
+        ISessionRepository sessionRepository,
         IUnitOfWork unitOfWork)
     {
         _alertRepository = alertRepository;
         _recordingRepository = recordingRepository;
+        _sessionRepository = sessionRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -115,18 +118,31 @@ public sealed class QaAlertService
                 "Trigger interval must be within the recording duration.");
         }
 
+        Session? evidenceSession =
+            await ResolveEvidenceSessionAsync(
+                recording,
+                request.SessionId,
+                triggerStart,
+                triggerEnd,
+                cancellationToken);
+
+        var evidenceScope =
+            ResolveEvidenceScope(
+                recording,
+                evidenceSession);
+
         DateTimeOffset observedAtUtc =
             recording.StartedAtUtc
                 .AddSeconds(triggerStart);
 
         double evidenceStart =
             Math.Max(
-                0,
+                evidenceScope.StartSeconds,
                 triggerStart - 10);
 
         double evidenceEnd =
             Math.Min(
-                duration,
+                evidenceScope.EndSeconds,
                 triggerEnd + 20);
 
         if (idempotencyKey is not null)
@@ -151,14 +167,17 @@ public sealed class QaAlertService
                     request.SourceTrackIndex!.Value,
                     request.AudioLayoutVersion!.Value,
                     triggerStart,
-                    triggerEnd);
+                    triggerEnd,
+                    request.SessionId);
 
                 return existing.Id;
             }
         }
 
         var snapshot =
-            ResolveSnapshot(recording);
+            ResolveSnapshot(
+                recording,
+                evidenceSession);
 
         DateTimeOffset now =
             DateTimeOffset.UtcNow;
@@ -610,7 +629,8 @@ public sealed class QaAlertService
         int sourceTrackIndex,
         int audioLayoutVersion,
         double triggerStart,
-        double triggerEnd)
+        double triggerEnd,
+        Guid? evidenceSessionId)
     {
         bool identical =
             existing.RecordingId ==
@@ -636,7 +656,12 @@ public sealed class QaAlertService
             existing.TriggerStartSeconds ==
                 triggerStart &&
             existing.TriggerEndSeconds ==
-                triggerEnd;
+                triggerEnd &&
+            (
+                !evidenceSessionId.HasValue ||
+                existing.SessionId ==
+                    evidenceSessionId
+            );
 
         if (!identical)
         {
@@ -645,23 +670,148 @@ public sealed class QaAlertService
         }
     }
 
+    private async Task<Session?>
+        ResolveEvidenceSessionAsync(
+            Recording recording,
+            Guid? requestedSessionId,
+            double triggerStartSeconds,
+            double triggerEndSeconds,
+            CancellationToken cancellationToken)
+    {
+        Session? session;
+
+        if (requestedSessionId.HasValue)
+        {
+            session =
+                await _sessionRepository
+                    .GetByIdWithDetailsAsync(
+                        requestedSessionId.Value,
+                        cancellationToken)
+                ?? throw new InvalidOperationException(
+                    "QA evidence session was not found.");
+        }
+        else
+        {
+            // Legacy/manual compatibility only.
+            session = recording.Session;
+        }
+
+        if (session is null)
+        {
+            return null;
+        }
+
+        if (session.DeviceId != recording.DeviceId)
+        {
+            throw new InvalidOperationException(
+                "QA evidence session belongs to a different laptop.");
+        }
+
+        if (requestedSessionId.HasValue &&
+            session.Status != SessionStatus.Live &&
+            session.Status != SessionStatus.Completed)
+        {
+            throw new InvalidOperationException(
+                "QA evidence requires a Live or Completed session.");
+        }
+
+        var (
+            sessionStartUtc,
+            sessionEndUtc) =
+                SessionWindowResolver.Resolve(
+                    session);
+
+        DateTimeOffset triggerStartUtc =
+            recording.StartedAtUtc
+                .AddSeconds(
+                    triggerStartSeconds);
+
+        DateTimeOffset triggerEndUtc =
+            recording.StartedAtUtc
+                .AddSeconds(
+                    triggerEndSeconds);
+
+        if (triggerStartUtc < sessionStartUtc ||
+            triggerEndUtc > sessionEndUtc)
+        {
+            throw new InvalidOperationException(
+                "QA trigger is outside the supplied scheduled session window.");
+        }
+
+        return session;
+    }
+
+    private static (
+        double StartSeconds,
+        double EndSeconds)
+        ResolveEvidenceScope(
+            Recording recording,
+            Session? session)
+    {
+        double duration =
+            Math.Max(
+                0,
+                recording.Duration.TotalSeconds);
+
+        if (session is null)
+        {
+            return (
+                0,
+                duration);
+        }
+
+        var (
+            sessionStartUtc,
+            sessionEndUtc) =
+                SessionWindowResolver.Resolve(
+                    session);
+
+        double start =
+            Math.Clamp(
+                (sessionStartUtc -
+                 recording.StartedAtUtc)
+                .TotalSeconds,
+                0,
+                duration);
+
+        double end =
+            Math.Clamp(
+                (sessionEndUtc -
+                 recording.StartedAtUtc)
+                .TotalSeconds,
+                0,
+                duration);
+
+        if (end <= start)
+        {
+            throw new InvalidOperationException(
+                "QA evidence session does not overlap the recording.");
+        }
+
+        return (
+            start,
+            end);
+    }
+
     private static QaSnapshot ResolveSnapshot(
-        Recording recording)
+        Recording recording,
+        Session? evidenceSession = null)
     {
         Session? session =
+            evidenceSession ??
             recording.Session;
 
         Device? device =
-            recording.Device ??
-            session?.Device;
+            session?.Device ??
+            recording.Device;
 
         Guid? teacherId =
-            recording.TeacherId ??
-            session?.TeacherId;
+            session?.TeacherId ??
+            recording.TeacherId;
 
         string? teacherName =
-            recording.Teacher?.FullName ??
-            session?.Teacher?.FullName;
+            session?.Teacher?.FullName ??
+            recording.Teacher?.FullName;
 
         string? laptopName =
             !string.IsNullOrWhiteSpace(
@@ -671,12 +821,17 @@ public sealed class QaAlertService
 
         return new QaSnapshot(
             recording.DeviceId,
-            recording.SessionId,
+            session?.Id ??
+                recording.SessionId,
             teacherId,
             session?.StudentId,
             session?.CourseId,
             laptopName,
+
+            // Physical Windows name is preserved internally.
+            // User-facing Evidence Session uses LaptopName.
             device?.DeviceName,
+
             teacherName,
             session?.Student?.FullName,
             session?.Course?.Name);

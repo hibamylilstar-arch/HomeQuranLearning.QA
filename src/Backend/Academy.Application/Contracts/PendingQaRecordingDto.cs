@@ -17,4 +17,17 @@ public sealed class PendingQaRecordingDto
     public int ClassroomAudioTrackIndex { get; init; }
 
     public string ClassroomAudioTrackTitle { get; init; } = string.Empty;
+
+    public IReadOnlyList<PendingQaSessionWindowDto>
+        QaSessionWindows { get; init; } =
+        Array.Empty<PendingQaSessionWindowDto>();
+}
+
+public sealed class PendingQaSessionWindowDto
+{
+    public Guid SessionId { get; init; }
+
+    public double StartSeconds { get; init; }
+
+    public double EndSeconds { get; init; }
 }

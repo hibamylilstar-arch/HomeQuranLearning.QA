@@ -134,16 +134,21 @@ public sealed class QaCandidateServiceTests
         var unit =
             new Mock<IUnitOfWork>();
 
+        var sessionRepository =
+            Mock.Of<ISessionRepository>();
+
         var alertService =
             new QaAlertService(
                 alerts.Object,
                 recordings.Object,
+                sessionRepository,
                 unit.Object);
 
         var service =
             new QaCandidateService(
                 candidates.Object,
                 recordings.Object,
+                sessionRepository,
                 alertService,
                 unit.Object);
 

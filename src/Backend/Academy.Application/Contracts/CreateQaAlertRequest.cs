@@ -4,6 +4,10 @@ public sealed class CreateQaAlertRequest
 {
     public Guid RecordingId { get; init; }
 
+    // Exact scheduled session that owns this QA evidence.
+    // Null is retained only for legacy/manual compatibility.
+    public Guid? SessionId { get; init; }
+
     public Guid? QaRuleId { get; init; }
 
     public string? MatchedPhrase { get; init; }

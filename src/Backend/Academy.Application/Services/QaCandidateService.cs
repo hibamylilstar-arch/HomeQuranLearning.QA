@@ -17,17 +17,20 @@ public sealed class QaCandidateService
 
     private readonly IQaCandidateRepository _candidateRepository;
     private readonly IRecordingRepository _recordingRepository;
+    private readonly ISessionRepository _sessionRepository;
     private readonly QaAlertService _alertService;
     private readonly IUnitOfWork _unitOfWork;
 
     public QaCandidateService(
         IQaCandidateRepository candidateRepository,
         IRecordingRepository recordingRepository,
+        ISessionRepository sessionRepository,
         QaAlertService alertService,
         IUnitOfWork unitOfWork)
     {
         _candidateRepository = candidateRepository;
         _recordingRepository = recordingRepository;
+        _sessionRepository = sessionRepository;
         _alertService = alertService;
         _unitOfWork = unitOfWork;
     }
@@ -110,6 +113,19 @@ public sealed class QaCandidateService
                 "Trigger interval must be within the recording duration.");
         }
 
+        Session? evidenceSession =
+            await ResolveEvidenceSessionAsync(
+                recording,
+                request.SessionId,
+                request.TriggerStartSeconds,
+                request.TriggerEndSeconds,
+                cancellationToken);
+
+        var evidenceScope =
+            ResolveEvidenceScope(
+                recording,
+                evidenceSession);
+
         string idempotencyKey =
             request.AnalysisIdempotencyKey.Trim();
 
@@ -126,6 +142,8 @@ public sealed class QaCandidateService
                 request,
                 recording,
                 duration,
+                evidenceScope.StartSeconds,
+                evidenceScope.EndSeconds,
                 detectionReason,
                 matchedPhrase);
 
@@ -134,28 +152,30 @@ public sealed class QaCandidateService
 
         double contextStart =
             Math.Max(
-                0,
+                evidenceScope.StartSeconds,
                 request.TriggerStartSeconds - 10);
 
         double contextEnd =
             Math.Min(
-                duration,
+                evidenceScope.EndSeconds,
                 request.TriggerEndSeconds + 10);
 
-        // Commercial evidence is deliberately longer
-        // after the finding than classifier context.
+        // Commercial evidence remains longer after the
+        // finding, but never leaves the scheduled class.
         double evidenceStart =
             Math.Max(
-                0,
+                evidenceScope.StartSeconds,
                 request.TriggerStartSeconds - 10);
 
         double evidenceEnd =
             Math.Min(
-                duration,
+                evidenceScope.EndSeconds,
                 request.TriggerEndSeconds + 20);
 
         var snapshot =
-            ResolveSnapshot(recording);
+            ResolveSnapshot(
+                recording,
+                evidenceSession);
 
         DateTimeOffset now =
             DateTimeOffset.UtcNow;
@@ -451,27 +471,29 @@ public sealed class QaCandidateService
         CreateQaCandidateRequest request,
         Recording recording,
         double duration,
+        double scopeStart,
+        double scopeEnd,
         string detectionReason,
         string? matchedPhrase)
     {
         double contextStart =
             Math.Max(
-                0,
+                scopeStart,
                 request.TriggerStartSeconds - 10);
 
         double contextEnd =
             Math.Min(
-                duration,
+                scopeEnd,
                 request.TriggerEndSeconds + 10);
 
         double evidenceStart =
             Math.Max(
-                0,
+                scopeStart,
                 request.TriggerStartSeconds - 10);
 
         double evidenceEnd =
             Math.Min(
-                duration,
+                scopeEnd,
                 request.TriggerEndSeconds + 20);
 
         string existingReason =
@@ -535,7 +557,12 @@ public sealed class QaCandidateService
             existing.AsrConfidence ==
                 request.AsrConfidence &&
             existing.IntentConfidence ==
-                request.IntentConfidence;
+                request.IntentConfidence &&
+            (
+                !request.SessionId.HasValue ||
+                existing.SessionId ==
+                    request.SessionId
+            );
 
         if (!identical)
         {
@@ -544,23 +571,148 @@ public sealed class QaCandidateService
         }
     }
 
+    private async Task<Session?>
+        ResolveEvidenceSessionAsync(
+            Recording recording,
+            Guid? requestedSessionId,
+            double triggerStartSeconds,
+            double triggerEndSeconds,
+            CancellationToken cancellationToken)
+    {
+        Session? session;
+
+        if (requestedSessionId.HasValue)
+        {
+            session =
+                await _sessionRepository
+                    .GetByIdWithDetailsAsync(
+                        requestedSessionId.Value,
+                        cancellationToken)
+                ?? throw new InvalidOperationException(
+                    "QA evidence session was not found.");
+        }
+        else
+        {
+            // Legacy/manual compatibility only.
+            session = recording.Session;
+        }
+
+        if (session is null)
+        {
+            return null;
+        }
+
+        if (session.DeviceId != recording.DeviceId)
+        {
+            throw new InvalidOperationException(
+                "QA evidence session belongs to a different laptop.");
+        }
+
+        if (requestedSessionId.HasValue &&
+            session.Status != SessionStatus.Live &&
+            session.Status != SessionStatus.Completed)
+        {
+            throw new InvalidOperationException(
+                "QA evidence requires a Live or Completed session.");
+        }
+
+        var (
+            sessionStartUtc,
+            sessionEndUtc) =
+                SessionWindowResolver.Resolve(
+                    session);
+
+        DateTimeOffset triggerStartUtc =
+            recording.StartedAtUtc
+                .AddSeconds(
+                    triggerStartSeconds);
+
+        DateTimeOffset triggerEndUtc =
+            recording.StartedAtUtc
+                .AddSeconds(
+                    triggerEndSeconds);
+
+        if (triggerStartUtc < sessionStartUtc ||
+            triggerEndUtc > sessionEndUtc)
+        {
+            throw new InvalidOperationException(
+                "QA trigger is outside the supplied scheduled session window.");
+        }
+
+        return session;
+    }
+
+    private static (
+        double StartSeconds,
+        double EndSeconds)
+        ResolveEvidenceScope(
+            Recording recording,
+            Session? session)
+    {
+        double duration =
+            Math.Max(
+                0,
+                recording.Duration.TotalSeconds);
+
+        if (session is null)
+        {
+            return (
+                0,
+                duration);
+        }
+
+        var (
+            sessionStartUtc,
+            sessionEndUtc) =
+                SessionWindowResolver.Resolve(
+                    session);
+
+        double start =
+            Math.Clamp(
+                (sessionStartUtc -
+                 recording.StartedAtUtc)
+                .TotalSeconds,
+                0,
+                duration);
+
+        double end =
+            Math.Clamp(
+                (sessionEndUtc -
+                 recording.StartedAtUtc)
+                .TotalSeconds,
+                0,
+                duration);
+
+        if (end <= start)
+        {
+            throw new InvalidOperationException(
+                "QA evidence session does not overlap the recording.");
+        }
+
+        return (
+            start,
+            end);
+    }
+
     private static QaSnapshot ResolveSnapshot(
-        Recording recording)
+        Recording recording,
+        Session? evidenceSession = null)
     {
         Session? session =
+            evidenceSession ??
             recording.Session;
 
         Device? device =
-            recording.Device ??
-            session?.Device;
+            session?.Device ??
+            recording.Device;
 
         Guid? teacherId =
-            recording.TeacherId ??
-            session?.TeacherId;
+            session?.TeacherId ??
+            recording.TeacherId;
 
         string? teacherName =
-            recording.Teacher?.FullName ??
-            session?.Teacher?.FullName;
+            session?.Teacher?.FullName ??
+            recording.Teacher?.FullName;
 
         string? laptopName =
             !string.IsNullOrWhiteSpace(
@@ -570,7 +722,8 @@ public sealed class QaCandidateService
 
         return new QaSnapshot(
             recording.DeviceId,
-            recording.SessionId,
+            session?.Id ??
+                recording.SessionId,
             teacherId,
             session?.StudentId,
             session?.CourseId,

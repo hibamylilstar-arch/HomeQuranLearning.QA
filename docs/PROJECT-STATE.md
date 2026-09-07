@@ -1,5 +1,141 @@
 <!-- HQL_CURRENT_HANDOFF_BEGIN -->
 
+<!-- HQL_QA3_PART3C_SOURCE_CLOSED_20260907_BEGIN -->
+## QA-3 Part 3C final source regression gate - SOURCE CLOSED - 2026-09-07
+
+Latest source checkpoint:
+
+`f3d5bca827d4bf11a0f74cfc590556fbad2a247b`
+
+Commit:
+
+`test: lock QA commercial evidence behavior`
+
+Parent checkpoint:
+
+`291cd37d7975bc0560a829cbbc39435e2a820c56`
+
+### QA-3 Part 3C source verification
+
+Dedicated regression coverage now locks the QA-3 commercial evidence contract.
+
+Direct Alert coverage verifies:
+
+- Restricted Rule exact MatchedPhrase
+- Off-topic Conversation MatchedPhrase = null
+- commercial evidence nominally -10 / +20
+- recording-boundary clamping
+- backend-authoritative observed timestamp
+- canonical track 0 / layout 1 enforcement
+- stable Alert retry idempotency
+- idempotency collision rejection
+- backend-resolved provenance
+- friendly LaptopName
+- physical ActualDeviceName
+- Teacher / Student / Course provenance
+
+Candidate coverage verifies:
+
+- legacy classifier Context remains nominal -10 / +10
+- commercial Evidence remains nominal -10 / +20
+- evidence boundary clamping
+- Restricted Candidate exact MatchedPhrase snapshot
+- Off-topic Candidate MatchedPhrase = null
+- confirmed Restricted Candidate does not use Transcript as MatchedPhrase
+- confirmed Off-topic Candidate creates Alert with null MatchedPhrase
+- canonical track/layout enforcement
+
+Dashboard coverage verifies:
+
+- Alert commercial evidence projection
+- Candidate commercial evidence projection
+- LaptopName / ActualDeviceName projection
+- Teacher / Student / Course projection
+- existing Manager visibility behavior
+- Owner-only trial device isolation
+
+### Worker / API final source gate
+
+Verified without additional production-source changes:
+
+- worker Alert endpoint accepts full CreateQaAlertRequest
+- old blanket MatchedPhrase requirement remains removed
+- worker Candidate endpoint accepts enriched Candidate request
+- Restricted direct Alert sends exact phrase
+- Off-topic direct Alert sends null phrase
+- Restricted Candidate sends exact phrase
+- Off-topic Candidate sends null phrase
+- shared deterministic analysis idempotency key remains in use
+- Restricted processing remains first
+- Off-topic processing remains second
+- mark_processed remains after persistence work
+- classifier verification padding remains unchanged
+
+### Migration readiness
+
+Pending QA migrations remain ordered:
+
+1. `20260907101637_AddQaCommercialEvidenceProvenance`
+2. `20260907104318_AddQaCandidateMatchedPhrase`
+
+Source/model audit passed.
+
+The migrations have NOT yet been deliberately applied as part of the QA-3
+runtime canary phase.
+
+No `dotnet ef` migration command was run during the final source gate.
+
+### Final regression evidence
+
+QA-3 Part 3C final source gate passed:
+
+- solution build
+- 159 Unit tests, 0 failures
+- 6 Integration tests, 0 failures
+- Python compile
+- Off-topic classifier self-test
+- QA worker self-test
+- worker commercial Alert payload self-test
+- worker commercial Candidate payload self-test
+- exact three-test-file commit
+- remote push verification
+
+### Important status
+
+QA-3 is SOURCE CLOSED but NOT yet runtime closed.
+
+No QA-3 runtime canary has been accepted yet.
+
+Database migration status has not yet been queried/applied in the controlled
+runtime environment.
+
+No production-wide deployment has been performed.
+
+### Next exact phase
+
+`QA-3 Runtime Canary Preparation`
+
+Sequence:
+
+1. inspect current local/runtime PostgreSQL container and migration state
+2. inspect backend / worker runtime configuration
+3. identify the exact Owner-laptop recording/device path for the canary
+4. deliberately apply only the required pending migrations
+5. start/restart only the required local QA backend/worker components
+6. verify backend health before touching the Owner-laptop test
+7. run controlled real Restricted Rule canary
+8. run controlled real Off-topic Conversation canary
+9. verify Dashboard Alert/Candidate metadata
+10. verify exact recording timestamp/deep-link
+11. verify audible evidence
+12. verify duplicate retry/idempotency behavior
+13. close QA-3 only after runtime proof
+
+Owner-laptop real QA canary is the next functional milestone.
+
+Production/VPS-wide rollout remains blocked until the controlled canary passes.
+<!-- HQL_QA3_PART3C_SOURCE_CLOSED_20260907_END -->
+
 <!-- HQL_QA3_PART3B_CLOSED_20260907_BEGIN -->
 ## QA-3 Part 3B API + Worker commercial evidence wiring - CLOSED - 2026-09-07
 

@@ -146,9 +146,66 @@ def get_active_rules():
     )
 
 
+def build_candidate_payload(
+    recording_id,
+    qa_rule_id,
+    matched_phrase,
+    detection_reason,
+    source_track_index,
+    trigger_start_seconds,
+    trigger_end_seconds,
+    transcript,
+    language_family,
+    intent_category,
+    trigger_confidence,
+    asr_confidence,
+    intent_confidence,
+    analysis_version=
+        RESTRICTED_RULE_ANALYSIS_VERSION,
+):
+    return {
+        "recordingId": recording_id,
+        "qaRuleId": qa_rule_id,
+        "matchedPhrase": matched_phrase,
+        "detectionReason": detection_reason,
+        "policyVersion": POLICY_VERSION,
+        "analysisVersion": analysis_version,
+        "sourceTrackIndex": source_track_index,
+        "audioLayoutVersion":
+            EXPECTED_AUDIO_LAYOUT_VERSION,
+        "triggerStartSeconds":
+            trigger_start_seconds,
+        "triggerEndSeconds":
+            trigger_end_seconds,
+        "transcript": transcript[:4096],
+        "languageFamily": language_family,
+
+        # Temporary backend compatibility only.
+        "intentCategory": intent_category,
+
+        "triggerConfidence":
+            trigger_confidence,
+        "asrConfidence":
+            asr_confidence,
+        "intentConfidence":
+            intent_confidence,
+        "analysisIdempotencyKey":
+            analysis_idempotency_key(
+                recording_id,
+                qa_rule_id,
+                trigger_start_seconds,
+                trigger_end_seconds,
+                source_track_index,
+                analysis_version,
+            ),
+    }
+
+
 def create_candidate(
     recording_id,
     qa_rule_id,
+    matched_phrase,
+    detection_reason,
     source_track_index,
     trigger_start_seconds,
     trigger_end_seconds,
@@ -163,63 +220,94 @@ def create_candidate(
 ):
     return http_post_json(
         "/api/worker/qa-candidates",
-        {
-            "recordingId": recording_id,
-            "qaRuleId": qa_rule_id,
-            "policyVersion": POLICY_VERSION,
-            "analysisVersion": analysis_version,
-            "sourceTrackIndex": source_track_index,
-            "audioLayoutVersion":
-                EXPECTED_AUDIO_LAYOUT_VERSION,
-            "triggerStartSeconds":
-                trigger_start_seconds,
-            "triggerEndSeconds":
-                trigger_end_seconds,
-            "transcript": transcript[:4096],
-            "languageFamily": language_family,
-
-            # Temporary backend compatibility field.
-            # Product semantics no longer use
-            # intent categories.
-            "intentCategory": intent_category,
-
-            "triggerConfidence":
-                trigger_confidence,
-            "asrConfidence":
-                asr_confidence,
-            "intentConfidence":
-                intent_confidence,
-            "analysisIdempotencyKey":
-                analysis_idempotency_key(
-                    recording_id,
-                    qa_rule_id,
-                    trigger_start_seconds,
-                    trigger_end_seconds,
-                    source_track_index,
-                    analysis_version,
-                ),
-        },
+        build_candidate_payload(
+            recording_id,
+            qa_rule_id,
+            matched_phrase,
+            detection_reason,
+            source_track_index,
+            trigger_start_seconds,
+            trigger_end_seconds,
+            transcript,
+            language_family,
+            intent_category,
+            trigger_confidence,
+            asr_confidence,
+            intent_confidence,
+            analysis_version,
+        ),
         WORKER_API_KEY,
     )
+
+
+def build_alert_payload(
+    recording_id,
+    qa_rule_id,
+    matched_phrase,
+    detection_reason,
+    source_track_index,
+    trigger_start_seconds,
+    trigger_end_seconds,
+    transcript,
+    analysis_version,
+    timestamp_utc,
+):
+    return {
+        "recordingId": recording_id,
+        "qaRuleId": qa_rule_id,
+        "matchedPhrase": matched_phrase,
+        "timestampUtc": timestamp_utc,
+        "detectionReason": detection_reason,
+        "transcript": transcript[:4096],
+        "policyVersion": POLICY_VERSION,
+        "analysisVersion": analysis_version,
+        "sourceTrackIndex": source_track_index,
+        "audioLayoutVersion":
+            EXPECTED_AUDIO_LAYOUT_VERSION,
+        "triggerStartSeconds":
+            trigger_start_seconds,
+        "triggerEndSeconds":
+            trigger_end_seconds,
+        "analysisIdempotencyKey":
+            analysis_idempotency_key(
+                recording_id,
+                qa_rule_id,
+                trigger_start_seconds,
+                trigger_end_seconds,
+                source_track_index,
+                analysis_version,
+            ),
+    }
 
 
 def create_alert(
     recording_id,
     qa_rule_id,
     matched_phrase,
+    detection_reason,
+    source_track_index,
+    trigger_start_seconds,
+    trigger_end_seconds,
+    transcript,
+    analysis_version,
     timestamp_utc,
 ):
     return http_post_json(
         "/api/worker/qa-alerts",
-        {
-            "recordingId": recording_id,
-            "qaRuleId": qa_rule_id,
-            "matchedPhrase": matched_phrase,
-            "timestampUtc": timestamp_utc,
-        },
+        build_alert_payload(
+            recording_id,
+            qa_rule_id,
+            matched_phrase,
+            detection_reason,
+            source_track_index,
+            trigger_start_seconds,
+            trigger_end_seconds,
+            transcript,
+            analysis_version,
+            timestamp_utc,
+        ),
         WORKER_API_KEY,
     )
-
 
 def mark_processed(recording_id):
     return http_post_json(
@@ -942,7 +1030,17 @@ def process_off_topic_detection(
                 create_alert(
                     recording_id,
                     None,
+                    None,
                     "Off-topic Conversation",
+                    classroom_audio_track_index,
+                    verified_start_seconds,
+                    verified_end_seconds,
+                    (
+                        verification_text.strip()
+                        if verification_text.strip()
+                        else conversation.text
+                    ),
+                    OFF_TOPIC_ANALYSIS_VERSION,
                     timestamp_for_offset(
                         recording_started_at,
                         verified_start_seconds,
@@ -1002,6 +1100,8 @@ def process_off_topic_detection(
         create_candidate(
             recording_id,
             None,
+            None,
+            "Off-topic Conversation",
             classroom_audio_track_index,
             candidate_start,
             candidate_end,
@@ -1009,8 +1109,6 @@ def process_off_topic_detection(
             candidate_language,
 
             # Temporary backend compatibility value.
-            # User-facing product reason is simply
-            # "Off-topic Conversation".
             "OffTopicConversation",
 
             None,
@@ -1446,6 +1544,16 @@ def process_recording(recording):
                     recording_id,
                     match["ruleId"],
                     match["phrase"],
+                    "Restricted Rule",
+                    classroom_audio_track_index,
+                    verified_start_seconds,
+                    verified_end_seconds,
+                    (
+                        verification_text.strip()
+                        if verification_text.strip()
+                        else context_text
+                    ),
+                    RESTRICTED_RULE_ANALYSIS_VERSION,
                     timestamp_for_offset(
                         recording_started_at,
                         verified_start_seconds,
@@ -1472,6 +1580,8 @@ def process_recording(recording):
             create_candidate(
                 recording_id,
                 match["ruleId"],
+                match["phrase"],
+                "Restricted Rule",
                 classroom_audio_track_index,
                 trigger_start,
                 trigger_end,
@@ -1481,6 +1591,7 @@ def process_recording(recording):
                 None,
                 asr_confidence,
                 None,
+                RESTRICTED_RULE_ANALYSIS_VERSION,
             )
 
             print(
@@ -1854,6 +1965,110 @@ def run_self_test():
         }
     ]
 
+    restricted_payload = build_alert_payload(
+        "recording-payload",
+        "rule-parent",
+        "mother",
+        "Restricted Rule",
+        0,
+        2.0,
+        5.0,
+        "please talk to your mother",
+        RESTRICTED_RULE_ANALYSIS_VERSION,
+        "2026-08-29T00:00:02Z",
+    )
+
+    assert (
+        restricted_payload["matchedPhrase"]
+        == "mother"
+    )
+
+    assert (
+        restricted_payload["detectionReason"]
+        == "Restricted Rule"
+    )
+
+    assert (
+        restricted_payload["sourceTrackIndex"]
+        == 0
+    )
+
+    assert (
+        restricted_payload["audioLayoutVersion"]
+        == 1
+    )
+
+    assert (
+        restricted_payload["triggerStartSeconds"]
+        == 2.0
+    )
+
+    assert (
+        restricted_payload["triggerEndSeconds"]
+        == 5.0
+    )
+
+    assert restricted_payload[
+        "analysisIdempotencyKey"
+    ] == analysis_idempotency_key(
+        "recording-payload",
+        "rule-parent",
+        2.0,
+        5.0,
+        0,
+        RESTRICTED_RULE_ANALYSIS_VERSION,
+    )
+
+    off_topic_payload = build_alert_payload(
+        "recording-payload",
+        None,
+        None,
+        "Off-topic Conversation",
+        0,
+        10.0,
+        14.0,
+        "we are going shopping tomorrow",
+        OFF_TOPIC_ANALYSIS_VERSION,
+        "2026-08-29T00:00:10Z",
+    )
+
+    assert (
+        off_topic_payload["matchedPhrase"]
+        is None
+    )
+
+    assert (
+        off_topic_payload["detectionReason"]
+        == "Off-topic Conversation"
+    )
+
+    candidate_payload = build_candidate_payload(
+        "recording-payload",
+        "rule-parent",
+        "mother",
+        "Restricted Rule",
+        0,
+        2.0,
+        5.0,
+        "please talk to your mother",
+        "Latin",
+        "RestrictedRuleUnverified",
+        None,
+        0.9,
+        None,
+        RESTRICTED_RULE_ANALYSIS_VERSION,
+    )
+
+    assert (
+        candidate_payload["matchedPhrase"]
+        == "mother"
+    )
+
+    assert (
+        candidate_payload["detectionReason"]
+        == "Restricted Rule"
+    )
+
     # Orchestration proof:
     # first-pass + second-pass agreement -> Alert.
     # Failed second-pass verification -> Candidate.
@@ -1956,6 +2171,11 @@ def run_self_test():
                         args[1],
                         args[2],
                         args[3],
+                        args[4],
+                        args[5],
+                        args[6],
+                        args[8],
+                        args[9],
                     )
                 ),
                 {"created": True},
@@ -1972,6 +2192,8 @@ def run_self_test():
                         args[2],
                         args[3],
                         args[4],
+                        args[5],
+                        args[6],
                     )
                 ),
                 {"status": "Pending"},
@@ -2025,6 +2247,11 @@ def run_self_test():
                 "alert",
                 "rule-parent",
                 "mother",
+                "Restricted Rule",
+                0,
+                2.0,
+                5.0,
+                RESTRICTED_RULE_ANALYSIS_VERSION,
                 "2026-08-29T00:00:02Z",
             ),
             "processed",
@@ -2058,6 +2285,8 @@ def run_self_test():
             (
                 "candidate",
                 "rule-parent",
+                "mother",
+                "Restricted Rule",
                 0,
                 2.0,
                 5.0,
@@ -2080,6 +2309,9 @@ def run_self_test():
     print("QA_WORKER_SEGMENT_PAYLOAD_OK")
     print("QA_WORKER_UNICODE_OUTPUT_OK")
     print("QA_WORKER_CLASSROOM_AUDIO_SOURCE_OK")
+    print("QA_WORKER_COMMERCIAL_ALERT_PAYLOAD_OK")
+    print("QA_WORKER_COMMERCIAL_CANDIDATE_PAYLOAD_OK")
+    print("QA_WORKER_OFFTOPIC_NULL_MATCHED_PHRASE_OK")
     print("QA_WORKER_RESTRICTED_RULE_TWO_PASS_ALERT_OK")
     print("QA_WORKER_UNVERIFIED_RULE_CANDIDATE_OK")
     print("QA_WORKER_SELF_TEST_OK")

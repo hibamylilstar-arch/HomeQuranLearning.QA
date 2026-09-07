@@ -2371,19 +2371,34 @@ app.MapPost("/api/worker/qa-alerts", async (
         jsonOptions,
         cancellationToken);
 
-    if (body is null || string.IsNullOrWhiteSpace(body.MatchedPhrase))
+    if (body is null)
     {
-        return Results.BadRequest("MatchedPhrase is required.");
+        return Results.BadRequest("Request body is required.");
     }
 
-    await alertService.CreateAlertAsync(
-        body.RecordingId,
-        body.QaRuleId,
-        body.MatchedPhrase,
-        body.TimestampUtc,
-        cancellationToken);
+    try
+    {
+        var alertId =
+            await alertService.CreateAlertAsync(
+                body,
+                cancellationToken);
 
-    return Results.Ok(new { created = true });
+        return Results.Ok(new
+        {
+            created = true,
+            alertId
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(
+            new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(
+            new { error = ex.Message });
+    }
 });
 
 app.MapPost("/api/worker/qa-candidates", async (

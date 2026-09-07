@@ -186,6 +186,9 @@ public sealed class RecordingService
                 "Server archive must be verified H.264 stream-copy media.");
         }
 
+        bool canonicalClassroomAudio =
+            ResolveServerArchiveCanonicalAudio(request);
+
         var device =
             await _deviceRepository.GetByDeviceIdAsync(
                 request.DeviceId.Trim(),
@@ -256,10 +259,13 @@ public sealed class RecordingService
             EndedAtUtc = request.EndedAtUtc,
             Duration = duration,
             SizeBytes = request.SizeBytes,
-            AudioLayoutVersion = 0,
+            AudioLayoutVersion =
+                canonicalClassroomAudio ? 1 : 0,
             TeacherAudioTrackIndex = null,
             TeacherAudioSourceKind =
-                "ServerArchiveMixedOnly",
+                canonicalClassroomAudio
+                    ? "ServerArchiveCanonicalMixed"
+                    : "ServerArchiveMixedOnly",
             TeacherAudioEndpointId = null,
             TeacherAudioEndpointName = null,
             TeacherAudioCoverageStartedAtUtc = null,
@@ -909,17 +915,57 @@ public sealed class RecordingService
              session.EndedAtUtc.Value >= endedAtUtc);
     }
 
+    private const string CanonicalClassroomAudioTrackTitle =
+        "Academy Class Mixed Audio";
+
+    private static bool ResolveServerArchiveCanonicalAudio(
+        ServerArchiveCompletedRequest request)
+    {
+        if (!request.CanonicalClassroomAudioVerified)
+        {
+            if (request.AudioLayoutVersion != 0 ||
+                request.ClassroomAudioTrackIndex.HasValue ||
+                !string.IsNullOrWhiteSpace(
+                    request.ClassroomAudioTrackTitle))
+            {
+                throw new ArgumentException(
+                    "Unverified server archive cannot declare canonical classroom audio.");
+            }
+
+            return false;
+        }
+
+        if (request.AudioLayoutVersion != 1 ||
+            request.ClassroomAudioTrackIndex != 0 ||
+            !string.Equals(
+                request.ClassroomAudioTrackTitle?.Trim(),
+                CanonicalClassroomAudioTrackTitle,
+                StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "Verified server archive canonical classroom audio metadata is invalid.");
+        }
+
+        return true;
+    }
+
     private static bool IsIdenticalServerArchiveRetry(
         Recording existing,
         ServerArchiveCompletedRequest request)
     {
+        bool canonicalClassroomAudio =
+            ResolveServerArchiveCanonicalAudio(request);
+
         return
             existing.Status == RecordingStatus.Uploaded &&
-            existing.AudioLayoutVersion == 0 &&
+            existing.AudioLayoutVersion ==
+                (canonicalClassroomAudio ? 1 : 0) &&
             existing.TeacherAudioTrackIndex is null &&
             string.Equals(
                 existing.TeacherAudioSourceKind,
-                "ServerArchiveMixedOnly",
+                canonicalClassroomAudio
+                    ? "ServerArchiveCanonicalMixed"
+                    : "ServerArchiveMixedOnly",
                 StringComparison.Ordinal) &&
             existing.TeacherAudioProvenanceStatus ==
                 TeacherAudioProvenanceStatus.Unavailable &&

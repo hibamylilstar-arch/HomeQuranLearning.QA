@@ -55,6 +55,88 @@ public sealed class ServerArchiveRegistrationTests
     }
 
     [Fact]
+    public async Task Register_VerifiedCanonicalArchive_PersistsQaLayoutOne()
+    {
+        DateTimeOffset startedAt = DateTimeOffset.UtcNow;
+        Device device = CreateDevice();
+        Recording? captured = null;
+
+        var recordings = new Mock<IRecordingRepository>();
+
+        recordings
+            .Setup(x => x.GetAllAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<Recording>());
+
+        recordings
+            .Setup(x => x.AddAsync(
+                It.IsAny<Recording>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<Recording, CancellationToken>(
+                (recording, _) => captured = recording)
+            .Returns(Task.CompletedTask);
+
+        RecordingService service = CreateService(
+            device,
+            recordings,
+            Array.Empty<Session>());
+
+        ServerArchiveRegistrationResponse response =
+            await service.RegisterServerArchiveAsync(
+                CreateCanonicalRequest(
+                    device.DeviceId,
+                    startedAt));
+
+        Assert.True(response.Accepted);
+        Assert.NotNull(captured);
+        Assert.Equal(RecordingStatus.Uploaded, captured.Status);
+        Assert.Equal(1, captured.AudioLayoutVersion);
+        Assert.Null(captured.TeacherAudioTrackIndex);
+        Assert.Equal(
+            "ServerArchiveCanonicalMixed",
+            captured.TeacherAudioSourceKind);
+        Assert.Equal(
+            TeacherAudioProvenanceStatus.Unavailable,
+            captured.TeacherAudioProvenanceStatus);
+    }
+
+    [Fact]
+    public async Task Register_InvalidCanonicalAudioIdentity_IsRejected()
+    {
+        DateTimeOffset startedAt = DateTimeOffset.UtcNow;
+        Device device = CreateDevice();
+
+        var recordings = new Mock<IRecordingRepository>();
+
+        recordings
+            .Setup(x => x.GetAllAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<Recording>());
+
+        RecordingService service = CreateService(
+            device,
+            recordings,
+            Array.Empty<Session>());
+
+        ServerArchiveCompletedRequest request =
+            CreateCanonicalRequest(
+                device.DeviceId,
+                startedAt);
+
+        request.ClassroomAudioTrackTitle =
+            "Wrong Audio Track";
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => service.RegisterServerArchiveAsync(request));
+
+        recordings.Verify(
+            x => x.AddAsync(
+                It.IsAny<Recording>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task Register_OneSessionCoveringWholeSegment_AssociatesSafely()
     {
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
@@ -248,6 +330,23 @@ public sealed class ServerArchiveRegistrationTests
             DeviceId = "device-server-archive",
             DeviceName = "Teacher Laptop"
         };
+    }
+
+    private static ServerArchiveCompletedRequest
+        CreateCanonicalRequest(
+            string deviceId,
+            DateTimeOffset startedAt)
+    {
+        ServerArchiveCompletedRequest request =
+            CreateRequest(deviceId, startedAt);
+
+        request.AudioLayoutVersion = 1;
+        request.ClassroomAudioTrackIndex = 0;
+        request.ClassroomAudioTrackTitle =
+            "Academy Class Mixed Audio";
+        request.CanonicalClassroomAudioVerified = true;
+
+        return request;
     }
 
     private static ServerArchiveCompletedRequest CreateRequest(

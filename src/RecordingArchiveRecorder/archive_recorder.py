@@ -50,6 +50,10 @@ RETRY_SECONDS = max(
 FINALIZE_POLL_SECONDS = 1.0
 MIN_SEGMENT_SECONDS = 2.0
 
+CANONICAL_CLASSROOM_AUDIO_TITLE = (
+    "Academy Class Mixed Audio"
+)
+
 shutdown = threading.Event()
 
 
@@ -77,7 +81,7 @@ def probe_segment(path):
             "-v",
             "error",
             "-show_entries",
-            "stream=codec_type,codec_name",
+            "stream=codec_type,codec_name:stream_tags=title,handler_name",
             "-show_entries",
             "format=duration",
             "-of",
@@ -136,6 +140,20 @@ def probe_segment(path):
     if (
         (audio.get("codec_name") or "").lower()
         != "aac"
+    ):
+        return None
+
+    audio_tags = audio.get("tags") or {}
+
+    audio_labels = {
+        str(value).strip()
+        for key, value in audio_tags.items()
+        if key.lower() in {"title", "handler_name"}
+    }
+
+    if (
+        CANONICAL_CLASSROOM_AUDIO_TITLE
+        not in audio_labels
     ):
         return None
 
@@ -275,6 +293,10 @@ class StreamWorker:
             "0:a:0?",
             "-c",
             "copy",
+            "-metadata:s:a:0",
+            f"title={CANONICAL_CLASSROOM_AUDIO_TITLE}",
+            "-metadata:s:a:0",
+            f"handler_name={CANONICAL_CLASSROOM_AUDIO_TITLE}",
             "-f",
             "segment",
             "-segment_time",

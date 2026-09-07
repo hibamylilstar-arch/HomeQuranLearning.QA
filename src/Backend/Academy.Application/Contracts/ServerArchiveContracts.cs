@@ -11,6 +11,12 @@ public sealed class ServerArchiveCompletedRequest
     public string ContainerFormat { get; set; } = "fmp4";
     public string VideoCodec { get; set; } = "h264";
     public bool VideoStreamCopyVerified { get; set; }
+
+    public int AudioLayoutVersion { get; set; }
+    public int? ClassroomAudioTrackIndex { get; set; }
+    public string ClassroomAudioTrackTitle { get; set; } =
+        string.Empty;
+    public bool CanonicalClassroomAudioVerified { get; set; }
 }
 
 public sealed class ServerArchiveRegistrationResponse

@@ -20,6 +20,10 @@ STREAM_COPY_VERIFIED = os.environ.get(
     "VIDEO_STREAM_COPY_VERIFIED", "false"
 ).lower() == "true"
 
+CANONICAL_CLASSROOM_AUDIO_TITLE = (
+    "Academy Class Mixed Audio"
+)
+
 
 def iso_utc(value):
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -43,9 +47,11 @@ def parse_identity(segment):
 def probe(segment):
     process = subprocess.run(
         [
-            "ffprobe", "-v", "error", "-select_streams", "v:0",
-            "-show_entries", "stream=codec_name",
-            "-show_entries", "format=duration", "-of", "json", str(segment),
+            "ffprobe", "-v", "error",
+            "-show_entries",
+            "stream=codec_type,codec_name:stream_tags=title,handler_name",
+            "-show_entries", "format=duration",
+            "-of", "json", str(segment),
         ],
         capture_output=True,
         text=True,
@@ -57,15 +63,64 @@ def probe(segment):
     try:
         data = json.loads(process.stdout)
         streams = data.get("streams") or []
-        codec = ((streams[0] if streams else {}).get("codec_name") or "").lower()
-        duration = float((data.get("format") or {}).get("duration") or 0)
+
+        video = next(
+            (
+                stream
+                for stream in streams
+                if stream.get("codec_type") == "video"
+            ),
+            None,
+        )
+
+        audio = next(
+            (
+                stream
+                for stream in streams
+                if stream.get("codec_type") == "audio"
+            ),
+            None,
+        )
+
+        duration = float(
+            (data.get("format") or {}).get("duration") or 0
+        )
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
         raise RuntimeError("ffprobe returned invalid archive metadata.") from exc
-    if codec != "h264":
+
+    video_codec = (
+        (video or {}).get("codec_name") or ""
+    ).lower()
+
+    audio_codec = (
+        (audio or {}).get("codec_name") or ""
+    ).lower()
+
+    if video_codec != "h264":
         raise RuntimeError("Finalized archive is not H.264.")
+
+    if audio_codec != "aac":
+        raise RuntimeError(
+            "Finalized archive has no canonical AAC classroom audio."
+        )
+
+    audio_tags = (audio or {}).get("tags") or {}
+
+    labels = {
+        str(value).strip()
+        for key, value in audio_tags.items()
+        if key.lower() in {"title", "handler_name"}
+    }
+
+    if CANONICAL_CLASSROOM_AUDIO_TITLE not in labels:
+        raise RuntimeError(
+            "Finalized archive canonical classroom audio identity is missing."
+        )
+
     if duration <= 0 or duration > 1800:
         raise RuntimeError("Finalized archive duration is outside pilot limits.")
-    return codec, duration
+
+    return video_codec, duration
 
 
 def storage_identity(device_id, started):
@@ -129,6 +184,11 @@ class Registrar:
                 "containerFormat": "fmp4",
                 "videoCodec": codec,
                 "videoStreamCopyVerified": STREAM_COPY_VERIFIED,
+                "audioLayoutVersion": 1,
+                "classroomAudioTrackIndex": 0,
+                "classroomAudioTrackTitle":
+                    CANONICAL_CLASSROOM_AUDIO_TITLE,
+                "canonicalClassroomAudioVerified": True,
             },
             timeout=30,
         )

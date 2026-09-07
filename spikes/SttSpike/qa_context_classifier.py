@@ -262,12 +262,13 @@ def analysis_idempotency_key(
     trigger_start_seconds: float,
     trigger_end_seconds: float,
     source_track_index: int,
+    analysis_version: str | None = None,
 ) -> str:
     material = "|".join([
         recording_id,
         rule_id or "",
         POLICY_VERSION,
-        ANALYSIS_VERSION,
+        analysis_version or ANALYSIS_VERSION,
         str(source_track_index),
         f"{trigger_start_seconds:.3f}",
         f"{trigger_end_seconds:.3f}",

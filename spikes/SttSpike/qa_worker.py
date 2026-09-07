@@ -1,6 +1,7 @@
 import json
 import io
 import os
+import re
 import sys
 import tempfile
 import time
@@ -10,12 +11,11 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from qa_context_classifier import (
-    ANALYSIS_VERSION,
     POLICY_VERSION,
     TranscriptWindow,
     analysis_idempotency_key,
     build_context_window,
-    classify_window,
+    classify_language,
     estimate_asr_confidence,
 )
 
@@ -52,6 +52,10 @@ _model = None
 EXPECTED_AUDIO_LAYOUT_VERSION = 1
 EXPECTED_CLASSROOM_AUDIO_TRACK_TITLE = (
     "Academy Class Mixed Audio"
+)
+
+RESTRICTED_RULE_ANALYSIS_VERSION = (
+    "QA-2A-rule-two-pass-v1"
 )
 
 
@@ -155,7 +159,7 @@ def create_candidate(
             "recordingId": recording_id,
             "qaRuleId": qa_rule_id,
             "policyVersion": POLICY_VERSION,
-            "analysisVersion": ANALYSIS_VERSION,
+            "analysisVersion": RESTRICTED_RULE_ANALYSIS_VERSION,
             "sourceTrackIndex": source_track_index,
             "audioLayoutVersion": EXPECTED_AUDIO_LAYOUT_VERSION,
             "triggerStartSeconds": trigger_start_seconds,
@@ -172,7 +176,26 @@ def create_candidate(
                 trigger_start_seconds,
                 trigger_end_seconds,
                 source_track_index,
+                RESTRICTED_RULE_ANALYSIS_VERSION,
             ),
+        },
+        WORKER_API_KEY,
+    )
+
+
+def create_alert(
+    recording_id,
+    qa_rule_id,
+    matched_phrase,
+    timestamp_utc,
+):
+    return http_post_json(
+        "/api/worker/qa-alerts",
+        {
+            "recordingId": recording_id,
+            "qaRuleId": qa_rule_id,
+            "matchedPhrase": matched_phrase,
+            "timestampUtc": timestamp_utc,
         },
         WORKER_API_KEY,
     )
@@ -318,6 +341,214 @@ def extract_classroom_audio(
     return sample_count
 
 
+def extract_wav_window(
+    input_path,
+    output_path,
+    trigger_start_seconds,
+    trigger_end_seconds,
+    padding_seconds=10.0,
+):
+    with wave.open(
+        input_path,
+        "rb",
+    ) as source:
+        frame_rate = source.getframerate()
+        frame_count = source.getnframes()
+
+        if frame_rate <= 0 or frame_count <= 0:
+            raise ValueError(
+                "Classroom audio WAV contains no frames."
+            )
+
+        duration_seconds = (
+            frame_count / frame_rate
+        )
+
+        start_seconds = max(
+            0.0,
+            trigger_start_seconds
+            - padding_seconds,
+        )
+
+        end_seconds = min(
+            duration_seconds,
+            trigger_end_seconds
+            + padding_seconds,
+        )
+
+        start_frame = int(
+            start_seconds * frame_rate
+        )
+
+        end_frame = int(
+            end_seconds * frame_rate
+        )
+
+        if end_frame <= start_frame:
+            raise ValueError(
+                "Verification audio window is empty."
+            )
+
+        source.setpos(start_frame)
+
+        frames = source.readframes(
+            end_frame - start_frame
+        )
+
+        channels = source.getnchannels()
+        sample_width = source.getsampwidth()
+        compression_type = source.getcomptype()
+        compression_name = source.getcompname()
+
+    with wave.open(
+        output_path,
+        "wb",
+    ) as target:
+        target.setnchannels(channels)
+        target.setsampwidth(sample_width)
+        target.setframerate(frame_rate)
+        target.setcomptype(
+            compression_type,
+            compression_name,
+        )
+        target.writeframes(frames)
+
+    return start_seconds
+
+
+def select_nearest_rule_match(
+    matches,
+    expected_offset_seconds,
+):
+    if not matches:
+        return None
+
+    return min(
+        matches,
+        key=lambda item: abs(
+            float(
+                item["offsetSeconds"]
+            )
+            - expected_offset_seconds
+        ),
+    )
+
+
+def verify_rule_match(
+    model,
+    classroom_audio_file,
+    phrase,
+    trigger_start_seconds,
+    trigger_end_seconds,
+):
+    descriptor, verification_file = (
+        tempfile.mkstemp(
+            prefix="academy-qa-rule-verify-",
+            suffix=".wav",
+        )
+    )
+
+    os.close(descriptor)
+
+    try:
+        clip_start_seconds = (
+            extract_wav_window(
+                classroom_audio_file,
+                verification_file,
+                trigger_start_seconds,
+                trigger_end_seconds,
+            )
+        )
+
+        segment_generator, _ = (
+            model.transcribe(
+                verification_file
+            )
+        )
+
+        verification_segments = list(
+            segment_generator
+        )
+
+        (
+            verification_text,
+            verification_matches,
+        ) = find_rule_matches(
+            verification_segments,
+            [
+                {
+                    "id": "verification",
+                    "phrase": phrase,
+                    "isActive": True,
+                }
+            ],
+        )
+
+        expected_relative_offset = max(
+            0.0,
+            trigger_start_seconds
+            - clip_start_seconds,
+        )
+
+        nearest_match = (
+            select_nearest_rule_match(
+                verification_matches,
+                expected_relative_offset,
+            )
+        )
+
+        if nearest_match is None:
+            return (
+                False,
+                verification_text,
+                None,
+                None,
+                None,
+            )
+
+        verified_start_seconds = (
+            clip_start_seconds
+            + float(
+                nearest_match[
+                    "offsetSeconds"
+                ]
+            )
+        )
+
+        verified_end_seconds = (
+            clip_start_seconds
+            + float(
+                nearest_match[
+                    "endOffsetSeconds"
+                ]
+            )
+        )
+
+        return (
+            True,
+            verification_text,
+            None,
+            verified_start_seconds,
+            verified_end_seconds,
+        )
+
+    except Exception as ex:
+        return (
+            False,
+            "",
+            str(ex),
+            None,
+            None,
+        )
+
+    finally:
+        if os.path.exists(
+            verification_file
+        ):
+            os.remove(
+                verification_file
+            )
+
 def parse_utc(value):
     if not value:
         raise ValueError(
@@ -340,6 +571,37 @@ def normalize_text(value):
     return " ".join(
         (value or "").strip().lower().split()
     )
+
+
+def find_phrase_spans(
+    transcript,
+    phrase,
+):
+    transcript = normalize_text(
+        transcript
+    )
+
+    phrase = normalize_text(
+        phrase
+    )
+
+    if not phrase:
+        return []
+
+    pattern = re.compile(
+        rf"(?<!\w){re.escape(phrase)}(?!\w)",
+        re.UNICODE,
+    )
+
+    return [
+        (
+            match.start(),
+            match.end(),
+        )
+        for match in pattern.finditer(
+            transcript
+        )
+    ]
 
 
 def build_transcript_index(segments):
@@ -379,7 +641,8 @@ def build_transcript_index(segments):
     return " ".join(parts), ranges
 
 
-def locate_phrase_offset(
+
+def locate_phrase_intervals(
     transcript,
     ranges,
     phrase,
@@ -387,50 +650,61 @@ def locate_phrase_offset(
     phrase = normalize_text(phrase)
 
     if not phrase:
-        return None
+        return []
 
-    match_index = transcript.find(phrase)
+    intervals = []
 
-    if match_index < 0:
-        return None
+    for (
+        match_index,
+        match_end,
+    ) in find_phrase_spans(
+        transcript,
+        phrase,
+    ):
+        start_offset = None
+        end_offset = None
 
-    for start_index, end_index, offset, _ in ranges:
-        if start_index <= match_index < end_index:
-            return offset
+        for (
+            start_index,
+            end_index,
+            offset,
+            segment_end,
+        ) in ranges:
+            if (
+                start_offset is None
+                and start_index <= match_index < end_index
+            ):
+                start_offset = offset
 
-    return ranges[0][2] if ranges else 0.0
+            if start_index < match_end <= end_index:
+                end_offset = segment_end
+                break
 
+        if start_offset is None:
+            start_offset = (
+                ranges[0][2]
+                if ranges
+                else 0.0
+            )
 
-def locate_phrase_interval(transcript, ranges, phrase):
-    phrase = normalize_text(phrase)
+        if end_offset is None:
+            end_offset = (
+                ranges[-1][3]
+                if ranges
+                else start_offset + 1.0
+            )
 
-    if not phrase:
-        return None
+        intervals.append(
+            (
+                start_offset,
+                max(
+                    start_offset + 0.01,
+                    end_offset,
+                ),
+            )
+        )
 
-    match_index = transcript.find(phrase)
-
-    if match_index < 0:
-        return None
-
-    match_end = match_index + len(phrase)
-    start_offset = None
-    end_offset = None
-
-    for start_index, end_index, offset, segment_end in ranges:
-        if start_offset is None and start_index <= match_index < end_index:
-            start_offset = offset
-
-        if start_index < match_end <= end_index:
-            end_offset = segment_end
-            break
-
-    if start_offset is None:
-        start_offset = ranges[0][2] if ranges else 0.0
-
-    if end_offset is None:
-        end_offset = ranges[-1][3] if ranges else start_offset + 1.0
-
-    return start_offset, max(start_offset + 0.01, end_offset)
+    return intervals
 
 
 def find_rule_matches(segments, rules):
@@ -451,25 +725,21 @@ def find_rule_matches(segments, rules):
         if not phrase:
             continue
 
-        interval = locate_phrase_interval(
+        intervals = locate_phrase_intervals(
             transcript,
             ranges,
             phrase,
         )
 
-        if interval is None:
-            continue
-
-        offset, end_offset = interval
-
-        matches.append(
-            {
-                "ruleId": rule.get("id"),
-                "phrase": phrase,
-                "offsetSeconds": offset,
-                "endOffsetSeconds": end_offset,
-            }
-        )
+        for offset, end_offset in intervals:
+            matches.append(
+                {
+                    "ruleId": rule.get("id"),
+                    "phrase": phrase,
+                    "offsetSeconds": offset,
+                    "endOffsetSeconds": end_offset,
+                }
+            )
 
     return transcript, matches
 
@@ -619,30 +889,95 @@ def process_recording(recording):
         asr_confidence = estimate_asr_confidence(transcript_windows)
 
         for match in matches:
-            trigger_start = match["offsetSeconds"]
-            trigger_end = match["endOffsetSeconds"]
-            context_text, _, _, context_windows = build_context_window(
-                transcript_windows,
+            trigger_start = match[
+                "offsetSeconds"
+            ]
+            trigger_end = match[
+                "endOffsetSeconds"
+            ]
+
+            context_text, _, _, _ = (
+                build_context_window(
+                    transcript_windows,
+                    trigger_start,
+                    trigger_end,
+                )
+            )
+
+            (
+                verified,
+                verification_text,
+                verification_error,
+                verified_start_seconds,
+                verified_end_seconds,
+            ) = verify_rule_match(
+                model,
+                classroom_audio_file,
+                match["phrase"],
                 trigger_start,
                 trigger_end,
             )
-            classification = classify_window(
-                context_text,
-                language_hint=getattr(info, "language", None),
-                rule_phrase=match["phrase"],
-                asr_confidence=asr_confidence,
+
+            language_family = (
+                classify_language(
+                    context_text,
+                    getattr(
+                        info,
+                        "language",
+                        None,
+                    ),
+                )
             )
 
             print(
                 f"MATCH: {match['phrase']} "
-                f"at +{trigger_start:.3f}s-+{trigger_end:.3f}s "
-                f"language={classification.language_family} "
-                f"intent={classification.intent_category} "
-                f"candidate={classification.should_create_candidate}"
+                f"at +{trigger_start:.3f}s-"
+                f"+{trigger_end:.3f}s "
+                f"detection=RestrictedRule "
+                f"verified={verified}"
             )
-            print(f"Classifier: {classification.reason}")
 
-            if not classification.should_create_candidate:
+            if verification_error:
+                print(
+                    "Rule verification warning: "
+                    f"{verification_error}"
+                )
+            else:
+                print(
+                    "Verification transcript: "
+                    f"{verification_text}"
+                )
+
+            if verified:
+                if (
+                    verified_start_seconds
+                    is None
+                    or verified_end_seconds
+                    is None
+                ):
+                    raise ValueError(
+                        "Verified rule match "
+                        "has no verified timestamp."
+                    )
+
+                create_alert(
+                    recording_id,
+                    match["ruleId"],
+                    match["phrase"],
+                    timestamp_for_offset(
+                        recording_started_at,
+                        verified_start_seconds,
+                    ),
+                )
+
+                print(
+                    "Restricted rule confirmed "
+                    "by second-pass STT "
+                    f"at +{verified_start_seconds:.3f}s-"
+                    f"+{verified_end_seconds:.3f}s; "
+                    "QA alert created."
+                )
+
                 continue
 
             create_candidate(
@@ -652,11 +987,17 @@ def process_recording(recording):
                 trigger_start,
                 trigger_end,
                 context_text,
-                classification.language_family,
-                classification.intent_category,
-                classification.trigger_confidence,
-                classification.asr_confidence,
-                classification.intent_confidence,
+                language_family,
+                "RestrictedRuleUnverified",
+                None,
+                asr_confidence,
+                None,
+            )
+
+            print(
+                "Restricted rule was not "
+                "confirmed by second pass; "
+                "QA candidate created."
             )
 
         mark_processed(recording_id)
@@ -778,6 +1119,164 @@ def run_self_test():
         whatsapp["offsetSeconds"],
     ) == "2026-08-27T06:00:09.250000Z"
 
+    repeated_segments = [
+        SimpleNamespace(
+            start=1.0,
+            end=2.0,
+            text="WhatsApp please",
+        ),
+        SimpleNamespace(
+            start=8.0,
+            end=9.0,
+            text="WhatsApp again",
+        ),
+    ]
+
+    _, repeated_matches = find_rule_matches(
+        repeated_segments,
+        [
+            {
+                "id": "rule-whatsapp",
+                "phrase": "WhatsApp",
+                "isActive": True,
+            }
+        ],
+    )
+
+    assert len(repeated_matches) == 2
+
+    assert [
+        item["offsetSeconds"]
+        for item in repeated_matches
+    ] == [1.0, 8.0]
+
+
+    _, false_positive_matches = (
+        find_rule_matches(
+            [
+                SimpleNamespace(
+                    start=1.0,
+                    end=2.0,
+                    text=(
+                        "Coffee is ready "
+                        "and please recall me"
+                    ),
+                )
+            ],
+            [
+                {
+                    "id": "rule-fee",
+                    "phrase": "fee",
+                    "isActive": True,
+                },
+                {
+                    "id": "rule-call",
+                    "phrase": "call",
+                    "isActive": True,
+                },
+            ],
+        )
+    )
+
+    assert false_positive_matches == []
+
+    _, punctuation_matches = (
+        find_rule_matches(
+            [
+                SimpleNamespace(
+                    start=3.0,
+                    end=4.0,
+                    text=(
+                        "WhatsApp, please."
+                    ),
+                )
+            ],
+            [
+                {
+                    "id": "rule-whatsapp",
+                    "phrase": "WhatsApp",
+                    "isActive": True,
+                }
+            ],
+        )
+    )
+
+    assert len(
+        punctuation_matches
+    ) == 1
+
+    assert (
+        punctuation_matches[0][
+            "offsetSeconds"
+        ]
+        == 3.0
+    )
+
+    cross_segment_segments = [
+        SimpleNamespace(
+            start=5.0,
+            end=6.0,
+            text="WhatsApp",
+        ),
+        SimpleNamespace(
+            start=6.0,
+            end=7.0,
+            text="number please",
+        ),
+    ]
+
+    _, cross_segment_matches = (
+        find_rule_matches(
+            cross_segment_segments,
+            [
+                {
+                    "id":
+                        "rule-whatsapp-number",
+                    "phrase":
+                        "WhatsApp number",
+                    "isActive": True,
+                }
+            ],
+        )
+    )
+
+    assert len(
+        cross_segment_matches
+    ) == 1
+
+    assert (
+        cross_segment_matches[0][
+            "offsetSeconds"
+        ]
+        == 5.0
+    )
+
+
+    nearest_verified = (
+        select_nearest_rule_match(
+            [
+                {
+                    "offsetSeconds": 1.0,
+                    "endOffsetSeconds": 2.0,
+                },
+                {
+                    "offsetSeconds": 8.0,
+                    "endOffsetSeconds": 9.0,
+                },
+            ],
+            7.5,
+        )
+    )
+
+    assert nearest_verified is not None
+
+    assert (
+        nearest_verified[
+            "offsetSeconds"
+        ]
+        == 8.0
+    )
+
     assert validate_classroom_audio_metadata(
         {
             "audioLayoutVersion": 1,
@@ -835,17 +1334,25 @@ def run_self_test():
         }
     ]
 
-    # Orchestration proof: a supported match reaches the candidate endpoint,
-    # never the final-alert endpoint, and marking processed is last.
+    # Orchestration proof:
+    # first-pass + second-pass agreement -> Alert.
+    # Failed second-pass verification -> Candidate.
+    # Marking processed remains last in both paths.
     original_functions = {
         "download_file": download_file,
-        "extract_classroom_audio": extract_classroom_audio,
+        "extract_classroom_audio":
+            extract_classroom_audio,
         "get_model": get_model,
-        "persist_transcript_segments": persist_transcript_segments,
+        "persist_transcript_segments":
+            persist_transcript_segments,
         "get_active_rules": get_active_rules,
+        "verify_rule_match":
+            verify_rule_match,
+        "create_alert": create_alert,
         "create_candidate": create_candidate,
         "mark_processed": mark_processed,
     }
+
     calls = []
 
     class FakeModel:
@@ -854,46 +1361,190 @@ def run_self_test():
                 SimpleNamespace(
                     start=2.0,
                     end=5.0,
-                    text="Please talk to your mother",
+                    text=(
+                        "Please talk "
+                        "to your mother"
+                    ),
                     avg_logprob=-0.2,
                     no_speech_prob=0.01,
                 )
-            ]), SimpleNamespace(language="en")
+            ]), SimpleNamespace(
+                language="en"
+            )
+
+    recording_proof = {
+        "recordingId": "recording-proof",
+        "fileName": "proof.mp4",
+        "startedAtUtc":
+            "2026-08-29T00:00:00Z",
+        "presignedUrl":
+            "https://example.invalid/proof.mp4",
+        "audioLayoutVersion": 1,
+        "classroomAudioTrackIndex": 0,
+        "classroomAudioTrackTitle":
+            "Academy Class Mixed Audio",
+    }
 
     try:
-        globals()["download_file"] = lambda _url, path: (calls.append("download"), open(path, "wb").write(b"x"))
-        globals()["extract_classroom_audio"] = lambda _source, _target, _index: calls.append("extract")
-        globals()["get_model"] = lambda: FakeModel()
-        globals()["persist_transcript_segments"] = lambda *_args: calls.append("persist")
-        globals()["get_active_rules"] = lambda: [{"id": "rule-parent", "phrase": "mother", "isActive": True}]
-        globals()["create_candidate"] = lambda *args: (calls.append(("candidate", args[1], args[2], args[3], args[4])), {"status": "Pending"})[1]
-        globals()["mark_processed"] = lambda *_args: calls.append("processed")
-        assert process_recording({
-            "recordingId": "recording-proof",
-            "fileName": "proof.mp4",
-            "startedAtUtc": "2026-08-29T00:00:00Z",
-            "presignedUrl": "https://example.invalid/proof.mp4",
-            "audioLayoutVersion": 1,
-            "classroomAudioTrackIndex": 0,
-            "classroomAudioTrackTitle":
-                "Academy Class Mixed Audio",
-        })
-    finally:
-        globals().update(original_functions)
+        globals()["download_file"] = (
+            lambda _url, path:
+            (
+                calls.append("download"),
+                open(
+                    path,
+                    "wb",
+                ).write(b"x"),
+            )
+        )
 
-    assert calls == [
-        "download", "extract", "persist",
-        ("candidate", "rule-parent", 0, 2.0, 5.0), "processed",
-    ]
+        globals()[
+            "extract_classroom_audio"
+        ] = (
+            lambda _source, _target, _index:
+            calls.append("extract")
+        )
+
+        globals()["get_model"] = (
+            lambda: FakeModel()
+        )
+
+        globals()[
+            "persist_transcript_segments"
+        ] = (
+            lambda *_args:
+            calls.append("persist")
+        )
+
+        globals()["get_active_rules"] = (
+            lambda: [
+                {
+                    "id": "rule-parent",
+                    "phrase": "mother",
+                    "isActive": True,
+                }
+            ]
+        )
+
+        globals()["create_alert"] = (
+            lambda *args:
+            (
+                calls.append(
+                    (
+                        "alert",
+                        args[1],
+                        args[2],
+                        args[3],
+                    )
+                ),
+                {"created": True},
+            )[1]
+        )
+
+        globals()["create_candidate"] = (
+            lambda *args:
+            (
+                calls.append(
+                    (
+                        "candidate",
+                        args[1],
+                        args[2],
+                        args[3],
+                        args[4],
+                    )
+                ),
+                {"status": "Pending"},
+            )[1]
+        )
+
+        globals()["mark_processed"] = (
+            lambda *_args:
+            calls.append("processed")
+        )
+
+        globals()["verify_rule_match"] = (
+            lambda *_args:
+            (
+                calls.append("verify"),
+                (
+                    True,
+                    "please talk to your mother",
+                    None,
+                    2.0,
+                    5.0,
+                ),
+            )[1]
+        )
+
+        assert process_recording(
+            recording_proof
+        )
+
+        assert calls == [
+            "download",
+            "extract",
+            "persist",
+            "verify",
+            (
+                "alert",
+                "rule-parent",
+                "mother",
+                "2026-08-29T00:00:02Z",
+            ),
+            "processed",
+        ]
+
+        calls.clear()
+
+        globals()["verify_rule_match"] = (
+            lambda *_args:
+            (
+                calls.append("verify"),
+                (
+                    False,
+                    "please talk to your",
+                    None,
+                    None,
+                    None,
+                ),
+            )[1]
+        )
+
+        assert process_recording(
+            recording_proof
+        )
+
+        assert calls == [
+            "download",
+            "extract",
+            "persist",
+            "verify",
+            (
+                "candidate",
+                "rule-parent",
+                0,
+                2.0,
+                5.0,
+            ),
+            "processed",
+        ]
+
+    finally:
+        globals().update(
+            original_functions
+        )
 
     print("QA_WORKER_TRANSCRIPT_INDEX_OK")
     print("QA_WORKER_CROSS_SEGMENT_MATCH_OK")
     print("QA_WORKER_RULE_LINK_OK")
+    print("QA_WORKER_ALL_RULE_OCCURRENCES_OK")
+    print("QA_WORKER_RULE_BOUNDARY_MATCHING_OK")
+    print("QA_WORKER_VERIFIED_TIMESTAMP_ALIGNMENT_OK")
     print("QA_WORKER_TIMESTAMP_ALIGNMENT_OK")
     print("QA_WORKER_SEGMENT_PAYLOAD_OK")
     print("QA_WORKER_UNICODE_OUTPUT_OK")
     print("QA_WORKER_CLASSROOM_AUDIO_SOURCE_OK")
-    print("QA_WORKER_CANDIDATE_ONLY_ORDER_OK")
+    print("QA_WORKER_RESTRICTED_RULE_TWO_PASS_ALERT_OK")
+    print("QA_WORKER_UNVERIFIED_RULE_CANDIDATE_OK")
     print("QA_WORKER_SELF_TEST_OK")
 
 

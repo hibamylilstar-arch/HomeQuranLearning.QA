@@ -15,7 +15,9 @@ from qa_context_classifier import (
     TranscriptWindow,
     analysis_idempotency_key,
     build_context_window,
+    build_conversation_windows,
     classify_language,
+    classify_off_topic,
     estimate_asr_confidence,
 )
 
@@ -56,6 +58,10 @@ EXPECTED_CLASSROOM_AUDIO_TRACK_TITLE = (
 
 RESTRICTED_RULE_ANALYSIS_VERSION = (
     "QA-2A-rule-two-pass-v1"
+)
+
+OFF_TOPIC_ANALYSIS_VERSION = (
+    "QA-2B-off-topic-two-pass-v1"
 )
 
 
@@ -152,6 +158,8 @@ def create_candidate(
     trigger_confidence,
     asr_confidence,
     intent_confidence,
+    analysis_version=
+        RESTRICTED_RULE_ANALYSIS_VERSION,
 ):
     return http_post_json(
         "/api/worker/qa-candidates",
@@ -159,25 +167,37 @@ def create_candidate(
             "recordingId": recording_id,
             "qaRuleId": qa_rule_id,
             "policyVersion": POLICY_VERSION,
-            "analysisVersion": RESTRICTED_RULE_ANALYSIS_VERSION,
+            "analysisVersion": analysis_version,
             "sourceTrackIndex": source_track_index,
-            "audioLayoutVersion": EXPECTED_AUDIO_LAYOUT_VERSION,
-            "triggerStartSeconds": trigger_start_seconds,
-            "triggerEndSeconds": trigger_end_seconds,
+            "audioLayoutVersion":
+                EXPECTED_AUDIO_LAYOUT_VERSION,
+            "triggerStartSeconds":
+                trigger_start_seconds,
+            "triggerEndSeconds":
+                trigger_end_seconds,
             "transcript": transcript[:4096],
             "languageFamily": language_family,
+
+            # Temporary backend compatibility field.
+            # Product semantics no longer use
+            # intent categories.
             "intentCategory": intent_category,
-            "triggerConfidence": trigger_confidence,
-            "asrConfidence": asr_confidence,
-            "intentConfidence": intent_confidence,
-            "analysisIdempotencyKey": analysis_idempotency_key(
-                recording_id,
-                qa_rule_id,
-                trigger_start_seconds,
-                trigger_end_seconds,
-                source_track_index,
-                RESTRICTED_RULE_ANALYSIS_VERSION,
-            ),
+
+            "triggerConfidence":
+                trigger_confidence,
+            "asrConfidence":
+                asr_confidence,
+            "intentConfidence":
+                intent_confidence,
+            "analysisIdempotencyKey":
+                analysis_idempotency_key(
+                    recording_id,
+                    qa_rule_id,
+                    trigger_start_seconds,
+                    trigger_end_seconds,
+                    source_track_index,
+                    analysis_version,
+                ),
         },
         WORKER_API_KEY,
     )
@@ -549,6 +569,466 @@ def verify_rule_match(
                 verification_file
             )
 
+
+def intervals_overlap(
+    left_start,
+    left_end,
+    right_start,
+    right_end,
+):
+    return (
+        left_end > right_start
+        and left_start < right_end
+    )
+
+
+def select_verification_conversation_window(
+    windows,
+    expected_start_seconds,
+    expected_end_seconds,
+):
+    if not windows:
+        return None
+
+    expected_center = (
+        expected_start_seconds
+        + expected_end_seconds
+    ) / 2.0
+
+    def score(window):
+        overlap = max(
+            0.0,
+            min(
+                window.end_seconds,
+                expected_end_seconds,
+            )
+            - max(
+                window.start_seconds,
+                expected_start_seconds,
+            ),
+        )
+
+        center = (
+            window.start_seconds
+            + window.end_seconds
+        ) / 2.0
+
+        distance = abs(
+            center - expected_center
+        )
+
+        # Prefer temporal overlap first.
+        # If second-pass segmentation shifted,
+        # choose the nearest conversation window.
+        return (
+            overlap,
+            -distance,
+        )
+
+    return max(
+        windows,
+        key=score,
+    )
+
+
+def verify_off_topic_window(
+    model,
+    classroom_audio_file,
+    trigger_start_seconds,
+    trigger_end_seconds,
+    language_hint,
+):
+    descriptor, verification_file = (
+        tempfile.mkstemp(
+            prefix=
+                "academy-qa-offtopic-verify-",
+            suffix=".wav",
+        )
+    )
+
+    os.close(descriptor)
+
+    try:
+        clip_start_seconds = (
+            extract_wav_window(
+                classroom_audio_file,
+                verification_file,
+                trigger_start_seconds,
+                trigger_end_seconds,
+
+                # Smaller than restricted-rule
+                # verification because this is
+                # already a conversation window.
+                padding_seconds=3.0,
+            )
+        )
+
+        segment_generator, info = (
+            model.transcribe(
+                verification_file
+            )
+        )
+
+        verification_segments = list(
+            segment_generator
+        )
+
+        verification_windows = [
+            TranscriptWindow(
+                start_seconds=
+                    float(segment.start),
+                end_seconds=max(
+                    float(segment.start)
+                    + 0.01,
+                    float(
+                        getattr(
+                            segment,
+                            "end",
+                            float(
+                                segment.start
+                            )
+                            + 1.0,
+                        )
+                    ),
+                ),
+                text=(
+                    getattr(
+                        segment,
+                        "text",
+                        "",
+                    )
+                    or ""
+                ).strip(),
+                language=getattr(
+                    info,
+                    "language",
+                    language_hint,
+                ),
+                avg_log_probability=
+                    getattr(
+                        segment,
+                        "avg_logprob",
+                        None,
+                    ),
+                no_speech_probability=
+                    getattr(
+                        segment,
+                        "no_speech_prob",
+                        None,
+                    ),
+            )
+            for segment
+            in verification_segments
+            if (
+                getattr(
+                    segment,
+                    "text",
+                    "",
+                )
+                or ""
+            ).strip()
+        ]
+
+        conversation_windows = (
+            build_conversation_windows(
+                verification_windows
+            )
+        )
+
+        expected_relative_start = max(
+            0.0,
+            trigger_start_seconds
+            - clip_start_seconds,
+        )
+
+        expected_relative_end = max(
+            expected_relative_start
+            + 0.01,
+            trigger_end_seconds
+            - clip_start_seconds,
+        )
+
+        selected = (
+            select_verification_conversation_window(
+                conversation_windows,
+                expected_relative_start,
+                expected_relative_end,
+            )
+        )
+
+        if selected is None:
+            return (
+                None,
+                "",
+                None,
+                None,
+                None,
+            )
+
+        decision = classify_off_topic(
+            selected.text,
+            language_hint=getattr(
+                info,
+                "language",
+                language_hint,
+            ),
+        )
+
+        verified_start_seconds = (
+            clip_start_seconds
+            + selected.start_seconds
+        )
+
+        verified_end_seconds = (
+            clip_start_seconds
+            + selected.end_seconds
+        )
+
+        return (
+            decision,
+            selected.text,
+            None,
+            verified_start_seconds,
+            verified_end_seconds,
+        )
+
+    except Exception as ex:
+        # Verification failure must not
+        # silently drop a primary finding.
+        # Part 2B will route this to Candidate.
+        return (
+            None,
+            "",
+            str(ex),
+            None,
+            None,
+        )
+
+    finally:
+        if os.path.exists(
+            verification_file
+        ):
+            os.remove(
+                verification_file
+            )
+
+
+
+def process_off_topic_detection(
+    model,
+    classroom_audio_file,
+    recording_id,
+    recording_started_at,
+    classroom_audio_track_index,
+    transcript_windows,
+    asr_confidence,
+    language_hint,
+    confirmed_restricted_intervals,
+):
+    conversation_windows = (
+        build_conversation_windows(
+            transcript_windows
+        )
+    )
+
+    counts = {
+        "windows": len(conversation_windows),
+        "alerts": 0,
+        "candidates": 0,
+        "allowed": 0,
+        "insufficient": 0,
+        "secondPassAllowedSuppressed": 0,
+        "restrictedOverlapReview": 0,
+    }
+
+    for conversation in conversation_windows:
+        primary = classify_off_topic(
+            conversation.text,
+            language_hint=language_hint,
+        )
+
+        print(
+            "OFFTOPIC PRIMARY: "
+            f"+{conversation.start_seconds:.3f}s-"
+            f"+{conversation.end_seconds:.3f}s "
+            f"outcome={primary.outcome}"
+        )
+
+        if primary.outcome == "AllowedLesson":
+            counts["allowed"] += 1
+            continue
+
+        if primary.outcome == "InsufficientSpeech":
+            counts["insufficient"] += 1
+            continue
+
+        (
+            second_pass,
+            verification_text,
+            verification_error,
+            verified_start_seconds,
+            verified_end_seconds,
+        ) = verify_off_topic_window(
+            model,
+            classroom_audio_file,
+            conversation.start_seconds,
+            conversation.end_seconds,
+            language_hint,
+        )
+
+        if verification_error:
+            print(
+                "Off-topic verification warning: "
+                f"{verification_error}"
+            )
+        elif second_pass is not None:
+            print(
+                "OFFTOPIC SECOND PASS: "
+                f"outcome={second_pass.outcome} "
+                f"text={verification_text}"
+            )
+        else:
+            print(
+                "OFFTOPIC SECOND PASS: "
+                "no usable conversation window"
+            )
+
+        # An uncertain first pass which is independently
+        # resolved as normal lesson speech should not
+        # create unnecessary human-review noise.
+        if (
+            primary.outcome == "Uncertain"
+            and second_pass is not None
+            and second_pass.outcome == "AllowedLesson"
+        ):
+            counts[
+                "secondPassAllowedSuppressed"
+            ] += 1
+
+            print(
+                "Uncertain primary resolved "
+                "as AllowedLesson by second pass; "
+                "finding suppressed."
+            )
+
+            continue
+
+        # Direct alert requires two independent
+        # clear OffTopic classifications.
+        two_pass_confirmed = (
+            primary.outcome == "OffTopic"
+            and second_pass is not None
+            and second_pass.outcome == "OffTopic"
+            and verified_start_seconds is not None
+            and verified_end_seconds is not None
+        )
+
+        if two_pass_confirmed:
+            restricted_overlap = any(
+                intervals_overlap(
+                    verified_start_seconds,
+                    verified_end_seconds,
+                    restricted_start,
+                    restricted_end,
+                )
+                for (
+                    restricted_start,
+                    restricted_end,
+                )
+                in confirmed_restricted_intervals
+            )
+
+            if not restricted_overlap:
+                create_alert(
+                    recording_id,
+                    None,
+                    "Off-topic Conversation",
+                    timestamp_for_offset(
+                        recording_started_at,
+                        verified_start_seconds,
+                    ),
+                )
+
+                counts["alerts"] += 1
+
+                print(
+                    "Off-topic conversation confirmed "
+                    "by two-pass STT; QA alert created "
+                    f"at +{verified_start_seconds:.3f}s."
+                )
+
+                continue
+
+            # A confirmed Restricted Rule already owns
+            # the direct alert for the overlapping
+            # incident. Preserve the broader off-topic
+            # evidence for human review instead of
+            # silently dropping the conversation.
+            counts[
+                "restrictedOverlapReview"
+            ] += 1
+
+            print(
+                "Two-pass off-topic finding overlaps "
+                "a confirmed Restricted Rule; "
+                "duplicate direct alert suppressed, "
+                "evidence retained as Candidate."
+            )
+
+        candidate_start = (
+            verified_start_seconds
+            if verified_start_seconds is not None
+            else conversation.start_seconds
+        )
+
+        candidate_end = (
+            verified_end_seconds
+            if verified_end_seconds is not None
+            else conversation.end_seconds
+        )
+
+        candidate_text = (
+            verification_text.strip()
+            if verification_text.strip()
+            else conversation.text
+        )
+
+        candidate_language = (
+            second_pass.language_family
+            if second_pass is not None
+            else primary.language_family
+        )
+
+        create_candidate(
+            recording_id,
+            None,
+            classroom_audio_track_index,
+            candidate_start,
+            candidate_end,
+            candidate_text,
+            candidate_language,
+
+            # Temporary backend compatibility value.
+            # User-facing product reason is simply
+            # "Off-topic Conversation".
+            "OffTopicConversation",
+
+            None,
+            asr_confidence,
+            None,
+            OFF_TOPIC_ANALYSIS_VERSION,
+        )
+
+        counts["candidates"] += 1
+
+        print(
+            "Off-topic finding requires review; "
+            "QA candidate created."
+        )
+
+    return counts
+
+
 def parse_utc(value):
     if not value:
         raise ValueError(
@@ -888,6 +1368,8 @@ def process_recording(recording):
         ]
         asr_confidence = estimate_asr_confidence(transcript_windows)
 
+        confirmed_restricted_intervals = []
+
         for match in matches:
             trigger_start = match[
                 "offsetSeconds"
@@ -970,6 +1452,13 @@ def process_recording(recording):
                     ),
                 )
 
+                confirmed_restricted_intervals.append(
+                    (
+                        verified_start_seconds,
+                        verified_end_seconds,
+                    )
+                )
+
                 print(
                     "Restricted rule confirmed "
                     "by second-pass STT "
@@ -999,6 +1488,37 @@ def process_recording(recording):
                 "confirmed by second pass; "
                 "QA candidate created."
             )
+
+        off_topic_counts = (
+            process_off_topic_detection(
+                model,
+                classroom_audio_file,
+                recording_id,
+                recording_started_at,
+                classroom_audio_track_index,
+                transcript_windows,
+                asr_confidence,
+                getattr(
+                    info,
+                    "language",
+                    None,
+                ),
+                confirmed_restricted_intervals,
+            )
+        )
+
+        print(
+            "Off-topic summary: "
+            f"windows={off_topic_counts['windows']} "
+            f"alerts={off_topic_counts['alerts']} "
+            f"candidates={off_topic_counts['candidates']} "
+            f"allowed={off_topic_counts['allowed']} "
+            f"insufficient={off_topic_counts['insufficient']} "
+            "resolvedAllowed="
+            f"{off_topic_counts['secondPassAllowedSuppressed']} "
+            "restrictedOverlapReview="
+            f"{off_topic_counts['restrictedOverlapReview']}"
+        )
 
         mark_processed(recording_id)
 
@@ -1351,6 +1871,8 @@ def run_self_test():
         "create_alert": create_alert,
         "create_candidate": create_candidate,
         "mark_processed": mark_processed,
+        "process_off_topic_detection":
+            process_off_topic_detection,
     }
 
     calls = []
@@ -1459,6 +1981,21 @@ def run_self_test():
         globals()["mark_processed"] = (
             lambda *_args:
             calls.append("processed")
+        )
+
+        globals()[
+            "process_off_topic_detection"
+        ] = (
+            lambda *_args, **_kwargs:
+            {
+                "windows": 0,
+                "alerts": 0,
+                "candidates": 0,
+                "allowed": 0,
+                "insufficient": 0,
+                "secondPassAllowedSuppressed": 0,
+                "restrictedOverlapReview": 0,
+            }
         )
 
         globals()["verify_rule_match"] = (

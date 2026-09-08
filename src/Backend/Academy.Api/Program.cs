@@ -31,6 +31,7 @@ builder.Services.AddScoped<DeviceQueryService>();
 builder.Services.AddScoped<QaRuleService>();
 builder.Services.AddScoped<QaAlertService>();
 builder.Services.AddScoped<QaAudioChunkService>();
+builder.Services.AddScoped<QaAudioChunkWorkerService>();
 builder.Services.AddScoped<QaCandidateService>();
 builder.Services.AddScoped<TranscriptSegmentService>();
 builder.Services.AddScoped<AdminUserService>();
@@ -2491,6 +2492,90 @@ app.MapPost("/api/worker/sessions/{sessionId:guid}/livekit-ingress", async (
 
     await sessionService.UpdateLiveKitIngressAsync(sessionId, body.IngressId, body.StreamKey, cancellationToken);
     return Results.Ok(new { updated = true });
+});
+
+app.MapPost("/api/worker/qa-audio-chunks/claim", async (
+    HttpRequest request,
+    int? limit,
+    QaAudioChunkWorkerService qaAudioChunkWorkerService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue(
+            "X-Api-Key",
+            out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        var windows =
+            await qaAudioChunkWorkerService
+                .ClaimReadyAsync(
+                    limit,
+                    cancellationToken);
+
+        return Results.Ok(
+            windows);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(
+            new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(
+            new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/worker/qa-audio-chunks/{chunkId:guid}/complete", async (
+    HttpRequest request,
+    Guid chunkId,
+    CompleteQaAudioChunkRequest body,
+    QaAudioChunkWorkerService qaAudioChunkWorkerService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue(
+            "X-Api-Key",
+            out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        await qaAudioChunkWorkerService
+            .CompleteAsync(
+                chunkId,
+                body,
+                cancellationToken);
+
+        return Results.Ok(
+            new
+            {
+                completed =
+                    body.Success
+            });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(
+            new { error = ex.Message });
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(
+            new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(
+            new { error = ex.Message });
+    }
 });
 
 app.MapGet("/api/worker/recordings/pending", async (

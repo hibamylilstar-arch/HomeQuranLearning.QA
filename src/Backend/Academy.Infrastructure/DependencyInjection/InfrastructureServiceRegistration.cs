@@ -35,6 +35,7 @@ public static class InfrastructureServiceRegistration
         services.AddScoped<IRecordingRepository, RecordingRepository>();
         services.AddScoped<IQaRuleRepository, QaRuleRepository>();
         services.AddScoped<IQaAlertRepository, QaAlertRepository>();
+        services.AddScoped<IQaAudioChunkRepository, QaAudioChunkRepository>();
         services.AddScoped<IQaCandidateRepository, QaCandidateRepository>();
         services.AddScoped<ITranscriptSegmentRepository, TranscriptSegmentRepository>();
         services.AddScoped<IUserRepository, UserRepository>();

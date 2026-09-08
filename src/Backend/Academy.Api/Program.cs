@@ -30,6 +30,7 @@ builder.Services.AddScoped<DeviceService>();
 builder.Services.AddScoped<DeviceQueryService>();
 builder.Services.AddScoped<QaRuleService>();
 builder.Services.AddScoped<QaAlertService>();
+builder.Services.AddScoped<QaAudioChunkService>();
 builder.Services.AddScoped<QaCandidateService>();
 builder.Services.AddScoped<TranscriptSegmentService>();
 builder.Services.AddScoped<AdminUserService>();
@@ -461,6 +462,146 @@ app.MapGet("/api/agent/class-window", async (
             new { error = ex.Message });
     }
 });
+app.MapPost("/api/agent/qa-audio-chunks", async (
+    HttpRequest request,
+    QaAudioChunkService qaAudioChunkService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue(
+            "X-Api-Key",
+            out var values) ||
+        values.ToString() != agentApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var maxRequestBodySizeFeature =
+        request.HttpContext.Features.Get<
+            Microsoft.AspNetCore.Http.Features
+                .IHttpMaxRequestBodySizeFeature>();
+
+    if (maxRequestBodySizeFeature is not null &&
+        !maxRequestBodySizeFeature.IsReadOnly)
+    {
+        maxRequestBodySizeFeature.MaxRequestBodySize =
+            1024L * 1024L;
+    }
+
+    if (!request.HasFormContentType)
+    {
+        return Results.BadRequest(
+            new
+            {
+                error =
+                    "Expected multipart/form-data."
+            });
+    }
+
+    var form =
+        await request.ReadFormAsync(
+            cancellationToken);
+
+    string deviceId =
+        form["deviceId"]
+            .ToString()
+            .Trim();
+
+    if (string.IsNullOrWhiteSpace(deviceId))
+    {
+        return Results.BadRequest(
+            new { error = "deviceId is required." });
+    }
+
+    if (!Guid.TryParse(
+            form["sessionId"].ToString(),
+            out Guid sessionId))
+    {
+        return Results.BadRequest(
+            new { error = "sessionId is invalid." });
+    }
+
+    if (!Guid.TryParse(
+            form["captureId"].ToString(),
+            out Guid captureId))
+    {
+        return Results.BadRequest(
+            new { error = "captureId is invalid." });
+    }
+
+    if (!long.TryParse(
+            form["sequenceNumber"].ToString(),
+            out long sequenceNumber))
+    {
+        return Results.BadRequest(
+            new
+            {
+                error =
+                    "sequenceNumber is invalid."
+            });
+    }
+
+    if (!DateTimeOffset.TryParse(
+            form["startedAtUtc"].ToString(),
+            out DateTimeOffset startedAtUtc))
+    {
+        return Results.BadRequest(
+            new
+            {
+                error =
+                    "startedAtUtc is invalid."
+            });
+    }
+
+    IFormFile? file =
+        form.Files.GetFile("audio")
+        ?? form.Files.FirstOrDefault();
+
+    if (file is null)
+    {
+        return Results.BadRequest(
+            new { error = "audio file is required." });
+    }
+
+    try
+    {
+        await using Stream stream =
+            file.OpenReadStream();
+
+        AgentQaAudioChunkResponse response =
+            await qaAudioChunkService.SubmitAsync(
+                deviceId,
+                sessionId,
+                captureId,
+                sequenceNumber,
+                startedAtUtc,
+                stream,
+                file.ContentType,
+                file.Length,
+                cancellationToken);
+
+        return Results.Ok(response);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(
+            new { error = ex.Message });
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(
+            new { error = ex.Message });
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return Results.Forbid();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(
+            new { error = ex.Message });
+    }
+});
+
 app.MapPost("/api/agent/recordings", async (
     HttpRequest request,
     RecordingSubmittedRequest body,

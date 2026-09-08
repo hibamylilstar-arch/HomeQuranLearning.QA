@@ -16,6 +16,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<RecordingAudioCoverageGap> RecordingAudioCoverageGaps => Set<RecordingAudioCoverageGap>();
     public DbSet<QaRule> QaRules => Set<QaRule>();
     public DbSet<QaAlert> QaAlerts => Set<QaAlert>();
+    public DbSet<QaAudioChunk> QaAudioChunks => Set<QaAudioChunk>();
     public DbSet<QaCandidate> QaCandidates => Set<QaCandidate>();
     public DbSet<TranscriptSegment> TranscriptSegments => Set<TranscriptSegment>();
     public DbSet<User> Users => Set<User>();
@@ -125,6 +126,59 @@ public sealed class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.QaRuleId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<QaAudioChunk>(entity =>
+        {
+            entity.ToTable("qa_audio_chunks");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.StorageKey)
+                .IsRequired()
+                .HasMaxLength(1024);
+
+            entity.Property(x => x.ContentType)
+                .IsRequired()
+                .HasMaxLength(128);
+
+            entity.Property(x => x.LastError)
+                .HasMaxLength(2048);
+
+            entity.HasIndex(
+                x => new
+                {
+                    x.DeviceId,
+                    x.SessionId,
+                    x.CaptureId,
+                    x.SequenceNumber
+                })
+                .IsUnique();
+
+            entity.HasIndex(
+                x => new
+                {
+                    x.SessionId,
+                    x.StartedAtUtc
+                });
+
+            entity.HasIndex(
+                x => new
+                {
+                    x.ProcessedAtUtc,
+                    x.CreatedAtUtc
+                });
+
+            entity.HasIndex(x => x.DeleteAfterUtc);
+
+            entity.HasOne(x => x.Device)
+                .WithMany()
+                .HasForeignKey(x => x.DeviceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Session)
+                .WithMany()
+                .HasForeignKey(x => x.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<QaCandidate>(entity =>

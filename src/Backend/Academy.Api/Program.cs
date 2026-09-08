@@ -2233,6 +2233,48 @@ app.MapGet("/api/worker/devices/pending-livekit-ingress", async (
     return Results.Ok(pending);
 });
 
+app.MapGet("/api/worker/devices/livekit-ingress-state", async (
+    HttpRequest request,
+    IDeviceRepository deviceRepository,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue("X-Api-Key", out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var devices =
+        await deviceRepository.GetAllAsync(
+            cancellationToken);
+
+    DateTimeOffset recentOnlineCutoff =
+        DateTimeOffset.UtcNow.AddMinutes(-2);
+
+    var state =
+        devices
+            .Select(x => new
+            {
+                deviceId = x.Id,
+                roomName = $"device-{x.Id}",
+                deviceName = x.DeviceName,
+
+                online =
+                    x.Status == DeviceStatus.Online &&
+                    x.LastSeenUtc >= recentOnlineCutoff,
+
+                ingressId =
+                    x.LiveKitIngressId
+                    ?? string.Empty,
+
+                hasStreamKey =
+                    !string.IsNullOrWhiteSpace(
+                        x.LiveKitStreamKey)
+            })
+            .ToList();
+
+    return Results.Ok(state);
+});
 app.MapPost("/api/worker/devices/{deviceId:guid}/livekit-ingress", async (
     HttpRequest request,
     Guid deviceId,

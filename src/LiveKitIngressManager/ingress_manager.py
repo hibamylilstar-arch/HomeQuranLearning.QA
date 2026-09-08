@@ -18,6 +18,15 @@ LIVEKIT_API_SECRET = os.environ.get(
 )
 POLL_INTERVAL_SECONDS = 5
 
+DEVICE_PUBLISH_GRACE_SECONDS = 45
+DEVICE_REPAIR_SUCCESS_COOLDOWN_SECONDS = 300
+DEVICE_REPAIR_FAILURE_BACKOFF_SECONDS = 30
+MAX_DEVICE_REPAIRS_PER_PASS = 5
+INGRESS_STATUS_PUBLISHING = 2
+
+_device_inactive_since = {}
+_device_repair_not_before = {}
+
 
 def http_get_json(path, api_key):
     request = urllib.request.Request(
@@ -65,6 +74,226 @@ async def create_ingress(room_name, identity, name):
     finally:
         await lkapi.aclose()
 
+
+async def list_ingresses():
+    api = LiveKitAPI(
+        LIVEKIT_URL,
+        LIVEKIT_API_KEY,
+        LIVEKIT_API_SECRET,
+    )
+
+    try:
+        result = await api.ingress.list_ingress(
+            ing.ListIngressRequest()
+        )
+        return list(result.items)
+    finally:
+        await api.aclose()
+
+
+async def delete_ingress(ingress_id):
+    api = LiveKitAPI(
+        LIVEKIT_URL,
+        LIVEKIT_API_KEY,
+        LIVEKIT_API_SECRET,
+    )
+
+    try:
+        await api.ingress.delete_ingress(
+            ing.DeleteIngressRequest(
+                ingress_id=ingress_id
+            )
+        )
+    finally:
+        await api.aclose()
+
+
+def replace_device_ingress(device, old_ingress_id):
+    device_id = str(device["deviceId"])
+    room_name = device["roomName"]
+
+    new_ingress_id, new_stream_key = asyncio.run(
+        create_ingress(
+            room_name,
+            f"agent-device-{device_id}",
+            f"device-ingress-{device_id}",
+        )
+    )
+
+    try:
+        http_post_json(
+            f"/api/worker/devices/{device_id}/livekit-ingress",
+            {
+                "ingressId": new_ingress_id,
+                "streamKey": new_stream_key,
+            },
+            WORKER_API_KEY,
+        )
+    except Exception:
+        try:
+            asyncio.run(
+                delete_ingress(new_ingress_id)
+            )
+        except Exception as cleanup_ex:
+            print(
+                "Replacement ingress cleanup warning: "
+                f"{cleanup_ex}"
+            )
+        raise
+
+    if (
+        old_ingress_id
+        and old_ingress_id != new_ingress_id
+    ):
+        try:
+            asyncio.run(
+                delete_ingress(old_ingress_id)
+            )
+        except Exception as cleanup_ex:
+            print(
+                "Old ingress cleanup warning. "
+                f"Ingress={old_ingress_id}, "
+                f"Error={cleanup_ex}"
+            )
+
+    return new_ingress_id
+
+
+def reconcile_device_ingresses():
+    devices = http_get_json(
+        "/api/worker/devices/livekit-ingress-state",
+        WORKER_API_KEY,
+    )
+
+    ingress_by_id = {
+        item.ingress_id: item
+        for item in asyncio.run(list_ingresses())
+    }
+
+    now = time.monotonic()
+
+    healthy = 0
+    pending = 0
+    offline = 0
+    waiting = 0
+    cooldown = 0
+    attempts = 0
+    repaired = 0
+    errors = 0
+
+    for device in devices:
+        device_id = str(device["deviceId"])
+        ingress_id = device.get("ingressId") or ""
+        online = bool(device.get("online"))
+        has_key = bool(device.get("hasStreamKey"))
+
+        if not online:
+            _device_inactive_since.pop(device_id, None)
+            offline += 1
+            continue
+
+        if not ingress_id or not has_key:
+            _device_inactive_since.pop(device_id, None)
+            pending += 1
+            continue
+
+        info = ingress_by_id.get(ingress_id)
+
+        expected_room = device["roomName"]
+        expected_identity = f"agent-device-{device_id}"
+
+        reason = None
+
+        if info is None:
+            reason = "missing-ingress"
+
+        elif (
+            info.room_name != expected_room
+            or info.participant_identity != expected_identity
+        ):
+            reason = "room-or-identity-mismatch"
+
+        elif int(info.state.status) == INGRESS_STATUS_PUBLISHING:
+            _device_inactive_since.pop(device_id, None)
+            healthy += 1
+            continue
+
+        else:
+            inactive_since = _device_inactive_since.setdefault(
+                device_id,
+                now,
+            )
+
+            inactive_seconds = now - inactive_since
+
+            if inactive_seconds < DEVICE_PUBLISH_GRACE_SECONDS:
+                waiting += 1
+                continue
+
+            reason = (
+                "online-not-publishing-"
+                f"{int(inactive_seconds)}s"
+            )
+
+        if now < _device_repair_not_before.get(device_id, 0):
+            cooldown += 1
+            continue
+
+        if attempts >= MAX_DEVICE_REPAIRS_PER_PASS:
+            waiting += 1
+            continue
+
+        attempts += 1
+
+        try:
+            new_ingress_id = replace_device_ingress(
+                device,
+                ingress_id,
+            )
+
+            _device_repair_not_before[device_id] = (
+                now
+                + DEVICE_REPAIR_SUCCESS_COOLDOWN_SECONDS
+            )
+
+            _device_inactive_since.pop(device_id, None)
+
+            repaired += 1
+
+            print(
+                "Device ingress self-healed. "
+                f"Device={device_id}, "
+                f"Reason={reason}, "
+                f"NewIngress={new_ingress_id}"
+            )
+
+        except Exception as ex:
+            _device_repair_not_before[device_id] = (
+                now
+                + DEVICE_REPAIR_FAILURE_BACKOFF_SECONDS
+            )
+
+            errors += 1
+
+            print(
+                "Device ingress repair failed. "
+                f"Device={device_id}, "
+                f"Reason={reason}, "
+                f"Error={ex}"
+            )
+
+    print(
+        "Reconcile devices: "
+        f"total={len(devices)}, "
+        f"healthy={healthy}, "
+        f"pending={pending}, "
+        f"offline={offline}, "
+        f"waiting={waiting}, "
+        f"cooldown={cooldown}, "
+        f"attempts={attempts}, "
+        f"repaired={repaired}, "
+        f"errors={errors}"
+    )
 
 def process_device(device):
     device_id = device["deviceId"]
@@ -133,6 +362,11 @@ def main(once):
                     process_device(device)
                 except Exception as ex:
                     print(f"Error processing device: {ex}")
+
+            try:
+                reconcile_device_ingresses()
+            except Exception as ex:
+                print(f"Device reconciliation error: {ex}")
 
             pending_sessions = http_get_json(
                 "/api/worker/sessions/pending-livekit-ingress",

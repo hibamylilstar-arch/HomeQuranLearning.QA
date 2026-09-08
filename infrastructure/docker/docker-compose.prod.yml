@@ -76,7 +76,11 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       HttpsRedirection__Enabled: "false"
-      RecordingRetention__Enabled: "false"
+      RecordingRetention__Enabled: "true"
+      RecordingRetention__NormalDays: "7"
+      RecordingRetention__QaEvidenceDays: "7"
+      RecordingRetention__IntervalHours: "6"
+      RecordingRetention__BatchSize: "1000"
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       AgentApiKey: ${AGENT_API_KEY}
       ArchiveRegistrarApiKey: ${ARCHIVE_REGISTRAR_API_KEY}

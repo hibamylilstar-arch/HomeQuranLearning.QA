@@ -101,9 +101,10 @@ public sealed class RecordingRepository : IRecordingRepository
         return await _dbContext.Recordings
             .Include(x => x.QaAlerts)
             .Where(x =>
-                x.Status == RecordingStatus.Uploaded &&
-                !x.IsPreserved &&
-                x.EndedAtUtc < cutoffUtc)
+                x.Status == RecordingStatus.Deleting ||
+                (x.Status == RecordingStatus.Uploaded &&
+                 !x.IsPreserved &&
+                 x.EndedAtUtc < cutoffUtc))
             .OrderBy(x => x.EndedAtUtc)
             .Take(limit)
             .ToListAsync(cancellationToken);

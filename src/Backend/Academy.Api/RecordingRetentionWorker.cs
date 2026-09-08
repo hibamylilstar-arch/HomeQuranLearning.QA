@@ -1,10 +1,14 @@
 using Academy.Application.Abstractions;
+using Academy.Application.Services;
 using Academy.Domain.Enums;
 
 namespace Academy.Api;
 
 public sealed class RecordingRetentionWorker : BackgroundService
 {
+    private const string AutomaticRetentionReason =
+        "AutomaticRetention7Days";
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IConfiguration _configuration;
     private readonly ILogger<RecordingRetentionWorker> _logger;
@@ -55,7 +59,7 @@ public sealed class RecordingRetentionWorker : BackgroundService
                 1,
                 _configuration.GetValue<int>(
                     "RecordingRetention:IntervalHours",
-                    24));
+                    6));
 
             try
             {
@@ -84,7 +88,7 @@ public sealed class RecordingRetentionWorker : BackgroundService
             1,
             _configuration.GetValue<int>(
                 "RecordingRetention:NormalDays",
-                3));
+                7));
 
         int qaDays = Math.Max(
             normalDays,
@@ -95,13 +99,9 @@ public sealed class RecordingRetentionWorker : BackgroundService
         int batchSize = Math.Clamp(
             _configuration.GetValue<int>(
                 "RecordingRetention:BatchSize",
-                100),
+                1000),
             1,
             1000);
-
-        string bucket =
-            _configuration["Storage:Bucket"]
-            ?? "academy-recordings";
 
         DateTimeOffset now =
             DateTimeOffset.UtcNow;
@@ -119,13 +119,9 @@ public sealed class RecordingRetentionWorker : BackgroundService
             scope.ServiceProvider
                 .GetRequiredService<IRecordingRepository>();
 
-        var storage =
+        var recordingService =
             scope.ServiceProvider
-                .GetRequiredService<IStorageService>();
-
-        var uow =
-            scope.ServiceProvider
-                .GetRequiredService<IUnitOfWork>();
+                .GetRequiredService<RecordingService>();
 
         var candidates =
             await repository.GetUploadedBeforeAsync(
@@ -135,14 +131,21 @@ public sealed class RecordingRetentionWorker : BackgroundService
 
         int deleted = 0;
         int retainedForQa = 0;
+        int retries = 0;
 
         foreach (var recording in candidates)
         {
+            bool deletionRetry =
+                recording.Status ==
+                RecordingStatus.Deleting;
+
             bool hasQaEvidence =
                 recording.QaAlerts.Count > 0;
 
-            // QA-linked recordings live up to 7 days.
-            if (hasQaEvidence &&
+            // QA can have a longer configured window when desired.
+            // A previously checkpointed Deleting row must always retry.
+            if (!deletionRetry &&
+                hasQaEvidence &&
                 recording.EndedAtUtc >= qaCutoff)
             {
                 retainedForQa++;
@@ -151,45 +154,56 @@ public sealed class RecordingRetentionWorker : BackgroundService
 
             try
             {
-                await storage.DeleteAsync(
-                    bucket,
-                    recording.StorageKey,
-                    ct);
+                if (deletionRetry)
+                {
+                    retries++;
+                }
 
-                // Keep metadata/history, remove only cloud object.
-                recording.Status =
-                    RecordingStatus.Deleted;
+                bool result =
+                    await recordingService
+                        .DeleteRecordingMediaAsync(
+                            recording.Id,
+                            deletedByUserId: null,
+                            deletionReason:
+                                AutomaticRetentionReason,
+                            cancellationToken: ct);
 
-                recording.UpdatedAtUtc =
-                    DateTimeOffset.UtcNow;
+                if (!result)
+                {
+                    _logger.LogWarning(
+                        "Retention could not find recording {RecordingId}.",
+                        recording.Id);
 
-                repository.Update(recording);
-
-                await uow.SaveChangesAsync(ct);
+                    continue;
+                }
 
                 deleted++;
 
                 _logger.LogInformation(
-                    "Recording expired. RecordingId={RecordingId}, FileName={FileName}, QaEvidence={QaEvidence}",
+                    "Recording expired. RecordingId={RecordingId}, FileName={FileName}, QaEvidence={QaEvidence}, Retry={Retry}, Reason={Reason}",
                     recording.Id,
                     recording.FileName,
-                    hasQaEvidence);
+                    hasQaEvidence,
+                    deletionRetry,
+                    AutomaticRetentionReason);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(
                     ex,
-                    "Could not expire recording {RecordingId}. It will be retried on a future pass.",
+                    "Could not expire recording {RecordingId}. Deleting checkpoints will be retried on a future pass.",
                     recording.Id);
             }
         }
 
         _logger.LogInformation(
-            "Retention completed. Candidates={Candidates}, Deleted={Deleted}, RetainedForQa={RetainedForQa}, NormalDays={NormalDays}, QaDays={QaDays}",
+            "Retention completed. Candidates={Candidates}, Deleted={Deleted}, RetainedForQa={RetainedForQa}, Retries={Retries}, NormalDays={NormalDays}, QaDays={QaDays}, BatchSize={BatchSize}",
             candidates.Count,
             deleted,
             retainedForQa,
+            retries,
             normalDays,
-            qaDays);
+            qaDays,
+            batchSize);
     }
 }

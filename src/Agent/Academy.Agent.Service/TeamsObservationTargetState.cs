@@ -124,7 +124,10 @@ public sealed class TeamsObservationTargetState
                 item.ScheduledStartUtc,
 
             ScheduledEndUtc =
-                item.ScheduledEndUtc
+                item.ScheduledEndUtc,
+
+            Status =
+                item.Status
         };
     }
 }

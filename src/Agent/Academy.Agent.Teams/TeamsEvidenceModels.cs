@@ -35,6 +35,9 @@ public sealed class TeamsObservationTarget
     public DateTimeOffset ScheduledStartUtc { get; init; }
 
     public DateTimeOffset ScheduledEndUtc { get; init; }
+
+    public string Status { get; init; } =
+        string.Empty;
 }
 
 public sealed class TeamsEvidenceEnvelope

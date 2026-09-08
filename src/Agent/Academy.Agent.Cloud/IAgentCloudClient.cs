@@ -13,6 +13,11 @@ public interface IAgentCloudClient
     Task<AgentSessionEventResponse> SubmitSessionEventAsync(
         AgentSessionEventRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<AgentQaAudioChunkResponse> UploadQaAudioChunkAsync(
+        QaAudioChunkUploadRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<RecordingResponse> SubmitRecordingAsync(
         RecordingSubmittedRequest request,
         CancellationToken cancellationToken = default);

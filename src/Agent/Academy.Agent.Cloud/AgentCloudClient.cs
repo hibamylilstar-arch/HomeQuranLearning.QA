@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -68,6 +69,139 @@ public sealed class AgentCloudClient : IAgentCloudClient
                 request,
                 cancellationToken);
     }
+    public async Task<AgentQaAudioChunkResponse>
+        UploadQaAudioChunkAsync(
+            QaAudioChunkUploadRequest request,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (string.IsNullOrWhiteSpace(
+                request.DeviceId))
+        {
+            throw new ArgumentException(
+                "DeviceId is required.",
+                nameof(request));
+        }
+
+        if (request.SessionId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "SessionId is required.",
+                nameof(request));
+        }
+
+        if (request.CaptureId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "CaptureId is required.",
+                nameof(request));
+        }
+
+        if (request.SequenceNumber < 0)
+        {
+            throw new ArgumentException(
+                "SequenceNumber must be zero or greater.",
+                nameof(request));
+        }
+
+        if (request.StartedAtUtc == default)
+        {
+            throw new ArgumentException(
+                "StartedAtUtc is required.",
+                nameof(request));
+        }
+
+        if (request.AudioWav.Length == 0)
+        {
+            throw new ArgumentException(
+                "AudioWav is required.",
+                nameof(request));
+        }
+
+        using var form =
+            new MultipartFormDataContent();
+
+        form.Add(
+            new StringContent(
+                request.DeviceId.Trim()),
+            "deviceId");
+
+        form.Add(
+            new StringContent(
+                request.SessionId
+                    .ToString("D")),
+            "sessionId");
+
+        form.Add(
+            new StringContent(
+                request.CaptureId
+                    .ToString("D")),
+            "captureId");
+
+        form.Add(
+            new StringContent(
+                request.SequenceNumber
+                    .ToString(
+                        CultureInfo.InvariantCulture)),
+            "sequenceNumber");
+
+        form.Add(
+            new StringContent(
+                request.StartedAtUtc
+                    .ToUniversalTime()
+                    .ToString(
+                        "O",
+                        CultureInfo.InvariantCulture)),
+            "startedAtUtc");
+
+        var audioContent =
+            new ByteArrayContent(
+                request.AudioWav);
+
+        audioContent.Headers.ContentType =
+            new MediaTypeHeaderValue(
+                "audio/wav");
+
+        form.Add(
+            audioContent,
+            "audio",
+            $"qa-{request.SequenceNumber:D12}.wav");
+
+        using var message =
+            new HttpRequestMessage(
+                HttpMethod.Post,
+                "/api/agent/qa-audio-chunks")
+            {
+                Content =
+                    form
+            };
+
+        message.Headers.Add(
+            "X-Api-Key",
+            _options.ApiKey);
+
+        using HttpResponseMessage response =
+            await _httpClient.SendAsync(
+                message,
+                cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+
+        string responseJson =
+            await response.Content
+                .ReadAsStringAsync(
+                    cancellationToken);
+
+        return
+            JsonSerializer.Deserialize<
+                AgentQaAudioChunkResponse>(
+                    responseJson,
+                    JsonOptions)
+            ?? throw new InvalidOperationException(
+                "Empty QA audio chunk response from cloud.");
+    }
+
     public async Task<RecordingResponse> SubmitRecordingAsync(
         RecordingSubmittedRequest request,
         CancellationToken cancellationToken = default)

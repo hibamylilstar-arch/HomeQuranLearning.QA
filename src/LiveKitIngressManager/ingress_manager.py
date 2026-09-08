@@ -19,13 +19,15 @@ LIVEKIT_API_SECRET = os.environ.get(
 POLL_INTERVAL_SECONDS = 5
 
 DEVICE_PUBLISH_GRACE_SECONDS = 45
-DEVICE_REPAIR_SUCCESS_COOLDOWN_SECONDS = 300
+DEVICE_REPAIR_RETRY_BASE_SECONDS = 60
+DEVICE_REPAIR_RETRY_MAX_SECONDS = 300
 DEVICE_REPAIR_FAILURE_BACKOFF_SECONDS = 30
 MAX_DEVICE_REPAIRS_PER_PASS = 5
 INGRESS_STATUS_PUBLISHING = 2
 
 _device_inactive_since = {}
 _device_repair_not_before = {}
+_device_consecutive_repairs = {}
 
 
 def http_get_json(path, api_key):
@@ -189,11 +191,15 @@ def reconcile_device_ingresses():
 
         if not online:
             _device_inactive_since.pop(device_id, None)
+            _device_repair_not_before.pop(device_id, None)
+            _device_consecutive_repairs.pop(device_id, None)
             offline += 1
             continue
 
         if not ingress_id or not has_key:
             _device_inactive_since.pop(device_id, None)
+            _device_repair_not_before.pop(device_id, None)
+            _device_consecutive_repairs.pop(device_id, None)
             pending += 1
             continue
 
@@ -215,6 +221,8 @@ def reconcile_device_ingresses():
 
         elif int(info.state.status) == INGRESS_STATUS_PUBLISHING:
             _device_inactive_since.pop(device_id, None)
+            _device_repair_not_before.pop(device_id, None)
+            _device_consecutive_repairs.pop(device_id, None)
             healthy += 1
             continue
 
@@ -251,9 +259,26 @@ def reconcile_device_ingresses():
                 ingress_id,
             )
 
+            repair_count = (
+                _device_consecutive_repairs.get(
+                    device_id,
+                    0,
+                )
+                + 1
+            )
+
+            _device_consecutive_repairs[
+                device_id
+            ] = repair_count
+
+            retry_delay = min(
+                DEVICE_REPAIR_RETRY_BASE_SECONDS
+                * (2 ** min(repair_count - 1, 3)),
+                DEVICE_REPAIR_RETRY_MAX_SECONDS,
+            )
+
             _device_repair_not_before[device_id] = (
-                now
-                + DEVICE_REPAIR_SUCCESS_COOLDOWN_SECONDS
+                now + retry_delay
             )
 
             _device_inactive_since.pop(device_id, None)
@@ -264,7 +289,9 @@ def reconcile_device_ingresses():
                 "Device ingress self-healed. "
                 f"Device={device_id}, "
                 f"Reason={reason}, "
-                f"NewIngress={new_ingress_id}"
+                f"NewIngress={new_ingress_id}, "
+                f"Attempt={repair_count}, "
+                f"RetryIn={retry_delay}s"
             )
 
         except Exception as ex:

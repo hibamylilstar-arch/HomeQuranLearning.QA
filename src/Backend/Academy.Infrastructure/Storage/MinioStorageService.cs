@@ -41,6 +41,30 @@ public sealed class MinioStorageService : IStorageService
             cancellationToken);
     }
 
+    public async Task DownloadAsync(
+        string bucketName,
+        string objectKey,
+        Stream destination,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(
+            destination);
+
+        var args =
+            new GetObjectArgs()
+                .WithBucket(bucketName)
+                .WithObject(objectKey)
+                .WithCallbackStream(
+                    (source, callbackCancellationToken) =>
+                        source.CopyToAsync(
+                            destination,
+                            callbackCancellationToken));
+
+        await _minioClient.GetObjectAsync(
+            args,
+            cancellationToken: cancellationToken);
+    }
+
     public async Task DeleteAsync(
         string bucketName,
         string objectKey,

@@ -140,12 +140,22 @@ export default function QaAlertsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <Link
-                          href={`/recordings/${alert.recordingId}/player`}
-                          className="font-semibold text-indigo-700 hover:text-indigo-500"
-                        >
-                          Review recording
-                        </Link>
+                        {alert.recordingId ? (
+                          <Link
+                            href={`/recordings/${alert.recordingId}/player`}
+                            className="font-semibold text-indigo-700 hover:text-indigo-500"
+                          >
+                            Review recording
+                          </Link>
+                        ) : alert.hasDirectEvidence ? (
+                          <span className="font-semibold text-emerald-700">
+                            Direct audio ready
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">
+                            Evidence unavailable
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );

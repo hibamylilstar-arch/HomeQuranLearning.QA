@@ -42,8 +42,9 @@ export interface QaRuleListItem {
 
 export interface QaAlertListItem {
   id: string;
-  recordingId: string;
-  matchedPhrase: string;
+  recordingId: string | null;
+  matchedPhrase: string | null;
+  hasDirectEvidence: boolean;
   timestampUtc: string;
   status: string;
   isPreserved: boolean;

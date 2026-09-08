@@ -902,6 +902,17 @@ public sealed class QaAlertService
                 alert.EvidenceStartSeconds,
             EvidenceEndSeconds =
                 alert.EvidenceEndSeconds,
+            SourceQaAudioChunkId =
+                alert.SourceQaAudioChunkId,
+            HasDirectEvidence =
+                !string.IsNullOrWhiteSpace(
+                    alert.EvidenceStorageKey),
+            EvidenceDurationSeconds =
+                alert.EvidenceDurationSeconds,
+            EvidenceStartUtc =
+                alert.EvidenceStartUtc,
+            EvidenceEndUtc =
+                alert.EvidenceEndUtc,
             AnalysisIdempotencyKey =
                 alert.AnalysisIdempotencyKey,
             DeviceId =

@@ -6,7 +6,7 @@ public sealed class QaAlert
 {
     public Guid Id { get; set; }
 
-    public Guid RecordingId { get; set; }
+    public Guid? RecordingId { get; set; }
 
     public Recording? Recording { get; set; }
 
@@ -39,6 +39,26 @@ public sealed class QaAlert
     public double? EvidenceEndSeconds { get; set; }
 
     public string? AnalysisIdempotencyKey { get; set; }
+
+    // Direct-audio provenance. Intentionally no FK because raw
+    // transport chunks are short-lived while alert history is longer.
+    public Guid? SourceQaAudioChunkId { get; set; }
+
+    // Standalone evidence generated from direct QA chunks.
+    // Recording-backed historical alerts leave these null.
+    public string? EvidenceStorageKey { get; set; }
+
+    public string? EvidenceContentType { get; set; }
+
+    public long? EvidenceSizeBytes { get; set; }
+
+    public double? EvidenceDurationSeconds { get; set; }
+
+    public DateTimeOffset? EvidenceStartUtc { get; set; }
+
+    public DateTimeOffset? EvidenceEndUtc { get; set; }
+
+    public DateTimeOffset? EvidenceDeleteAfterUtc { get; set; }
 
     public Guid? DeviceId { get; set; }
     public Guid? SessionId { get; set; }

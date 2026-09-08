@@ -4,7 +4,7 @@ public sealed class QaAlertDto
 {
     public Guid Id { get; init; }
 
-    public Guid RecordingId { get; init; }
+    public Guid? RecordingId { get; init; }
 
     public Guid? QaRuleId { get; init; }
 
@@ -37,6 +37,16 @@ public sealed class QaAlertDto
     public double? EvidenceStartSeconds { get; init; }
 
     public double? EvidenceEndSeconds { get; init; }
+
+    public Guid? SourceQaAudioChunkId { get; init; }
+
+    public bool HasDirectEvidence { get; init; }
+
+    public double? EvidenceDurationSeconds { get; init; }
+
+    public DateTimeOffset? EvidenceStartUtc { get; init; }
+
+    public DateTimeOffset? EvidenceEndUtc { get; init; }
 
     public string? AnalysisIdempotencyKey { get; init; }
 

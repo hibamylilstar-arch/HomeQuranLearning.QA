@@ -32,6 +32,7 @@ builder.Services.AddScoped<QaRuleService>();
 builder.Services.AddScoped<QaAlertService>();
 builder.Services.AddScoped<QaAudioChunkService>();
 builder.Services.AddScoped<QaAudioChunkWorkerService>();
+builder.Services.AddScoped<QaDirectAlertService>();
 builder.Services.AddScoped<QaCandidateService>();
 builder.Services.AddScoped<TranscriptSegmentService>();
 builder.Services.AddScoped<AdminUserService>();
@@ -2622,6 +2623,48 @@ app.MapGet("/api/worker/qa-rules", async (
 
     var rules = await ruleService.GetRulesAsync(cancellationToken);
     return Results.Ok(rules);
+});
+
+app.MapPost("/api/worker/qa-alerts/direct-restricted", async (
+    HttpRequest request,
+    CreateDirectRestrictedQaAlertRequest body,
+    QaDirectAlertService directAlertService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue(
+            "X-Api-Key",
+            out var values) ||
+        values.ToString() != workerApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        DirectQaAlertResponse result =
+            await directAlertService
+                .CreateRestrictedAsync(
+                    body,
+                    cancellationToken);
+
+        return Results.Ok(
+            result);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(
+            new { error = ex.Message });
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(
+            new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(
+            new { error = ex.Message });
+    }
 });
 
 app.MapPost("/api/worker/qa-alerts", async (

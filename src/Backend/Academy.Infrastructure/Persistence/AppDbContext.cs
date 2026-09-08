@@ -107,6 +107,8 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.PolicyVersion).HasMaxLength(128);
             entity.Property(x => x.AnalysisVersion).HasMaxLength(128);
             entity.Property(x => x.AnalysisIdempotencyKey).HasMaxLength(512);
+            entity.Property(x => x.EvidenceStorageKey).HasMaxLength(1024);
+            entity.Property(x => x.EvidenceContentType).HasMaxLength(128);
             entity.Property(x => x.LaptopName).HasMaxLength(256);
             entity.Property(x => x.ActualDeviceName).HasMaxLength(256);
             entity.Property(x => x.TeacherName).HasMaxLength(256);
@@ -115,6 +117,8 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.ReviewNote).HasMaxLength(2048);
             entity.Property(x => x.ReviewVersion).IsConcurrencyToken();
             entity.HasIndex(x => x.AnalysisIdempotencyKey).IsUnique();
+            entity.HasIndex(x => x.SourceQaAudioChunkId);
+            entity.HasIndex(x => x.EvidenceDeleteAfterUtc);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
 
             entity.HasOne(x => x.Recording)

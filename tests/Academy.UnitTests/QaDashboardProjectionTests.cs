@@ -104,7 +104,8 @@ public sealed class QaDashboardProjectionTests
     private static DashboardQueryService CreateService(
         IReadOnlyList<Recording> recordings,
         IReadOnlyList<QaAlert> alerts,
-        IReadOnlyList<QaCandidate> candidates)
+        IReadOnlyList<QaCandidate> candidates,
+        IReadOnlyList<Session>? sessions = null)
     {
         var recordingRepository =
             new Mock<IRecordingRepository>();
@@ -133,16 +134,47 @@ public sealed class QaDashboardProjectionTests
                     It.IsAny<CancellationToken>()))
             .ReturnsAsync(candidates);
 
+        IReadOnlyList<Session> dashboardSessions =
+            sessions ??
+            recordings
+                .Select(x => x.Session)
+                .Where(x => x is not null)
+                .Select(x => x!)
+                .GroupBy(x => x.Id)
+                .Select(x => x.First())
+                .ToArray();
+
+        var sessionRepository =
+            new Mock<ISessionRepository>();
+
+        sessionRepository
+            .Setup(x =>
+                x.GetAllWithDetailsAsync(
+                    It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                dashboardSessions);
+
+        var deviceTeacherAssignments =
+            new Mock<
+                IDeviceTeacherAssignmentRepository>();
+
+        deviceTeacherAssignments
+            .Setup(x =>
+                x.GetAllWithTeachersAsync(
+                    It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                Array.Empty<
+                    DeviceTeacherAssignment>());
+
         return new DashboardQueryService(
             recordingRepository.Object,
             alertRepository.Object,
             candidateRepository.Object,
             Mock.Of<IDeviceRepository>(),
-            Mock.Of<
-                IDeviceTeacherAssignmentRepository>(),
+            deviceTeacherAssignments.Object,
             Mock.Of<
                 IManagerTeacherAssignmentRepository>(),
-            Mock.Of<ISessionRepository>(),
+            sessionRepository.Object,
             Mock.Of<ISessionEventRepository>());
     }
 
@@ -295,6 +327,212 @@ public sealed class QaDashboardProjectionTests
             await service.GetVisibleQaAlertsAsync(
                 Guid.NewGuid(),
                 UserRole.Owner.ToString());
+
+        Assert.Equal(
+            2,
+            ownerVisible.Count);
+    }
+
+    [Fact]
+    public async Task
+        Alerts_ManagerUsesSessionVisibilityForDirectAudioEvidence()
+    {
+        var normal =
+            CreateGraph(
+                "normal-direct-device",
+                "WIN-DIRECT",
+                "Direct Laptop");
+
+        var trial =
+            CreateGraph(
+                OwnerTrialDeviceId,
+                "WIN-OWNER-DIRECT",
+                "Owner Direct");
+
+        var normalAlert =
+            new QaAlert
+            {
+                Id =
+                    Guid.NewGuid(),
+
+                RecordingId =
+                    null,
+
+                SourceQaAudioChunkId =
+                    Guid.NewGuid(),
+
+                EvidenceStorageKey =
+                    "qa/evidence/normal.wav",
+
+                EvidenceContentType =
+                    "audio/wav",
+
+                EvidenceDurationSeconds =
+                    31,
+
+                EvidenceStartUtc =
+                    normal.Session
+                        .ScheduledStartUtc
+                        .AddSeconds(10),
+
+                EvidenceEndUtc =
+                    normal.Session
+                        .ScheduledStartUtc
+                        .AddSeconds(41),
+
+                DeviceId =
+                    normal.Device.Id,
+
+                SessionId =
+                    normal.Session.Id,
+
+                TeacherId =
+                    normal.Teacher.Id,
+
+                StudentId =
+                    normal.Student.Id,
+
+                CourseId =
+                    normal.Course.Id,
+
+                LaptopName =
+                    "Direct Laptop",
+
+                ActualDeviceName =
+                    "WIN-DIRECT",
+
+                TeacherName =
+                    normal.Teacher.FullName,
+
+                StudentName =
+                    normal.Student.FullName,
+
+                CourseName =
+                    normal.Course.Name,
+
+                QaRuleId =
+                    Guid.NewGuid(),
+
+                MatchedPhrase =
+                    "WhatsApp",
+
+                DetectionReason =
+                    "Restricted Rule",
+
+                Transcript =
+                    "WhatsApp number",
+
+                TimestampUtc =
+                    normal.Session
+                        .ScheduledStartUtc
+                        .AddSeconds(20),
+
+                Status =
+                    QaAlertStatus.Open
+            };
+
+        var trialAlert =
+            new QaAlert
+            {
+                Id =
+                    Guid.NewGuid(),
+
+                RecordingId =
+                    null,
+
+                SourceQaAudioChunkId =
+                    Guid.NewGuid(),
+
+                EvidenceStorageKey =
+                    "qa/evidence/trial.wav",
+
+                SessionId =
+                    trial.Session.Id,
+
+                DeviceId =
+                    trial.Device.Id,
+
+                QaRuleId =
+                    Guid.NewGuid(),
+
+                MatchedPhrase =
+                    "WhatsApp",
+
+                DetectionReason =
+                    "Restricted Rule",
+
+                Transcript =
+                    "WhatsApp",
+
+                TimestampUtc =
+                    trial.Session
+                        .ScheduledStartUtc
+                        .AddSeconds(20),
+
+                Status =
+                    QaAlertStatus.Open
+            };
+
+        var service =
+            CreateService(
+                Array.Empty<Recording>(),
+                new[]
+                {
+                    normalAlert,
+                    trialAlert
+                },
+                Array.Empty<QaCandidate>(),
+                new[]
+                {
+                    normal.Session,
+                    trial.Session
+                });
+
+        var managerVisible =
+            await service
+                .GetVisibleQaAlertsAsync(
+                    Guid.NewGuid(),
+                    UserRole.Manager.ToString());
+
+        var item =
+            Assert.Single(
+                managerVisible);
+
+        Assert.Equal(
+            normalAlert.Id,
+            item.Id);
+
+        Assert.Null(
+            item.RecordingId);
+
+        Assert.True(
+            item.HasDirectEvidence);
+
+        Assert.Equal(
+            normalAlert.SourceQaAudioChunkId,
+            item.SourceQaAudioChunkId);
+
+        Assert.Equal(
+            normal.Session.Id,
+            item.SessionId);
+
+        Assert.Equal(
+            "Direct Laptop",
+            item.LaptopName);
+
+        Assert.Equal(
+            "WIN-DIRECT",
+            item.ActualDeviceName);
+
+        Assert.Equal(
+            31d,
+            item.EvidenceDurationSeconds);
+
+        var ownerVisible =
+            await service
+                .GetVisibleQaAlertsAsync(
+                    Guid.NewGuid(),
+                    UserRole.Owner.ToString());
 
         Assert.Equal(
             2,

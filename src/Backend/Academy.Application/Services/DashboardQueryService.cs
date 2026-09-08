@@ -126,10 +126,30 @@ public sealed class DashboardQueryService
                     .Select(x => x.Id)
                     .ToHashSet();
 
+            var visibleSessions =
+                await GetVisibleSessionsAsync(
+                    userId,
+                    role,
+                    cancellationToken);
+
+            var visibleSessionIds =
+                visibleSessions
+                    .Select(x => x.Id)
+                    .ToHashSet();
+
             alerts = alerts
                 .Where(x =>
-                    visibleRecordingIds.Contains(
-                        x.RecordingId))
+                    (
+                        x.RecordingId.HasValue &&
+                        visibleRecordingIds.Contains(
+                            x.RecordingId.Value)
+                    ) ||
+                    (
+                        !x.RecordingId.HasValue &&
+                        x.SessionId.HasValue &&
+                        visibleSessionIds.Contains(
+                            x.SessionId.Value)
+                    ))
                 .ToList();
         }
 
@@ -202,6 +222,17 @@ public sealed class DashboardQueryService
                         x.EvidenceStartSeconds,
                     EvidenceEndSeconds =
                         x.EvidenceEndSeconds,
+                    SourceQaAudioChunkId =
+                        x.SourceQaAudioChunkId,
+                    HasDirectEvidence =
+                        !string.IsNullOrWhiteSpace(
+                            x.EvidenceStorageKey),
+                    EvidenceDurationSeconds =
+                        x.EvidenceDurationSeconds,
+                    EvidenceStartUtc =
+                        x.EvidenceStartUtc,
+                    EvidenceEndUtc =
+                        x.EvidenceEndUtc,
                     AnalysisIdempotencyKey =
                         x.AnalysisIdempotencyKey,
                     DeviceId =

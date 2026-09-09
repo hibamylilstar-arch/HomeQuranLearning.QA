@@ -33,6 +33,7 @@ builder.Services.AddScoped<QaAlertService>();
 builder.Services.AddScoped<QaAudioChunkService>();
 builder.Services.AddScoped<QaAudioChunkWorkerService>();
 builder.Services.AddScoped<QaDirectAlertService>();
+builder.Services.AddScoped<QaLocalAlertService>();
 builder.Services.AddScoped<QaCandidateService>();
 builder.Services.AddScoped<TranscriptSegmentService>();
 builder.Services.AddScoped<AdminUserService>();
@@ -464,6 +465,204 @@ app.MapGet("/api/agent/class-window", async (
             new { error = ex.Message });
     }
 });
+app.MapGet("/api/agent/qa/restricted-rule", async (
+    HttpRequest request,
+    string? deviceId,
+    QaLocalAlertService qaLocalAlertService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue(
+            "X-Api-Key",
+            out var values) ||
+        values.ToString() != agentApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (string.IsNullOrWhiteSpace(deviceId))
+    {
+        return Results.BadRequest(
+            new { error = "deviceId is required." });
+    }
+
+    try
+    {
+        AgentQaRestrictedRuleResponse response =
+            await qaLocalAlertService
+                .GetActiveRestrictedRuleAsync(
+                    deviceId,
+                    cancellationToken);
+
+        return Results.Ok(response);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(
+            new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(
+            new { error = ex.Message });
+    }
+});
+
+app.MapPost("/api/agent/qa-alerts/local-restricted", async (
+    HttpRequest request,
+    QaLocalAlertService qaLocalAlertService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue(
+            "X-Api-Key",
+            out var values) ||
+        values.ToString() != agentApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    var maxRequestBodySizeFeature =
+        request.HttpContext.Features.Get<
+            Microsoft.AspNetCore.Http.Features
+                .IHttpMaxRequestBodySizeFeature>();
+
+    if (maxRequestBodySizeFeature is not null &&
+        !maxRequestBodySizeFeature.IsReadOnly)
+    {
+        maxRequestBodySizeFeature.MaxRequestBodySize =
+            3L * 1024L * 1024L;
+    }
+
+    if (!request.HasFormContentType)
+    {
+        return Results.BadRequest(
+            new
+            {
+                error =
+                    "Expected multipart/form-data."
+            });
+    }
+
+    var form =
+        await request.ReadFormAsync(
+            cancellationToken);
+
+    string deviceId =
+        form["deviceId"]
+            .ToString()
+            .Trim();
+
+    if (!Guid.TryParse(
+            form["sessionId"].ToString(),
+            out Guid sessionId))
+    {
+        return Results.BadRequest(
+            new { error = "sessionId is invalid." });
+    }
+
+    if (!Guid.TryParse(
+            form["qaRuleId"].ToString(),
+            out Guid qaRuleId))
+    {
+        return Results.BadRequest(
+            new { error = "qaRuleId is invalid." });
+    }
+
+    if (!DateTimeOffset.TryParse(
+            form["triggerStartUtc"].ToString(),
+            out DateTimeOffset triggerStartUtc))
+    {
+        return Results.BadRequest(
+            new { error = "triggerStartUtc is invalid." });
+    }
+
+    if (!DateTimeOffset.TryParse(
+            form["triggerEndUtc"].ToString(),
+            out DateTimeOffset triggerEndUtc))
+    {
+        return Results.BadRequest(
+            new { error = "triggerEndUtc is invalid." });
+    }
+
+    if (!DateTimeOffset.TryParse(
+            form["evidenceStartUtc"].ToString(),
+            out DateTimeOffset evidenceStartUtc))
+    {
+        return Results.BadRequest(
+            new { error = "evidenceStartUtc is invalid." });
+    }
+
+    IFormFile? file =
+        form.Files.GetFile("audio")
+        ?? form.Files.FirstOrDefault();
+
+    if (file is null)
+    {
+        return Results.BadRequest(
+            new { error = "audio file is required." });
+    }
+
+    var body =
+        new CreateAgentLocalRestrictedQaAlertRequest
+        {
+            DeviceId =
+                deviceId,
+            SessionId =
+                sessionId,
+            QaRuleId =
+                qaRuleId,
+            TriggerStartUtc =
+                triggerStartUtc,
+            TriggerEndUtc =
+                triggerEndUtc,
+            EvidenceStartUtc =
+                evidenceStartUtc,
+            Transcript =
+                form["transcript"].ToString(),
+            PolicyVersion =
+                form["policyVersion"].ToString(),
+            AnalysisVersion =
+                form["analysisVersion"].ToString(),
+            AnalysisIdempotencyKey =
+                form["analysisIdempotencyKey"].ToString()
+        };
+
+    try
+    {
+        await using Stream stream =
+            file.OpenReadStream();
+
+        DirectQaAlertResponse response =
+            await qaLocalAlertService
+                .CreateRestrictedAsync(
+                    body,
+                    stream,
+                    file.ContentType,
+                    file.Length,
+                    cancellationToken);
+
+        return Results.Ok(response);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(
+            new { error = ex.Message });
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(
+            new { error = ex.Message });
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return Results.Forbid();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(
+            new { error = ex.Message });
+    }
+});
+
 app.MapPost("/api/agent/qa-audio-chunks", async (
     HttpRequest request,
     QaAudioChunkService qaAudioChunkService,
@@ -1297,6 +1496,67 @@ app.MapGet("/api/admin/qa-alerts", async (
     var (userId, role) = GetUserInfo(user);
     var alerts = await dashboardQueryService.GetVisibleQaAlertsAsync(userId, role, cancellationToken);
     return Results.Ok(alerts);
+}).RequireAuthorization();
+
+app.MapGet("/api/admin/qa-alerts/{alertId:guid}/evidence-playback", async (
+    ClaimsPrincipal user,
+    Guid alertId,
+    DashboardQueryService dashboardQueryService,
+    IQaAlertRepository alertRepository,
+    IStorageService storageService,
+    IConfiguration configuration,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) = GetUserInfo(user);
+
+    var visibleAlerts =
+        await dashboardQueryService.GetVisibleQaAlertsAsync(
+            userId,
+            role,
+            cancellationToken);
+
+    if (!visibleAlerts.Any(x => x.Id == alertId))
+    {
+        return Results.NotFound(
+            new { message = "QA Alert not found." });
+    }
+
+    QaAlert? alert =
+        await alertRepository.GetByIdAsync(
+            alertId,
+            cancellationToken);
+
+    if (alert is null)
+    {
+        return Results.NotFound(
+            new { message = "QA Alert not found." });
+    }
+
+    if (string.IsNullOrWhiteSpace(alert.EvidenceStorageKey))
+    {
+        return Results.NotFound(
+            new { message = "Direct QA evidence is unavailable." });
+    }
+
+    if (alert.EvidenceDeleteAfterUtc.HasValue &&
+        alert.EvidenceDeleteAfterUtc.Value <= DateTimeOffset.UtcNow)
+    {
+        return Results.NotFound(
+            new { message = "Direct QA evidence has expired." });
+    }
+
+    string bucketName =
+        configuration["Storage:Bucket"]
+        ?? "academy-recordings";
+
+    string url =
+        await storageService.GetPresignedUrlAsync(
+            bucketName,
+            alert.EvidenceStorageKey,
+            TimeSpan.FromMinutes(10),
+            cancellationToken);
+
+    return Results.Ok(new { url });
 }).RequireAuthorization();
 
 app.MapPost("/api/admin/qa-alerts", async (

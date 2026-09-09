@@ -10,6 +10,14 @@ public interface IAgentCloudClient
         string deviceId,
         CancellationToken cancellationToken = default);
 
+    Task<AgentQaRestrictedRuleResponse> GetQaRestrictedRuleAsync(
+        string deviceId,
+        CancellationToken cancellationToken = default);
+
+    Task<AgentLocalRestrictedQaAlertResponse> UploadLocalRestrictedQaAlertAsync(
+        AgentLocalRestrictedQaAlertUploadRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<AgentSessionEventResponse> SubmitSessionEventAsync(
         AgentSessionEventRequest request,
         CancellationToken cancellationToken = default);

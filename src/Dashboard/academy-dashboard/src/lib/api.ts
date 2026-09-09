@@ -429,6 +429,22 @@ export async function getQaAlerts(): Promise<QaAlertListItem[]> {
   return proxyFetch<QaAlertListItem[]>(["qa-alerts"]);
 }
 
+export async function getQaAlertEvidencePlaybackUrl(
+  alertId: string
+): Promise<string> {
+  const response = await proxyFetch<{ url: string }>([
+    "qa-alerts",
+    alertId,
+    "evidence-playback",
+  ]);
+
+  if (!response.url) {
+    throw new Error("QA evidence playback URL is unavailable.");
+  }
+
+  return response.url;
+}
+
 export async function getQaCandidates(): Promise<QaCandidateListItem[]> {
   return proxyFetch<QaCandidateListItem[]>(["qa-candidates"]);
 }

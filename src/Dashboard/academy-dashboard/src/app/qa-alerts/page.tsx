@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { getQaAlerts } from "@/lib/api";
+import { getQaAlerts, getQaAlertEvidencePlaybackUrl } from "@/lib/api";
 import type { QaAlertListItem } from "@/types";
 
 const utcDateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -16,6 +16,9 @@ export default function QaAlertsPage() {
   const [alerts, setAlerts] = useState<QaAlertListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [evidenceUrls, setEvidenceUrls] = useState<Record<string, string>>({});
+  const [evidenceLoadingId, setEvidenceLoadingId] = useState<string | null>(null);
+  const [evidenceErrors, setEvidenceErrors] = useState<Record<string, string>>({});
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -40,6 +43,22 @@ export default function QaAlertsPage() {
     });
   }, [alerts, searchQuery, statusFilter]);
 
+  async function playDirectEvidence(alertId: string) {
+    setEvidenceLoadingId(alertId);
+    setEvidenceErrors((current) => ({ ...current, [alertId]: "" }));
+
+    try {
+      const url = await getQaAlertEvidencePlaybackUrl(alertId);
+      setEvidenceUrls((current) => ({ ...current, [alertId]: url }));
+    } catch (err) {
+      setEvidenceErrors((current) => ({
+        ...current,
+        [alertId]: err instanceof Error ? err.message : "Unable to load QA evidence.",
+      }));
+    } finally {
+      setEvidenceLoadingId(null);
+    }
+  }
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -148,9 +167,36 @@ export default function QaAlertsPage() {
                             Review recording
                           </Link>
                         ) : alert.hasDirectEvidence ? (
-                          <span className="font-semibold text-emerald-700">
-                            Direct audio ready
-                          </span>
+                          <div className="space-y-2 min-w-[16rem]">
+                            <button
+                              type="button"
+                              disabled={evidenceLoadingId === alert.id}
+                              onClick={() => void playDirectEvidence(alert.id)}
+                              className="font-semibold text-indigo-700 hover:text-indigo-500 disabled:text-slate-400 disabled:cursor-wait"
+                            >
+                              {evidenceLoadingId === alert.id
+                                ? "Loading audio..."
+                                : evidenceUrls[alert.id]
+                                  ? "Reload Audio"
+                                  : "Play Audio"}
+                            </button>
+
+                            {evidenceUrls[alert.id] ? (
+                              <audio
+                                controls
+                                autoPlay
+                                preload="none"
+                                src={evidenceUrls[alert.id]}
+                                className="h-8 w-64"
+                              />
+                            ) : null}
+
+                            {evidenceErrors[alert.id] ? (
+                              <p className="text-[10px] text-rose-600">
+                                {evidenceErrors[alert.id]}
+                              </p>
+                            ) : null}
+                          </div>
                         ) : (
                           <span className="text-slate-400">
                             Evidence unavailable

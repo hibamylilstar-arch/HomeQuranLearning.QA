@@ -58,6 +58,177 @@ public sealed class AgentCloudClient : IAgentCloudClient
                    "Empty class-window response from cloud.");
     }
 
+    public async Task<AgentQaRestrictedRuleResponse> GetQaRestrictedRuleAsync(
+        string deviceId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(deviceId))
+        {
+            throw new ArgumentException(
+                "DeviceId is required.",
+                nameof(deviceId));
+        }
+
+        using var message =
+            new HttpRequestMessage(
+                HttpMethod.Get,
+                $"/api/agent/qa/restricted-rule?deviceId={Uri.EscapeDataString(deviceId.Trim())}");
+
+        message.Headers.Add(
+            "X-Api-Key",
+            _options.ApiKey);
+
+        using HttpResponseMessage response =
+            await _httpClient.SendAsync(
+                message,
+                cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+
+        string json =
+            await response.Content.ReadAsStringAsync(
+                cancellationToken);
+
+        return JsonSerializer.Deserialize<AgentQaRestrictedRuleResponse>(
+                   json,
+                   JsonOptions)
+               ?? throw new InvalidOperationException(
+                   "Empty QA restricted-rule response from cloud.");
+    }
+
+    public async Task<AgentLocalRestrictedQaAlertResponse>
+        UploadLocalRestrictedQaAlertAsync(
+            AgentLocalRestrictedQaAlertUploadRequest request,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (string.IsNullOrWhiteSpace(request.DeviceId))
+        {
+            throw new ArgumentException(
+                "DeviceId is required.",
+                nameof(request));
+        }
+
+        if (request.SessionId == Guid.Empty ||
+            request.QaRuleId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "SessionId and QaRuleId are required.",
+                nameof(request));
+        }
+
+        if (request.TriggerStartUtc == default ||
+            request.TriggerEndUtc <= request.TriggerStartUtc ||
+            request.EvidenceStartUtc == default)
+        {
+            throw new ArgumentException(
+                "QA evidence timestamps are invalid.",
+                nameof(request));
+        }
+
+        if (request.AudioWav.Length == 0)
+        {
+            throw new ArgumentException(
+                "AudioWav is required.",
+                nameof(request));
+        }
+
+        using var form =
+            new MultipartFormDataContent();
+
+        form.Add(
+            new StringContent(request.DeviceId.Trim()),
+            "deviceId");
+
+        form.Add(
+            new StringContent(request.SessionId.ToString("D")),
+            "sessionId");
+
+        form.Add(
+            new StringContent(request.QaRuleId.ToString("D")),
+            "qaRuleId");
+
+        form.Add(
+            new StringContent(
+                request.TriggerStartUtc
+                    .ToUniversalTime()
+                    .ToString("O", CultureInfo.InvariantCulture)),
+            "triggerStartUtc");
+
+        form.Add(
+            new StringContent(
+                request.TriggerEndUtc
+                    .ToUniversalTime()
+                    .ToString("O", CultureInfo.InvariantCulture)),
+            "triggerEndUtc");
+
+        form.Add(
+            new StringContent(
+                request.EvidenceStartUtc
+                    .ToUniversalTime()
+                    .ToString("O", CultureInfo.InvariantCulture)),
+            "evidenceStartUtc");
+
+        form.Add(
+            new StringContent(request.Transcript),
+            "transcript");
+
+        form.Add(
+            new StringContent(request.PolicyVersion),
+            "policyVersion");
+
+        form.Add(
+            new StringContent(request.AnalysisVersion),
+            "analysisVersion");
+
+        form.Add(
+            new StringContent(request.AnalysisIdempotencyKey),
+            "analysisIdempotencyKey");
+
+        var audioContent =
+            new ByteArrayContent(
+                request.AudioWav);
+
+        audioContent.Headers.ContentType =
+            new MediaTypeHeaderValue(
+                "audio/wav");
+
+        form.Add(
+            audioContent,
+            "audio",
+            $"qa-local-{request.SessionId:N}.wav");
+
+        using var message =
+            new HttpRequestMessage(
+                HttpMethod.Post,
+                "/api/agent/qa-alerts/local-restricted")
+            {
+                Content = form
+            };
+
+        message.Headers.Add(
+            "X-Api-Key",
+            _options.ApiKey);
+
+        using HttpResponseMessage response =
+            await _httpClient.SendAsync(
+                message,
+                cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+
+        string json =
+            await response.Content.ReadAsStringAsync(
+                cancellationToken);
+
+        return JsonSerializer.Deserialize<
+                   AgentLocalRestrictedQaAlertResponse>(
+                       json,
+                       JsonOptions)
+               ?? throw new InvalidOperationException(
+                   "Empty local QA alert response from cloud.");
+    }
     public async Task<AgentSessionEventResponse> SubmitSessionEventAsync(
         AgentSessionEventRequest request,
         CancellationToken cancellationToken = default)

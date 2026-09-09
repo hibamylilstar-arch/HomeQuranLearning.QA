@@ -101,6 +101,7 @@ builder.Services.AddHostedService<AttendanceEventDeliveryWorker>();
 builder.Services.AddHostedService<ClassObserverWorker>();
 builder.Services.AddHostedService<AttendanceAudioEvidenceWorker>();
 builder.Services.AddHostedService<QaAudioPublisherWorker>();
+builder.Services.AddHostedService<QaLocalVoskWorker>();
 builder.Services.AddHostedService<CommunicationProcessMonitorWorker>();
 builder.Services.AddHostedService<TeamsEvidencePipeServer>();
 builder.Services.AddHostedService<TeamsEvidenceJournalWorker>();

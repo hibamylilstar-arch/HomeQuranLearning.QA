@@ -253,7 +253,8 @@ export default function UsersPage() {
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${user.isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>
                         {user.isActive ? "Active" : "Disabled"}
                       </span>
-                    </td>`r`n                    <td className="px-6 py-4">
+                    </td>
+                    <td className="px-6 py-4">
                       {user.role === "Owner" ? (
                         <span className="text-slate-400">
                           Protected
@@ -290,10 +291,31 @@ export default function UsersPage() {
                           </button>
                         </div>
                       ) : currentUser?.role === "Admin" &&
-                        (
-                          user.id === currentUser.id ||
-                          user.role === "Manager"
-                        ) ? (
+                        user.role === "Manager" ? (
+                        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => void changeStatus(user)}
+                            className={
+                              "inline-flex min-h-11 items-center justify-center rounded-xl border px-3.5 text-xs font-semibold shadow-sm transition-all hover:-translate-y-px hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 active:translate-y-0 " +
+                              (user.isActive
+                                ? "border-amber-200 bg-white text-amber-700 hover:bg-amber-50 focus:ring-amber-500"
+                                : "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 focus:ring-emerald-500")
+                            }
+                          >
+                            {user.isActive ? "Disable" : "Enable"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void resetPassword(user)}
+                            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                          >
+                            Reset Password
+                          </button>
+                        </div>
+                      ) : currentUser?.role === "Admin" &&
+                        user.id === currentUser.id ? (
                         <button
                           type="button"
                           onClick={() => void resetPassword(user)}

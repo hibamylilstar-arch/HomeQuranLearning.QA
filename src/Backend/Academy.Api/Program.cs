@@ -1420,6 +1420,34 @@ app.MapPatch("/api/admin/users/{userId:guid}/status", async (
     AdminUserService adminUserService,
     CancellationToken cancellationToken) =>
 {
+    var (_, actorRole) = GetUserInfo(user);
+
+    if (actorRole == UserRole.Admin.ToString())
+    {
+        var users =
+            await adminUserService.GetUsersAsync(
+                cancellationToken);
+
+        var target =
+            users.FirstOrDefault(x => x.Id == userId);
+
+        if (target is null)
+        {
+            return Results.NotFound();
+        }
+
+        bool managerAccount =
+            string.Equals(
+                Convert.ToString(target.Role),
+                UserRole.Manager.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+
+        if (!managerAccount)
+        {
+            return Results.Forbid();
+        }
+    }
+
     try
     {
         await adminUserService.UpdateUserStatusAsync(
@@ -1434,7 +1462,7 @@ app.MapPatch("/api/admin/users/{userId:guid}/status", async (
         return Results.BadRequest(
             new { message = ex.Message });
     }
-}).RequireAuthorization(OwnerOnlyPolicy);
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPost("/api/admin/users/{userId:guid}/reset-password", async (
     ClaimsPrincipal user,

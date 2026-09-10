@@ -96,6 +96,46 @@ public sealed class AgentCloudClient : IAgentCloudClient
                    "Empty QA restricted-rule response from cloud.");
     }
 
+    public async Task<AgentQaRestrictedRulesResponse>
+        GetQaRestrictedRulesAsync(
+            string deviceId,
+            CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(deviceId))
+        {
+            throw new ArgumentException(
+                "DeviceId is required.",
+                nameof(deviceId));
+        }
+
+        using var message =
+            new HttpRequestMessage(
+                HttpMethod.Get,
+                $"/api/agent/qa/restricted-rules?deviceId={Uri.EscapeDataString(deviceId.Trim())}");
+
+        message.Headers.Add(
+            "X-Api-Key",
+            _options.ApiKey);
+
+        using HttpResponseMessage response =
+            await _httpClient.SendAsync(
+                message,
+                cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+
+        string json =
+            await response.Content.ReadAsStringAsync(
+                cancellationToken);
+
+        return JsonSerializer.Deserialize<
+                   AgentQaRestrictedRulesResponse>(
+                       json,
+                       JsonOptions)
+               ?? throw new InvalidOperationException(
+                   "Empty QA restricted-rules response from cloud.");
+    }
+
     public async Task<AgentLocalRestrictedQaAlertResponse>
         UploadLocalRestrictedQaAlertAsync(
             AgentLocalRestrictedQaAlertUploadRequest request,

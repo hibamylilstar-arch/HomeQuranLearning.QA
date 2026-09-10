@@ -10,6 +10,13 @@ public sealed class AgentQaRestrictedRuleResponse
         string.Empty;
 }
 
+public sealed class AgentQaRestrictedRulesResponse
+{
+    public List<AgentQaRestrictedRuleResponse>
+        Rules { get; init; } =
+            new();
+}
+
 public sealed class AgentLocalRestrictedQaAlertUploadRequest
 {
     public string DeviceId { get; init; } =

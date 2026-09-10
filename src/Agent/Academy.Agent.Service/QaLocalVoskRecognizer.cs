@@ -1,24 +1,48 @@
 namespace Academy.Agent.Service;
 
-public sealed class QaLocalVoskRecognizer : IDisposable
+public sealed class QaLocalVoskRecognizer :
+    IDisposable
 {
-    private readonly Vosk.VoskRecognizer _recognizer;
+    private readonly Vosk.VoskRecognizer
+        _recognizer;
+
+    private readonly HashSet<string>
+        _allowedPhrases;
 
     private readonly byte[] _pcmBytes =
         new byte[
-            QaTeacherPcm16kConverter.OutputSamplesPerFrame *
+            QaTeacherPcm16kConverter
+                .OutputSamplesPerFrame *
             sizeof(short)];
 
     public QaLocalVoskRecognizer(
-        Vosk.Model model)
+        Vosk.Model model,
+        IEnumerable<string> phrases)
     {
         ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(phrases);
+
+        _allowedPhrases =
+            QaLocalVoskDecisionGate
+                .NormalizePhrases(phrases);
+
+        if (_allowedPhrases.Count == 0)
+        {
+            throw new ArgumentException(
+                "At least one supported QA phrase is required.",
+                nameof(phrases));
+        }
+
+        string grammarJson =
+            QaLocalVoskDecisionGate
+                .BuildGrammarJson(
+                    _allowedPhrases);
 
         _recognizer =
             new Vosk.VoskRecognizer(
                 model,
                 16_000.0f,
-                QaLocalVoskDecisionGate.GrammarJson);
+                grammarJson);
 
         _recognizer.SetWords(true);
     }
@@ -31,7 +55,8 @@ public sealed class QaLocalVoskRecognizer : IDisposable
         ArgumentNullException.ThrowIfNull(pcm16);
 
         if (pcm16.Length !=
-            QaTeacherPcm16kConverter.OutputSamplesPerFrame)
+            QaTeacherPcm16kConverter
+                .OutputSamplesPerFrame)
         {
             throw new ArgumentException(
                 "PCM16 frame must contain exactly 320 samples.",
@@ -49,15 +74,21 @@ public sealed class QaLocalVoskRecognizer : IDisposable
                 _pcmBytes,
                 _pcmBytes.Length))
         {
-            matchedText = string.Empty;
-            confidence = 0.0;
+            matchedText =
+                string.Empty;
+
+            confidence =
+                0.0;
+
             return false;
         }
 
-        return QaLocalVoskDecisionGate.TryAccept(
-            _recognizer.Result(),
-            out matchedText,
-            out confidence);
+        return
+            QaLocalVoskDecisionGate.TryAccept(
+                _recognizer.Result(),
+                _allowedPhrases,
+                out matchedText,
+                out confidence);
     }
 
     public void Reset()

@@ -6,72 +6,131 @@ namespace Academy.Agent.Tests;
 public sealed class QaLocalVoskDecisionGateTests
 {
     [Theory]
-    [InlineData("whatsapp", "whatsapp")]
-    [InlineData("[unk] whatsapp", "[unk] whatsapp")]
-    [InlineData("whatsapp up", "whatsapp up")]
-    public void Accepts_ConfidentWhatsappToken(string text, string words)
+    [InlineData("whatsapp")]
+    [InlineData("mother")]
+    [InlineData("father")]
+    [InlineData("contact")]
+    public void Accepts_ExactConfiguredPhrase(
+        string phrase)
     {
-        string json = CreateResult(text, words, 0.90);
+        var allowed =
+            QaLocalVoskDecisionGate
+                .NormalizePhrases(
+                    new[] { phrase });
+
+        string json =
+            CreateResult(
+                phrase,
+                0.90);
 
         bool accepted =
             QaLocalVoskDecisionGate.TryAccept(
                 json,
+                allowed,
                 out string matched,
                 out double confidence);
 
         Assert.True(accepted);
-        Assert.Equal(text, matched);
+        Assert.Equal(phrase, matched);
         Assert.True(confidence >= 0.80);
+    }
+
+    [Fact]
+    public void Accepts_ExactConfiguredMultiWordPhrase()
+    {
+        var allowed =
+            QaLocalVoskDecisionGate
+                .NormalizePhrases(
+                    new[] { "personal number" });
+
+        string json =
+            CreateResult(
+                "personal number",
+                0.91);
+
+        Assert.True(
+            QaLocalVoskDecisionGate.TryAccept(
+                json,
+                allowed,
+                out string matched,
+                out _));
+
+        Assert.Equal(
+            "personal number",
+            matched);
+    }
+
+    [Fact]
+    public void Rejects_AliasWhenOnlyWhatsappConfigured()
+    {
+        var allowed =
+            QaLocalVoskDecisionGate
+                .NormalizePhrases(
+                    new[] { "whatsapp" });
+
+        string json =
+            CreateResult(
+                "what's up",
+                0.99);
+
+        Assert.False(
+            QaLocalVoskDecisionGate.TryAccept(
+                json,
+                allowed,
+                out _,
+                out _));
+    }
+
+    [Fact]
+    public void Rejects_UnconfiguredPhrase()
+    {
+        var allowed =
+            QaLocalVoskDecisionGate
+                .NormalizePhrases(
+                    new[] { "whatsapp", "mother" });
+
+        string json =
+            CreateResult(
+                "sister",
+                0.99);
+
+        Assert.False(
+            QaLocalVoskDecisionGate.TryAccept(
+                json,
+                allowed,
+                out _,
+                out _));
     }
 
     [Fact]
     public void Rejects_BelowConfidenceFloor()
     {
-        string json = CreateResult("whatsapp", "whatsapp", 0.7999);
+        var allowed =
+            QaLocalVoskDecisionGate
+                .NormalizePhrases(
+                    new[] { "whatsapp" });
 
-        Assert.False(
-            QaLocalVoskDecisionGate.TryAccept(
-                json,
-                out _,
-                out _));
-    }
-
-    [Theory]
-    [InlineData("[unk]")]
-    [InlineData("alhamdulillah")]
-    [InlineData("quran")]
-    [InlineData("please read")]
-    [InlineData("what's up")]
-    [InlineData("what app")]
-    [InlineData("what is up")]
-    [InlineData("what up")]
-    public void Rejects_UnrelatedOrUnknownText(string text)
-    {
         string json =
-            JsonSerializer.Serialize(
-                new
-                {
-                    result = new[]
-                    {
-                        new
-                        {
-                            conf = 0.99,
-                            word = text
-                        }
-                    },
-                    text
-                });
+            CreateResult(
+                "whatsapp",
+                0.7999);
 
         Assert.False(
             QaLocalVoskDecisionGate.TryAccept(
                 json,
+                allowed,
                 out _,
                 out _));
     }
 
     [Fact]
-    public void Accepts_TargetMixedWithUnknownContext()
+    public void Rejects_UnknownMixedWithTarget()
     {
+        var allowed =
+            QaLocalVoskDecisionGate
+                .NormalizePhrases(
+                    new[] { "whatsapp" });
+
         string json =
             """
             {
@@ -83,58 +142,44 @@ public sealed class QaLocalVoskDecisionGateTests
             }
             """;
 
-        Assert.True(
-            QaLocalVoskDecisionGate.TryAccept(
-                json,
-                out string matched,
-                out double confidence));
-
-        Assert.Equal("[unk] whatsapp", matched);
-        Assert.True(confidence >= 0.99);
-    }
-
-    [Fact]
-    public void Rejects_TargetMixedWithUnknown_WhenTargetBelowConfidenceFloor()
-    {
-        string json =
-            """
-            {
-              "result": [
-                { "conf": 0.99, "word": "[unk]" },
-                { "conf": 0.7999, "word": "whatsapp" }
-              ],
-              "text": "[unk] whatsapp"
-            }
-            """;
-
         Assert.False(
             QaLocalVoskDecisionGate.TryAccept(
                 json,
+                allowed,
                 out _,
                 out _));
     }
 
     [Fact]
-    public void Grammar_IsExactlyLocked()
+    public void Grammar_IsExactAndContainsOnlyConfiguredPhrasesPlusUnknown()
     {
+        string grammar =
+            QaLocalVoskDecisionGate
+                .BuildGrammarJson(
+                    new[]
+                    {
+                        "WhatsApp",
+                        "mother",
+                        "whatsapp"
+                    });
+
         Assert.Equal(
-            "[\"whatsapp\",\"what's up\",\"what app\",\"what is up\",\"[unk]\"]",
-            QaLocalVoskDecisionGate.GrammarJson);
+            "[\"mother\",\"whatsapp\",\"[unk]\"]",
+            grammar);
     }
 
     private static string CreateResult(
         string text,
-        string words,
         double confidence)
     {
         return JsonSerializer.Serialize(
             new
             {
                 result =
-                    words.Split(
-                        ' ',
-                        StringSplitOptions.RemoveEmptyEntries)
-                      .Select(
+                    text.Split(
+                            ' ',
+                            StringSplitOptions.RemoveEmptyEntries)
+                        .Select(
                             word =>
                                 new
                                 {

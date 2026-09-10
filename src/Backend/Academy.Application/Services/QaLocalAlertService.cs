@@ -12,6 +12,10 @@ public sealed class QaLocalAlertService
     private const string CanonicalPhrase = "whatsapp";
     private const string RestrictedRuleReason = "Restricted Rule";
 
+    private const int MaximumActiveRestrictedRules = 64;
+    private const int MaximumRestrictedPhraseLength = 128;
+    private const int MaximumRestrictedPhraseWords = 6;
+
     private const int SampleRate = 16000;
     private const int Channels = 1;
     private const int BitsPerSample = 16;
@@ -116,6 +120,88 @@ public sealed class QaLocalAlertService
             Enabled = true,
             QaRuleId = active[0].Id,
             Phrase = CanonicalPhrase
+        };
+    }
+
+    public async Task<AgentQaRestrictedRulesResponse>
+        GetActiveRestrictedRulesAsync(
+            string deviceId,
+            CancellationToken cancellationToken = default)
+    {
+        string canonicalDeviceId =
+            RequireText(
+                deviceId,
+                nameof(deviceId),
+                256);
+
+        _ =
+            await _deviceRepository.GetByDeviceIdAsync(
+                canonicalDeviceId,
+                cancellationToken)
+            ?? throw new KeyNotFoundException(
+                "Unknown device.");
+
+        IReadOnlyList<QaRule> rules =
+            await _ruleRepository.GetAllAsync(
+                cancellationToken);
+
+        var active =
+            rules
+                .Where(
+                    x =>
+                        x.IsActive &&
+                        x.Severity ==
+                            QaSeverity.High)
+                .Select(
+                    x =>
+                        new
+                        {
+                            Rule = x,
+                            Phrase =
+                                NormalizePhrase(
+                                    x.Phrase)
+                        })
+                .Where(
+                    x =>
+                        IsSupportedRestrictedPhrase(
+                            x.Phrase))
+                .OrderByDescending(
+                    x =>
+                        x.Rule.UpdatedAtUtc)
+                .ThenBy(
+                    x =>
+                        x.Phrase,
+                    StringComparer.Ordinal)
+                .GroupBy(
+                    x =>
+                        x.Phrase,
+                    StringComparer.Ordinal)
+                .Select(
+                    group =>
+                        group.First())
+                .Take(
+                    MaximumActiveRestrictedRules)
+                .OrderBy(
+                    x =>
+                        x.Phrase,
+                    StringComparer.Ordinal)
+                .ToArray();
+
+        return new AgentQaRestrictedRulesResponse
+        {
+            Rules =
+                active
+                    .Select(
+                        x =>
+                            new AgentQaRestrictedRuleResponse
+                            {
+                                Enabled = true,
+                                QaRuleId =
+                                    x.Rule.Id,
+                                Phrase =
+                                    x.Phrase
+                            })
+                    .ToList()
         };
     }
 
@@ -248,14 +334,25 @@ public sealed class QaLocalAlertService
             ?? throw new KeyNotFoundException(
                 "QA rule was not found.");
 
+        string normalizedRulePhrase =
+            NormalizePhrase(
+                rule.Phrase);
+
+        string normalizedTranscript =
+            NormalizePhrase(
+                transcript);
+
         if (!rule.IsActive ||
+            rule.Severity != QaSeverity.High ||
+            !IsSupportedRestrictedPhrase(
+                normalizedRulePhrase) ||
             !string.Equals(
-                rule.Phrase.Trim(),
-                CanonicalPhrase,
-                StringComparison.OrdinalIgnoreCase))
+                normalizedTranscript,
+                normalizedRulePhrase,
+                StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                "The WhatsApp QA rule is not active.");
+                "The requested High-priority QA rule is not active or the transcript does not match it exactly.");
         }
 
         QaAlert? existing =
@@ -269,9 +366,10 @@ public sealed class QaLocalAlertService
                 existing.DeviceId != device.Id ||
                 existing.QaRuleId != rule.Id ||
                 !string.Equals(
-                    existing.MatchedPhrase,
-                    CanonicalPhrase,
-                    StringComparison.OrdinalIgnoreCase))
+                    NormalizePhrase(
+                        existing.MatchedPhrase),
+                    normalizedRulePhrase,
+                    StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
                     "AnalysisIdempotencyKey is already used by different QA evidence.");
@@ -378,10 +476,12 @@ public sealed class QaLocalAlertService
                 RecordingId = null,
                 SourceQaAudioChunkId = null,
                 QaRuleId = rule.Id,
-                MatchedPhrase = CanonicalPhrase,
+                MatchedPhrase =
+                    normalizedRulePhrase,
                 TimestampUtc = triggerStartUtc,
                 DetectionReason = RestrictedRuleReason,
-                Transcript = transcript,
+                Transcript =
+                    normalizedTranscript,
                 PolicyVersion = policyVersion,
                 AnalysisVersion = analysisVersion,
                 SourceTrackIndex = null,
@@ -585,6 +685,53 @@ public sealed class QaLocalAlertService
             contentType == "audio/wav" ||
             contentType == "audio/x-wav" ||
             contentType == "audio/wave";
+    }
+
+    private static bool IsSupportedRestrictedPhrase(
+        string? value)
+    {
+        string normalized =
+            NormalizePhrase(value);
+
+        if (string.IsNullOrWhiteSpace(normalized) ||
+            string.Equals(
+                normalized,
+                "[unk]",
+                StringComparison.Ordinal) ||
+            normalized.Length >
+                MaximumRestrictedPhraseLength)
+        {
+            return false;
+        }
+
+        int wordCount =
+            normalized.Split(
+                    ' ',
+                    StringSplitOptions.RemoveEmptyEntries)
+                .Length;
+
+        return
+            wordCount > 0 &&
+            wordCount <=
+                MaximumRestrictedPhraseWords;
+    }
+
+    private static string NormalizePhrase(
+        string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            " ",
+            value
+                .Trim()
+                .ToLowerInvariant()
+                .Split(
+                    ' ',
+                    StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static string RequireText(

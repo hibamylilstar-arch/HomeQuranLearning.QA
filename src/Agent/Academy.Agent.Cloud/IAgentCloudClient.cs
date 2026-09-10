@@ -14,9 +14,34 @@ public interface IAgentCloudClient
         string deviceId,
         CancellationToken cancellationToken = default);
 
-    Task<AgentLocalRestrictedQaAlertResponse> UploadLocalRestrictedQaAlertAsync(
-        AgentLocalRestrictedQaAlertUploadRequest request,
-        CancellationToken cancellationToken = default);
+    async Task<AgentQaRestrictedRulesResponse>
+        GetQaRestrictedRulesAsync(
+            string deviceId,
+            CancellationToken cancellationToken = default)
+    {
+        AgentQaRestrictedRuleResponse rule =
+            await GetQaRestrictedRuleAsync(
+                deviceId,
+                cancellationToken);
+
+        var response =
+            new AgentQaRestrictedRulesResponse();
+
+        if (rule.Enabled &&
+            rule.QaRuleId.HasValue &&
+            !string.IsNullOrWhiteSpace(
+                rule.Phrase))
+        {
+            response.Rules.Add(rule);
+        }
+
+        return response;
+    }
+
+    Task<AgentLocalRestrictedQaAlertResponse>
+        UploadLocalRestrictedQaAlertAsync(
+            AgentLocalRestrictedQaAlertUploadRequest request,
+            CancellationToken cancellationToken = default);
 
     Task<AgentSessionEventResponse> SubmitSessionEventAsync(
         AgentSessionEventRequest request,

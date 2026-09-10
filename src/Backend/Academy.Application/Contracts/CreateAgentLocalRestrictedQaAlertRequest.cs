@@ -31,3 +31,10 @@ public sealed class AgentQaRestrictedRuleResponse
 
     public string Phrase { get; init; } = string.Empty;
 }
+
+public sealed class AgentQaRestrictedRulesResponse
+{
+    public List<AgentQaRestrictedRuleResponse>
+        Rules { get; init; } =
+            new();
+}

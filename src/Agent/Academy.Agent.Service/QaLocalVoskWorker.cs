@@ -14,7 +14,7 @@ public sealed class QaLocalVoskWorker : BackgroundService
     private const int PostContextFrames = 1000;  // ~20 seconds
 
     private const string PolicyVersion =
-        "qa-local-vosk-whatsapp-token-v1";
+        "qa-local-vosk-exact-high-rule-v2";
 
     private const string AnalysisVersion =
         "vosk-model-en-us-0.22-lgraph-v1";
@@ -177,13 +177,13 @@ public sealed class QaLocalVoskWorker : BackgroundService
         Vosk.Model model,
         CancellationToken cancellationToken)
     {
-        AgentQaRestrictedRuleResponse rule;
+        AgentQaRestrictedRulesResponse rulesResponse;
 
         try
         {
-            rule =
+            rulesResponse =
                 _cloudClient
-                    .GetQaRestrictedRuleAsync(
+                    .GetQaRestrictedRulesAsync(
                         identity.DeviceId,
                         cancellationToken)
                     .GetAwaiter()
@@ -198,7 +198,7 @@ public sealed class QaLocalVoskWorker : BackgroundService
         {
             _logger.LogWarning(
                 ex,
-                "Unable to resolve active local QA restricted rule.");
+                "Unable to resolve active local QA restricted rules.");
 
             cancellationToken.WaitHandle.WaitOne(
                 RuleRetryDelay);
@@ -206,21 +206,55 @@ public sealed class QaLocalVoskWorker : BackgroundService
             return;
         }
 
-        if (!rule.Enabled ||
-            !rule.QaRuleId.HasValue ||
-            !string.Equals(
-                rule.Phrase.Trim(),
-                "whatsapp",
-                StringComparison.OrdinalIgnoreCase))
+        Dictionary<string, Guid>
+            ruleIdsByPhrase =
+                rulesResponse.Rules
+                    .Where(
+                        x =>
+                            x.Enabled &&
+                            x.QaRuleId.HasValue &&
+                            QaLocalVoskDecisionGate
+                                .IsSupportedPhrase(
+                                    x.Phrase))
+                    .Select(
+                        x =>
+                            new
+                            {
+                                Phrase =
+                                    QaLocalVoskDecisionGate
+                                        .NormalizePhrase(
+                                            x.Phrase),
+                                RuleId =
+                                    x.QaRuleId!.Value
+                            })
+                    .GroupBy(
+                        x =>
+                            x.Phrase,
+                        StringComparer.Ordinal)
+                    .Select(
+                        group =>
+                            group.First())
+                    .OrderBy(
+                        x =>
+                            x.Phrase,
+                        StringComparer.Ordinal)
+                    .Take(
+                        QaLocalVoskDecisionGate
+                            .MaximumActivePhrases)
+                    .ToDictionary(
+                        x =>
+                            x.Phrase,
+                        x =>
+                            x.RuleId,
+                        StringComparer.Ordinal);
+
+        if (ruleIdsByPhrase.Count == 0)
         {
             cancellationToken.WaitHandle.WaitOne(
                 RuleRetryDelay);
 
             return;
         }
-
-        Guid qaRuleId =
-            rule.QaRuleId.Value;
 
         using ClassroomAudioSubscription subscription =
             _audioHub.Subscribe(
@@ -231,7 +265,9 @@ public sealed class QaLocalVoskWorker : BackgroundService
             _audioRuntime.Acquire();
 
         using var recognizer =
-            new QaLocalVoskRecognizer(model);
+            new QaLocalVoskRecognizer(
+                model,
+                ruleIdsByPhrase.Keys);
 
         var ring =
             new Queue<EvidenceFrame>();
@@ -239,8 +275,8 @@ public sealed class QaLocalVoskWorker : BackgroundService
         PendingEvidence? pending =
             null;
 
-        DateTimeOffset? lastAcceptedAtUtc =
-            null;
+        var lastAcceptedAtUtcByRule =
+            new Dictionary<Guid, DateTimeOffset>();
 
         DateTimeOffset? mediaAnchorUtc =
             null;
@@ -252,9 +288,9 @@ public sealed class QaLocalVoskWorker : BackgroundService
             null;
 
         _logger.LogInformation(
-            "Local Vosk QA observing SessionId={SessionId}, RuleId={QaRuleId}.",
+            "Local Vosk QA observing SessionId={SessionId}, RuleCount={RuleCount}.",
             session.SessionId,
-            qaRuleId);
+            ruleIdsByPhrase.Count);
 
         try
         {
@@ -378,19 +414,29 @@ public sealed class QaLocalVoskWorker : BackgroundService
                     continue;
                 }
 
+                if (!ruleIdsByPhrase.TryGetValue(
+                        matchedText,
+                        out Guid qaRuleId))
+                {
+                    continue;
+                }
+
                 if (pending is not null)
                 {
                     continue;
                 }
 
-                if (lastAcceptedAtUtc.HasValue &&
+                if (lastAcceptedAtUtcByRule.TryGetValue(
+                        qaRuleId,
+                        out DateTimeOffset lastAcceptedAtUtc) &&
                     frameUtc -
-                        lastAcceptedAtUtc.Value <
+                        lastAcceptedAtUtc <
                     SameRuleDebounce)
                 {
                     _logger.LogDebug(
-                        "Local Vosk QA duplicate suppressed. SessionId={SessionId}.",
-                        session.SessionId);
+                        "Local Vosk QA duplicate suppressed. SessionId={SessionId}, RuleId={RuleId}.",
+                        session.SessionId,
+                        qaRuleId);
 
                     continue;
                 }
@@ -437,8 +483,9 @@ public sealed class QaLocalVoskWorker : BackgroundService
                         idempotencyKey,
                         preFrames);
 
-                lastAcceptedAtUtc =
-                    frameUtc;
+                lastAcceptedAtUtcByRule[
+                    qaRuleId] =
+                        frameUtc;
 
                 _logger.LogWarning(
                     "Local Vosk QA candidate confirmed. SessionId={SessionId}, RuleId={RuleId}, Text={MatchedText}, Confidence={Confidence:F3}.",
@@ -469,6 +516,18 @@ public sealed class QaLocalVoskWorker : BackgroundService
                         cancellationToken);
                 }
             }
+
+            // Release session-scoped QA memory immediately instead of
+            // retaining audio/rule/debounce state until a later GC cycle.
+            ring.Clear();
+
+            if (pending is not null)
+            {
+                pending.Frames.Clear();
+            }
+
+            lastAcceptedAtUtcByRule.Clear();
+            ruleIdsByPhrase.Clear();
 
             _logger.LogInformation(
                 "Local Vosk QA Session observation stopped. SessionId={SessionId}, DroppedFrames={DroppedFrames}.",

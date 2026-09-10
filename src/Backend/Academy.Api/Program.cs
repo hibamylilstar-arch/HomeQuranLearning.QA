@@ -507,6 +507,48 @@ app.MapGet("/api/agent/qa/restricted-rule", async (
     }
 });
 
+app.MapGet("/api/agent/qa/restricted-rules", async (
+    HttpRequest request,
+    string? deviceId,
+    QaLocalAlertService qaLocalAlertService,
+    CancellationToken cancellationToken) =>
+{
+    if (!request.Headers.TryGetValue(
+            "X-Api-Key",
+            out var values) ||
+        values.ToString() != agentApiKey)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (string.IsNullOrWhiteSpace(deviceId))
+    {
+        return Results.BadRequest(
+            new { error = "deviceId is required." });
+    }
+
+    try
+    {
+        AgentQaRestrictedRulesResponse response =
+            await qaLocalAlertService
+                .GetActiveRestrictedRulesAsync(
+                    deviceId,
+                    cancellationToken);
+
+        return Results.Ok(response);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(
+            new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(
+            new { error = ex.Message });
+    }
+});
+
 app.MapPost("/api/agent/qa-alerts/local-restricted", async (
     HttpRequest request,
     QaLocalAlertService qaLocalAlertService,

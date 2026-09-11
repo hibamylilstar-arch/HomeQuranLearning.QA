@@ -122,6 +122,11 @@ export default function Header({
   const rawRole =
     user?.role || "User";
 
+  const displayRole =
+    rawRole === "Owner"
+      ? "Support"
+      : rawRole;
+
   const displayName =
     rawName.toLowerCase() ===
     rawRole.toLowerCase()
@@ -182,7 +187,7 @@ export default function Header({
             </div>
 
             <div className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-indigo-600">
-              {rawRole}
+              {displayRole}
             </div>
           </div>
 

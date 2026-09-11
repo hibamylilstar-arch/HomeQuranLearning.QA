@@ -441,7 +441,9 @@ export default function Sidebar({
             </div>
 
             <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-indigo-400">
-              {user?.role ?? "User"}
+              {user?.role === "Owner"
+                ? "Support"
+                : (user?.role ?? "User")}
             </div>
           </div>
 

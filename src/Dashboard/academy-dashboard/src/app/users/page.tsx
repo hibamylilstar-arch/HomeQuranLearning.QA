@@ -246,7 +246,9 @@ export default function UsersPage() {
                     <td className="px-6 py-4 text-slate-600">{user.email}</td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
-                        {user.role}
+                        {user.role === "Owner"
+                          ? "Support"
+                          : user.role}
                       </span>
                     </td>
                     <td className="px-6 py-4">

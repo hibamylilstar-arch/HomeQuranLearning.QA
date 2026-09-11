@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 
 const backendBaseUrl =
-  process.env.BACKEND_BASE_URL ?? "http://localhost:5100";
+  process.env.BACKEND_BASE_URL ??
+  "http://localhost:5100";
 
-function getAuthToken(request: Request): string | null {
+function getAuthToken(
+  request: Request
+): string | null {
   return (
     request.headers
       .get("cookie")
@@ -12,7 +15,8 @@ function getAuthToken(request: Request): string | null {
       .find((cookie) =>
         cookie.startsWith("qa_auth_token=")
       )
-      ?.slice("qa_auth_token=".length) ?? null
+      ?.slice("qa_auth_token=".length) ??
+    null
   );
 }
 
@@ -21,108 +25,125 @@ export async function GET(
   {
     params,
   }: {
-    params: Promise<{ alertId: string }>;
+    params: Promise<{
+      alertId: string;
+    }>;
   }
 ) {
-  const token = getAuthToken(request);
+  const token =
+    getAuthToken(request);
 
   if (!token) {
     return NextResponse.json(
-      { error: "Not authenticated" },
-      { status: 401 }
+      {
+        error: "Not authenticated",
+      },
+      {
+        status: 401,
+      }
     );
   }
 
-  const { alertId } = await params;
+  const { alertId } =
+    await params;
 
-  const playbackResponse = await fetch(
-    `${backendBaseUrl}/api/admin/qa-alerts/${encodeURIComponent(
-      alertId
-    )}/evidence-playback`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      cache: "no-store",
-    }
+  const backendHeaders =
+    new Headers();
+
+  backendHeaders.set(
+    "Authorization",
+    `Bearer ${token}`
   );
 
-  if (!playbackResponse.ok) {
-    const message =
-      await playbackResponse.text().catch(() => "");
+  const range =
+    request.headers.get("range");
+
+  if (range) {
+    backendHeaders.set(
+      "Range",
+      range
+    );
+  }
+
+  const response =
+    await fetch(
+      `${backendBaseUrl}/api/admin/qa-alerts/${encodeURIComponent(
+        alertId
+      )}/evidence-playback`,
+      {
+        method: "GET",
+        headers: backendHeaders,
+        cache: "no-store",
+      }
+    );
+
+  if (!response.ok) {
+    const errorText =
+      await response
+        .text()
+        .catch(() => "");
 
     return NextResponse.json(
       {
         error:
-          message ||
+          errorText ||
           "QA evidence is unavailable.",
       },
-      { status: playbackResponse.status }
+      {
+        status: response.status,
+      }
     );
   }
 
-  const payload = (await playbackResponse
-    .json()
-    .catch(() => null)) as
-    | { url?: string }
-    | null;
-
-  if (!payload?.url) {
+  if (!response.body) {
     return NextResponse.json(
       {
         error:
-          "QA evidence playback URL is unavailable.",
+          "QA evidence response was empty.",
       },
-      { status: 502 }
+      {
+        status: 502,
+      }
     );
   }
 
-  const evidenceResponse = await fetch(
-    payload.url,
-    {
-      method: "GET",
-      cache: "no-store",
+  const headers =
+    new Headers();
+
+  for (const name of [
+    "content-type",
+    "content-length",
+    "content-range",
+    "accept-ranges",
+  ]) {
+    const value =
+      response.headers.get(name);
+
+    if (value) {
+      headers.set(name, value);
     }
-  );
+  }
 
-  if (!evidenceResponse.ok || !evidenceResponse.body) {
-    return NextResponse.json(
-      {
-        error:
-          "QA evidence storage could not be reached.",
-      },
-      { status: 502 }
+  if (
+    !headers.has(
+      "content-type"
+    )
+  ) {
+    headers.set(
+      "content-type",
+      "audio/wav"
     );
   }
 
-  const headers = new Headers();
-
   headers.set(
-    "Content-Type",
-    evidenceResponse.headers.get("content-type") ??
-      "audio/wav"
-  );
-
-  headers.set(
-    "Cache-Control",
+    "cache-control",
     "private, no-store, max-age=0"
   );
 
-  const contentLength =
-    evidenceResponse.headers.get("content-length");
-
-  if (contentLength) {
-    headers.set(
-      "Content-Length",
-      contentLength
-    );
-  }
-
   return new NextResponse(
-    evidenceResponse.body,
+    response.body,
     {
-      status: 200,
+      status: response.status,
       headers,
     }
   );

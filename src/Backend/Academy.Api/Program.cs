@@ -1591,14 +1591,28 @@ app.MapGet("/api/admin/qa-alerts/{alertId:guid}/evidence-playback", async (
         configuration["Storage:Bucket"]
         ?? "academy-recordings";
 
-    string url =
-        await storageService.GetPresignedUrlAsync(
-            bucketName,
-            alert.EvidenceStorageKey,
-            TimeSpan.FromMinutes(10),
-            cancellationToken);
+    await using var evidenceStream =
+        new MemoryStream();
 
-    return Results.Ok(new { url });
+    await storageService.DownloadAsync(
+        bucketName,
+        alert.EvidenceStorageKey,
+        evidenceStream,
+        cancellationToken);
+
+    byte[] evidenceBytes =
+        evidenceStream.ToArray();
+
+    string contentType =
+        string.IsNullOrWhiteSpace(
+            alert.EvidenceContentType)
+            ? "audio/wav"
+            : alert.EvidenceContentType;
+
+    return Results.File(
+        evidenceBytes,
+        contentType,
+        enableRangeProcessing: true);
 }).RequireAuthorization();
 
 app.MapPost("/api/admin/qa-alerts", async (

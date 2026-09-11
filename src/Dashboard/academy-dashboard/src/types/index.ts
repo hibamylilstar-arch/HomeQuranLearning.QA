@@ -44,12 +44,27 @@ export interface QaAlertListItem {
   id: string;
   recordingId: string | null;
   matchedPhrase: string | null;
+  rulePhrase?: string | null;
+  detectionReason?: string | null;
+  transcript?: string | null;
   hasDirectEvidence: boolean;
+  evidenceDurationSeconds?: number | null;
   timestampUtc: string;
   status: string;
   isPreserved: boolean;
   preservedAtUtc: string | null;
-  rulePhrase?: string | null;
+
+  deviceId?: string | null;
+  sessionId?: string | null;
+  teacherId?: string | null;
+  studentId?: string | null;
+  courseId?: string | null;
+
+  laptopName?: string | null;
+  actualDeviceName?: string | null;
+  teacherName?: string | null;
+  studentName?: string | null;
+  courseName?: string | null;
 }
 
 export interface UserListItem {

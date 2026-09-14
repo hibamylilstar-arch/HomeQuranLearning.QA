@@ -51,6 +51,10 @@ export interface QaAlertListItem {
   evidenceDurationSeconds?: number | null;
   timestampUtc: string;
   status: string;
+  reviewedByUserId?: string | null;
+  reviewedAtUtc?: string | null;
+  reviewNote?: string | null;
+  reviewVersion: number;
   isPreserved: boolean;
   preservedAtUtc: string | null;
 

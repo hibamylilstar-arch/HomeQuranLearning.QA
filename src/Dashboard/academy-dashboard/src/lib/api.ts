@@ -139,6 +139,7 @@ function mutationSuccessMessage(
         "Manager assignment",
       "qa-rules": "QA rule",
       "qa-candidates": "QA review",
+      "qa-alerts": "QA alert",
     };
 
   const subject =
@@ -427,6 +428,25 @@ export async function deleteQaRule(
 }
 export async function getQaAlerts(): Promise<QaAlertListItem[]> {
   return proxyFetch<QaAlertListItem[]>(["qa-alerts"]);
+}
+
+export async function reviewQaAlert(
+  alertId: string,
+  decision: "Reviewed" | "Ignored" | "Open",
+  note: string,
+  expectedReviewVersion: number
+): Promise<QaAlertListItem> {
+  return proxyFetch<QaAlertListItem>(
+    ["qa-alerts", alertId, "review"],
+    {
+      method: "POST",
+      body: JSON.stringify({
+        decision,
+        note,
+        expectedReviewVersion,
+      }),
+    }
+  );
 }
 
 export async function getQaAlertEvidencePlaybackUrl(

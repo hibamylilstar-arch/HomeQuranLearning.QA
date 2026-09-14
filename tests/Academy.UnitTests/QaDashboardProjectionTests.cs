@@ -105,7 +105,8 @@ public sealed class QaDashboardProjectionTests
         IReadOnlyList<Recording> recordings,
         IReadOnlyList<QaAlert> alerts,
         IReadOnlyList<QaCandidate> candidates,
-        IReadOnlyList<Session>? sessions = null)
+        IReadOnlyList<Session>? sessions = null,
+        IReadOnlyList<Guid>? managerTeacherIds = null)
     {
         var recordingRepository =
             new Mock<IRecordingRepository>();
@@ -166,14 +167,47 @@ public sealed class QaDashboardProjectionTests
                 Array.Empty<
                     DeviceTeacherAssignment>());
 
+        var managerAssignments =
+            new Mock<
+                IManagerTeacherAssignmentRepository>();
+
+        IReadOnlyList<Guid>
+            effectiveManagerTeacherIds =
+                managerTeacherIds ??
+                dashboardSessions
+                    .Select(x => x.TeacherId)
+                    .Distinct()
+                    .ToArray();
+
+        managerAssignments
+            .Setup(x =>
+                x.GetByManagerUserIdAsync(
+                    It.IsAny<Guid>(),
+                    It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                effectiveManagerTeacherIds
+                    .Select(
+                        teacherId =>
+                            new ManagerTeacherAssignment
+                            {
+                                Id =
+                                    Guid.NewGuid(),
+                                ManagerUserId =
+                                    Guid.NewGuid(),
+                                TeacherId =
+                                    teacherId,
+                                AssignedAtUtc =
+                                    DateTimeOffset.UtcNow
+                            })
+                    .ToArray());
+
         return new DashboardQueryService(
             recordingRepository.Object,
             alertRepository.Object,
             candidateRepository.Object,
             Mock.Of<IDeviceRepository>(),
             deviceTeacherAssignments.Object,
-            Mock.Of<
-                IManagerTeacherAssignmentRepository>(),
+            managerAssignments.Object,
             sessionRepository.Object,
             Mock.Of<ISessionEventRepository>());
     }
@@ -537,6 +571,100 @@ public sealed class QaDashboardProjectionTests
         Assert.Equal(
             2,
             ownerVisible.Count);
+    }
+
+    [Fact]
+    public async Task
+        Alerts_ManagerSeesOnlyAssignedTeacherAlerts()
+    {
+        var assigned =
+            CreateGraph(
+                "assigned-device",
+                "WIN-ASSIGNED",
+                "Assigned Laptop");
+
+        var unassigned =
+            CreateGraph(
+                "unassigned-device",
+                "WIN-UNASSIGNED",
+                "Unassigned Laptop");
+
+        var assignedAlert =
+            new QaAlert
+            {
+                Id = Guid.NewGuid(),
+                RecordingId =
+                    assigned.Recording.Id,
+                Recording =
+                    assigned.Recording,
+                TeacherId =
+                    assigned.Teacher.Id,
+                MatchedPhrase =
+                    "Restricted",
+                TimestampUtc =
+                    assigned.Recording
+                        .StartedAtUtc
+                        .AddSeconds(10),
+                Status =
+                    QaAlertStatus.Open
+            };
+
+        var unassignedAlert =
+            new QaAlert
+            {
+                Id = Guid.NewGuid(),
+                RecordingId =
+                    unassigned.Recording.Id,
+                Recording =
+                    unassigned.Recording,
+                TeacherId =
+                    unassigned.Teacher.Id,
+                MatchedPhrase =
+                    "Restricted",
+                TimestampUtc =
+                    unassigned.Recording
+                        .StartedAtUtc
+                        .AddSeconds(10),
+                Status =
+                    QaAlertStatus.Open
+            };
+
+        var service =
+            CreateService(
+                new[]
+                {
+                    assigned.Recording,
+                    unassigned.Recording
+                },
+                new[]
+                {
+                    assignedAlert,
+                    unassignedAlert
+                },
+                Array.Empty<QaCandidate>(),
+                managerTeacherIds:
+                    new[]
+                    {
+                        assigned.Teacher.Id
+                    });
+
+        var visible =
+            await service
+                .GetVisibleQaAlertsAsync(
+                    Guid.NewGuid(),
+                    UserRole.Manager
+                        .ToString());
+
+        var item =
+            Assert.Single(visible);
+
+        Assert.Equal(
+            assignedAlert.Id,
+            item.Id);
+
+        Assert.Equal(
+            assigned.Teacher.Id,
+            item.TeacherId);
     }
 
     [Fact]

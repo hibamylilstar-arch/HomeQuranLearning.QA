@@ -113,6 +113,37 @@ public sealed class DashboardQueryService
     {
         var alerts = await _qaAlertRepository.GetAllAsync(cancellationToken);
 
+        if (role == UserRole.Manager.ToString())
+        {
+            var assignments =
+                await _assignmentRepository
+                    .GetByManagerUserIdAsync(
+                        userId,
+                        cancellationToken)
+                ?? Array.Empty<
+                    ManagerTeacherAssignment>();
+
+            var assignedTeacherIds =
+                assignments
+                    .Select(x => x.TeacherId)
+                    .ToHashSet();
+
+            alerts = alerts
+                .Where(x =>
+                {
+                    Guid? teacherId =
+                        x.TeacherId ??
+                        x.Recording?.TeacherId ??
+                        x.Recording?.Session?.TeacherId;
+
+                    return
+                        teacherId.HasValue &&
+                        assignedTeacherIds.Contains(
+                            teacherId.Value);
+                })
+                .ToList();
+        }
+
         if (role != UserRole.Owner.ToString())
         {
             var visibleRecordings =

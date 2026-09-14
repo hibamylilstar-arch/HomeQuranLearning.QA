@@ -1616,6 +1616,77 @@ app.MapGet("/api/admin/qa-alerts/{alertId:guid}/evidence-playback", async (
         enableRangeProcessing: true);
 }).RequireAuthorization();
 
+app.MapPost("/api/admin/qa-alerts/{alertId:guid}/review", async (
+    ClaimsPrincipal user,
+    Guid alertId,
+    ReviewQaAlertRequest body,
+    DashboardQueryService dashboardQueryService,
+    QaAlertService alertService,
+    CancellationToken cancellationToken) =>
+{
+    var (userId, role) =
+        GetUserInfo(user);
+
+    if (userId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    var visibleAlerts =
+        await dashboardQueryService
+            .GetVisibleQaAlertsAsync(
+                userId,
+                role,
+                cancellationToken);
+
+    if (!visibleAlerts.Any(
+            x => x.Id == alertId))
+    {
+        return Results.NotFound(
+            new
+            {
+                message =
+                    "QA alert not found."
+            });
+    }
+
+    try
+    {
+        QaAlertDto updated =
+            await alertService.ReviewAsync(
+                alertId,
+                userId,
+                body,
+                cancellationToken);
+
+        return Results.Ok(updated);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(
+            new { message = ex.Message });
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(
+            new { message = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Conflict(
+            new { message = ex.Message });
+    }
+    catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+    {
+        return Results.Conflict(
+            new
+            {
+                message =
+                    "QA alert was updated by another reviewer. Refresh and try again."
+            });
+    }
+}).RequireAuthorization(OwnerAdminManagerPolicy);
+
 app.MapPost("/api/admin/qa-alerts", async (
     ClaimsPrincipal user,
     HttpRequest request,

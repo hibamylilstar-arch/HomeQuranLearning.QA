@@ -9,6 +9,7 @@ import Link from "next/link";
 import {
   getQaAlerts,
   getQaAlertEvidencePlaybackUrl,
+  reviewQaAlert,
 } from "@/lib/api";
 import type {
   QaAlertListItem,
@@ -49,6 +50,15 @@ export default function QaAlertsPage() {
     useState("");
   const [statusFilter, setStatusFilter] =
     useState("ALL");
+
+  const [reviewNotes, setReviewNotes] =
+    useState<Record<string, string>>({});
+
+  const [reviewBusy, setReviewBusy] =
+    useState<string | null>(null);
+
+  const [reviewError, setReviewError] =
+    useState("");
 
   useEffect(() => {
     getQaAlerts()
@@ -170,6 +180,35 @@ export default function QaAlertsPage() {
     );
   }
 
+  async function reviewAlert(
+    alert: QaAlertListItem,
+    decision: "Reviewed" | "Ignored" | "Open"
+  ) {
+    setReviewBusy(alert.id);
+    setReviewError("");
+
+    try {
+      await reviewQaAlert(
+        alert.id,
+        decision,
+        (
+          reviewNotes[alert.id] ??
+          alert.reviewNote ??
+          ""
+        ).trim(),
+        alert.reviewVersion
+      );
+    } catch (err) {
+      setReviewError(
+        err instanceof Error
+          ? err.message
+          : "QA alert review failed."
+      );
+    } finally {
+      setReviewBusy(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -200,6 +239,12 @@ export default function QaAlertsPage() {
           evidence context.
         </p>
       </div>
+
+      {reviewError ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700">
+          {reviewError}
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryCard
@@ -261,6 +306,9 @@ export default function QaAlertsPage() {
                 </option>
                 <option value="REVIEWED">
                   Reviewed
+                </option>
+                <option value="IGNORED">
+                  Ignored
                 </option>
               </select>
             </div>
@@ -366,6 +414,34 @@ export default function QaAlertsPage() {
                         status={alert.status}
                       />
                     </div>
+                  </div>
+
+                  <div className="border-b border-slate-100 bg-slate-50/60 px-4 py-3">
+                    <AlertReviewControls
+                      alert={alert}
+                      note={
+                        reviewNotes[alert.id] ??
+                        alert.reviewNote ??
+                        ""
+                      }
+                      busy={
+                        reviewBusy === alert.id
+                      }
+                      onNoteChange={(value) =>
+                        setReviewNotes(
+                          (current) => ({
+                            ...current,
+                            [alert.id]: value,
+                          })
+                        )
+                      }
+                      onDecision={(decision) =>
+                        void reviewAlert(
+                          alert,
+                          decision
+                        )
+                      }
+                    />
                   </div>
 
                   <div className="space-y-4 p-4">
@@ -732,10 +808,44 @@ export default function QaAlertsPage() {
                           </div>
                         </td>
 
-                        <td className="px-5 py-4">
+                        <td className="min-w-56 px-5 py-4">
                           <StatusBadge
                             status={
                               alert.status
+                            }
+                          />
+
+                          <AlertReviewControls
+                            alert={alert}
+                            note={
+                              reviewNotes[
+                                alert.id
+                              ] ??
+                              alert.reviewNote ??
+                              ""
+                            }
+                            busy={
+                              reviewBusy ===
+                              alert.id
+                            }
+                            onNoteChange={(
+                              value
+                            ) =>
+                              setReviewNotes(
+                                (current) => ({
+                                  ...current,
+                                  [alert.id]:
+                                    value,
+                                })
+                              )
+                            }
+                            onDecision={(
+                              decision
+                            ) =>
+                              void reviewAlert(
+                                alert,
+                                decision
+                              )
                             }
                           />
                         </td>
@@ -846,6 +956,91 @@ export default function QaAlertsPage() {
   );
 }
 
+function AlertReviewControls({
+  alert,
+  note,
+  busy,
+  onNoteChange,
+  onDecision,
+}: {
+  alert: QaAlertListItem;
+  note: string;
+  busy: boolean;
+  onNoteChange: (value: string) => void;
+  onDecision: (
+    decision: "Reviewed" | "Ignored" | "Open"
+  ) => void;
+}) {
+  const normalized =
+    alert.status?.toLowerCase();
+
+  return (
+    <div className="mt-2 space-y-2">
+      <input
+        type="text"
+        value={note}
+        maxLength={2048}
+        onChange={(event) =>
+          onNoteChange(event.target.value)
+        }
+        placeholder="Review note (optional)"
+        disabled={busy}
+        className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 disabled:opacity-60"
+      />
+
+      <div className="flex flex-wrap gap-1.5">
+        {normalized !== "reviewed" ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              onDecision("Reviewed")
+            }
+            className="rounded-md bg-emerald-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+          >
+            Mark reviewed
+          </button>
+        ) : null}
+
+        {normalized !== "ignored" ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              onDecision("Ignored")
+            }
+            className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[10px] font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+          >
+            Ignore
+          </button>
+        ) : null}
+
+        {normalized !== "open" ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              onDecision("Open")
+            }
+            className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Reopen
+          </button>
+        ) : null}
+      </div>
+
+      {alert.reviewedAtUtc ? (
+        <p className="text-[10px] leading-4 text-slate-400">
+          Last reviewed{" "}
+          {localDateTimeFormatter.format(
+            new Date(alert.reviewedAtUtc)
+          )}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function SummaryCard({
   label,
   value,
@@ -878,7 +1073,9 @@ function StatusBadge({
       ? "border-rose-200 bg-rose-50 text-rose-700"
       : normalized === "reviewed"
         ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-        : "border-slate-200 bg-slate-50 text-slate-600";
+        : normalized === "ignored"
+          ? "border-amber-200 bg-amber-50 text-amber-700"
+          : "border-slate-200 bg-slate-50 text-slate-600";
 
   return (
     <span

@@ -434,6 +434,110 @@ public sealed class QaAlertService
         return alert.Id;
     }
 
+    public async Task<QaAlertDto> ReviewAsync(
+        Guid alertId,
+        Guid reviewerUserId,
+        ReviewQaAlertRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (reviewerUserId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Reviewer identity is required.");
+        }
+
+        if (request.ExpectedReviewVersion < 0)
+        {
+            throw new ArgumentException(
+                "ExpectedReviewVersion must be non-negative.");
+        }
+
+        QaAlertStatus decision =
+            request.Decision
+                .Trim()
+                .ToLowerInvariant() switch
+            {
+                "review" or "reviewed" =>
+                    QaAlertStatus.Reviewed,
+
+                "ignore" or "ignored" =>
+                    QaAlertStatus.Ignored,
+
+                "open" or "reopen" =>
+                    QaAlertStatus.Open,
+
+                _ => throw new ArgumentException(
+                    "Decision must be Reviewed, Ignored, or Open.")
+            };
+
+        string? reviewNote = null;
+
+        if (!string.IsNullOrWhiteSpace(
+                request.Note))
+        {
+            reviewNote =
+                request.Note.Trim();
+
+            if (reviewNote.Length > 2048)
+            {
+                throw new ArgumentException(
+                    "Review note must be at most 2048 characters.");
+            }
+        }
+
+        QaAlert alert =
+            await _alertRepository.GetByIdAsync(
+                alertId,
+                cancellationToken)
+            ?? throw new KeyNotFoundException(
+                "QA alert not found.");
+
+        if (alert.ReviewVersion !=
+            request.ExpectedReviewVersion)
+        {
+            throw new InvalidOperationException(
+                "QA alert was updated by another reviewer. Refresh and try again.");
+        }
+
+        DateTimeOffset now =
+            DateTimeOffset.UtcNow;
+
+        alert.Status =
+            decision;
+
+        if (decision == QaAlertStatus.Open)
+        {
+            alert.ReviewedByUserId = null;
+            alert.ReviewedAtUtc = null;
+            alert.ReviewNote = null;
+        }
+        else
+        {
+            alert.ReviewedByUserId =
+                reviewerUserId;
+
+            alert.ReviewedAtUtc =
+                now;
+
+            alert.ReviewNote =
+                reviewNote;
+        }
+
+        alert.ReviewVersion++;
+        alert.UpdatedAtUtc =
+            now;
+
+        _alertRepository.Update(
+            alert);
+
+        await _unitOfWork.SaveChangesAsync(
+            cancellationToken);
+
+        return ToDto(alert);
+    }
+
     public async Task UpdateStatusAsync(
         Guid alertId,
         QaAlertStatus status,

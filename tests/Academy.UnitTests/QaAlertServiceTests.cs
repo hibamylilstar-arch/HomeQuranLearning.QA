@@ -569,4 +569,150 @@ public sealed class QaAlertServiceTests
                         ruleId:
                             Guid.NewGuid())));
     }
+
+    [Fact]
+    public async Task
+        Review_MarksAlertReviewedAndCapturesAudit()
+    {
+        var (
+            service,
+            alerts,
+            _,
+            unit,
+            _) = Create();
+
+        var reviewerId =
+            Guid.NewGuid();
+
+        var alert =
+            new QaAlert
+            {
+                Id = Guid.NewGuid(),
+                Status =
+                    QaAlertStatus.Open,
+                ReviewVersion = 0,
+                TimestampUtc =
+                    DateTimeOffset.UtcNow,
+                CreatedAtUtc =
+                    DateTimeOffset.UtcNow,
+                UpdatedAtUtc =
+                    DateTimeOffset.UtcNow
+            };
+
+        alerts
+            .Setup(x =>
+                x.GetByIdAsync(
+                    alert.Id,
+                    It.IsAny<
+                        CancellationToken>()))
+            .ReturnsAsync(alert);
+
+        var result =
+            await service.ReviewAsync(
+                alert.Id,
+                reviewerId,
+                new ReviewQaAlertRequest
+                {
+                    Decision =
+                        "Reviewed",
+                    Note =
+                        "Evidence checked.",
+                    ExpectedReviewVersion =
+                        0
+                });
+
+        Assert.Equal(
+            QaAlertStatus.Reviewed,
+            alert.Status);
+
+        Assert.Equal(
+            reviewerId,
+            alert.ReviewedByUserId);
+
+        Assert.NotNull(
+            alert.ReviewedAtUtc);
+
+        Assert.Equal(
+            "Evidence checked.",
+            alert.ReviewNote);
+
+        Assert.Equal(
+            1,
+            alert.ReviewVersion);
+
+        Assert.Equal(
+            "Reviewed",
+            result.Status);
+
+        alerts.Verify(
+            x => x.Update(alert),
+            Times.Once);
+
+        unit.Verify(
+            x => x.SaveChangesAsync(
+                It.IsAny<
+                    CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task
+        Review_RejectsStaleReviewVersion()
+    {
+        var (
+            service,
+            alerts,
+            _,
+            unit,
+            _) = Create();
+
+        var alert =
+            new QaAlert
+            {
+                Id = Guid.NewGuid(),
+                Status =
+                    QaAlertStatus.Open,
+                ReviewVersion = 2,
+                TimestampUtc =
+                    DateTimeOffset.UtcNow,
+                CreatedAtUtc =
+                    DateTimeOffset.UtcNow,
+                UpdatedAtUtc =
+                    DateTimeOffset.UtcNow
+            };
+
+        alerts
+            .Setup(x =>
+                x.GetByIdAsync(
+                    alert.Id,
+                    It.IsAny<
+                        CancellationToken>()))
+            .ReturnsAsync(alert);
+
+        await Assert.ThrowsAsync<
+            InvalidOperationException>(
+            () =>
+                service.ReviewAsync(
+                    alert.Id,
+                    Guid.NewGuid(),
+                    new ReviewQaAlertRequest
+                    {
+                        Decision =
+                            "Ignored",
+                        ExpectedReviewVersion =
+                            1
+                    }));
+
+        alerts.Verify(
+            x => x.Update(
+                It.IsAny<QaAlert>()),
+            Times.Never);
+
+        unit.Verify(
+            x => x.SaveChangesAsync(
+                It.IsAny<
+                    CancellationToken>()),
+            Times.Never);
+    }
+
 }

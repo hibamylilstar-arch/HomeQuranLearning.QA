@@ -15,6 +15,8 @@ public sealed class QaRetentionCleanupWorker :
         TimeSpan.FromDays(7);
 
     private const int BatchSize = 1000;
+    private const int MaxChunkBatchesPerPass = 100;
+    private const int MaxAlertBatchesPerPass = 20;
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<QaRetentionCleanupWorker> _logger;
@@ -147,75 +149,98 @@ public sealed class QaRetentionCleanupWorker :
         DateTimeOffset claimCutoffUtc,
         CancellationToken ct)
     {
-        IQueryable<Guid> activeSessions =
-            db.QaAudioChunks
-                .Where(
-                    x =>
-                        x.ProcessedAtUtc == null &&
-                        x.ClaimedAtUtc.HasValue &&
-                        x.ClaimedAtUtc.Value >
-                            claimCutoffUtc)
-                .Select(x => x.SessionId);
+        int totalDeleted = 0;
 
-        List<StorageTarget> rows =
-            await db.QaAudioChunks
-                .AsNoTracking()
-                .Where(
-                    x =>
-                        (
-                            x.DeleteAfterUtc <=
-                                nowUtc ||
-                            x.CreatedAtUtc <=
-                                chunkCutoffUtc
-                        ) &&
-                        !activeSessions.Contains(
-                            x.SessionId))
-                .OrderBy(x => x.CreatedAtUtc)
-                .Take(BatchSize)
-                .Select(
-                    x =>
-                        new StorageTarget(
-                            x.Id,
-                            x.StorageKey))
-                .ToListAsync(ct);
-
-        List<Guid> deletedIds = new();
-
-        foreach (StorageTarget row in rows)
+        for (
+            int batchNumber = 0;
+            batchNumber < MaxChunkBatchesPerPass;
+            batchNumber++)
         {
-            try
-            {
-                await storage.DeleteAsync(
-                    bucket,
-                    row.StorageKey!,
-                    ct);
+            IQueryable<Guid> activeSessions =
+                db.QaAudioChunks
+                    .Where(
+                        x =>
+                            x.ProcessedAtUtc == null &&
+                            x.ClaimedAtUtc.HasValue &&
+                            x.ClaimedAtUtc.Value >
+                                claimCutoffUtc)
+                    .Select(x => x.SessionId);
 
-                deletedIds.Add(row.Id);
-            }
-            catch (OperationCanceledException)
-                when (ct.IsCancellationRequested)
+            List<StorageTarget> rows =
+                await db.QaAudioChunks
+                    .AsNoTracking()
+                    .Where(
+                        x =>
+                            (
+                                x.DeleteAfterUtc <=
+                                    nowUtc ||
+                                x.CreatedAtUtc <=
+                                    chunkCutoffUtc
+                            ) &&
+                            !activeSessions.Contains(
+                                x.SessionId))
+                    .OrderBy(x => x.CreatedAtUtc)
+                    .Take(BatchSize)
+                    .Select(
+                        x =>
+                            new StorageTarget(
+                                x.Id,
+                                x.StorageKey))
+                    .ToListAsync(ct);
+
+            if (rows.Count == 0)
             {
-                throw;
+                break;
             }
-            catch (Exception ex)
+
+            List<Guid> deletedIds = new();
+
+            foreach (StorageTarget row in rows)
             {
-                _logger.LogWarning(
-                    ex,
-                    "QA chunk cleanup failed for {StorageKey}.",
-                    row.StorageKey);
+                try
+                {
+                    await storage.DeleteAsync(
+                        bucket,
+                        row.StorageKey!,
+                        ct);
+
+                    deletedIds.Add(row.Id);
+                }
+                catch (OperationCanceledException)
+                    when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "QA chunk cleanup failed for {StorageKey}.",
+                        row.StorageKey);
+                }
+            }
+
+            if (deletedIds.Count == 0)
+            {
+                break;
+            }
+
+            int deleted =
+                await db.QaAudioChunks
+                    .Where(
+                        x =>
+                            deletedIds.Contains(x.Id))
+                    .ExecuteDeleteAsync(ct);
+
+            totalDeleted += deleted;
+
+            if (rows.Count < BatchSize)
+            {
+                break;
             }
         }
 
-        if (deletedIds.Count == 0)
-        {
-            return 0;
-        }
-
-        return await db.QaAudioChunks
-            .Where(
-                x =>
-                    deletedIds.Contains(x.Id))
-            .ExecuteDeleteAsync(ct);
+        return totalDeleted;
     }
 
     private async Task<int> CleanupAlertsAsync(
@@ -225,66 +250,89 @@ public sealed class QaRetentionCleanupWorker :
         DateTimeOffset qaCutoffUtc,
         CancellationToken ct)
     {
-        List<StorageTarget> rows =
-            await db.QaAlerts
-                .AsNoTracking()
-                .Where(
-                    x =>
-                        x.CreatedAtUtc <=
-                            qaCutoffUtc)
-                .OrderBy(x => x.CreatedAtUtc)
-                .Take(BatchSize)
-                .Select(
-                    x =>
-                        new StorageTarget(
-                            x.Id,
-                            x.EvidenceStorageKey))
-                .ToListAsync(ct);
+        int totalDeleted = 0;
 
-        List<Guid> deletedIds = new();
-
-        foreach (StorageTarget row in rows)
+        for (
+            int batchNumber = 0;
+            batchNumber < MaxAlertBatchesPerPass;
+            batchNumber++)
         {
-            if (string.IsNullOrWhiteSpace(
-                    row.StorageKey))
+            List<StorageTarget> rows =
+                await db.QaAlerts
+                    .AsNoTracking()
+                    .Where(
+                        x =>
+                            x.CreatedAtUtc <=
+                                qaCutoffUtc)
+                    .OrderBy(x => x.CreatedAtUtc)
+                    .Take(BatchSize)
+                    .Select(
+                        x =>
+                            new StorageTarget(
+                                x.Id,
+                                x.EvidenceStorageKey))
+                    .ToListAsync(ct);
+
+            if (rows.Count == 0)
             {
-                deletedIds.Add(row.Id);
-                continue;
+                break;
             }
 
-            try
-            {
-                await storage.DeleteAsync(
-                    bucket,
-                    row.StorageKey,
-                    ct);
+            List<Guid> deletedIds = new();
 
-                deletedIds.Add(row.Id);
-            }
-            catch (OperationCanceledException)
-                when (ct.IsCancellationRequested)
+            foreach (StorageTarget row in rows)
             {
-                throw;
+                if (string.IsNullOrWhiteSpace(
+                        row.StorageKey))
+                {
+                    deletedIds.Add(row.Id);
+                    continue;
+                }
+
+                try
+                {
+                    await storage.DeleteAsync(
+                        bucket,
+                        row.StorageKey,
+                        ct);
+
+                    deletedIds.Add(row.Id);
+                }
+                catch (OperationCanceledException)
+                    when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "QA evidence cleanup failed for {StorageKey}.",
+                        row.StorageKey);
+                }
             }
-            catch (Exception ex)
+
+            if (deletedIds.Count == 0)
             {
-                _logger.LogWarning(
-                    ex,
-                    "QA evidence cleanup failed for {StorageKey}.",
-                    row.StorageKey);
+                break;
+            }
+
+            int deleted =
+                await db.QaAlerts
+                    .Where(
+                        x =>
+                            deletedIds.Contains(x.Id))
+                    .ExecuteDeleteAsync(ct);
+
+            totalDeleted += deleted;
+
+            if (rows.Count < BatchSize)
+            {
+                break;
             }
         }
 
-        if (deletedIds.Count == 0)
-        {
-            return 0;
-        }
-
-        return await db.QaAlerts
-            .Where(
-                x =>
-                    deletedIds.Contains(x.Id))
-            .ExecuteDeleteAsync(ct);
+        return totalDeleted;
     }
 
     private sealed record StorageTarget(

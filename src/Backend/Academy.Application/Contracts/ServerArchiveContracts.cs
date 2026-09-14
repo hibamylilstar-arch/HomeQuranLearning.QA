@@ -53,5 +53,6 @@ public sealed class RelayPublishAuthRequest
 
 public sealed class ServerArchiveTargetResponse
 {
+    public string DeviceId { get; set; } = string.Empty;
     public string StreamKey { get; set; } = string.Empty;
 }

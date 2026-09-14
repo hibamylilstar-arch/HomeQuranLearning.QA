@@ -61,6 +61,10 @@ public sealed class ServerArchiveTargetTests
         var target = Assert.Single(targets);
 
         Assert.Equal(
+            "online-device",
+            target.DeviceId);
+
+        Assert.Equal(
             "stream-online",
             target.StreamKey);
     }

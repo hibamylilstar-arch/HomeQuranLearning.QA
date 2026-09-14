@@ -16,6 +16,27 @@ MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY", "")
 MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY", "")
 BUCKET = os.environ.get("MINIO_BUCKET", "academy-recordings")
 POLL = max(1.0, float(os.environ.get("POLL_SECONDS", "2")))
+
+RETRY_BASE_SECONDS = max(
+    POLL,
+    float(
+        os.environ.get(
+            "RETRY_BASE_SECONDS",
+            "5",
+        )
+    ),
+)
+
+RETRY_MAX_SECONDS = max(
+    RETRY_BASE_SECONDS,
+    float(
+        os.environ.get(
+            "RETRY_MAX_SECONDS",
+            "300",
+        )
+    ),
+)
+
 STREAM_COPY_VERIFIED = os.environ.get(
     "VIDEO_STREAM_COPY_VERIFIED", "false"
 ).lower() == "true"
@@ -23,6 +44,8 @@ STREAM_COPY_VERIFIED = os.environ.get(
 CANONICAL_CLASSROOM_AUDIO_TITLE = (
     "Academy Class Mixed Audio"
 )
+
+DEVICE_ID_FILE = ".device-id"
 
 
 def iso_utc(value):
@@ -42,6 +65,52 @@ def parse_identity(segment):
         raise ValueError("Finalized archive filename is invalid.")
     started = datetime.fromtimestamp(int(Path(name).stem), tz=timezone.utc)
     return stream_key, started
+
+
+def valid_device_id(value):
+    return bool(
+        value
+        and value == value.strip()
+        and len(value) <= 128
+        and "\n" not in value
+        and "\r" not in value
+        and "/" not in value
+        and "\\" not in value
+    )
+
+
+def read_device_identity(segment):
+    identity = segment.parent / DEVICE_ID_FILE
+
+    if not identity.is_file():
+        return None
+
+    device_id = identity.read_text(
+        encoding="utf-8"
+    ).strip()
+
+    if not valid_device_id(device_id):
+        raise RuntimeError(
+            "Archive device identity sidecar is invalid."
+        )
+
+    return device_id
+
+
+def retry_delay(attempt):
+    exponent = max(
+        0,
+        min(
+            int(attempt) - 1,
+            16,
+        ),
+    )
+
+    return min(
+        RETRY_MAX_SECONDS,
+        RETRY_BASE_SECONDS
+        * (2 ** exponent),
+    )
 
 
 def probe(segment):
@@ -143,6 +212,8 @@ class Registrar:
             secure=False,
         )
 
+        self.retry_state = {}
+
     def resolve_device(self, stream_key):
         response = self.http.post(
             f"{BACKEND}/api/worker/server-recordings/resolve-device",
@@ -160,12 +231,18 @@ class Registrar:
         if not segment.is_file():
             raise RuntimeError("Finalized marker has no media file.")
         stream_key, started = parse_identity(segment)
+
+        device_id = (
+            read_device_identity(segment)
+            or self.resolve_device(stream_key)
+        )
+
         codec, seconds = probe(segment)
         ended = started + timedelta(seconds=seconds)
         size = segment.stat().st_size
+
         if size <= 0:
             raise RuntimeError("Finalized archive is empty.")
-        device_id = self.resolve_device(stream_key)
         file_name, key = storage_identity(device_id, started)
         if not self.minio.bucket_exists(BUCKET):
             self.minio.make_bucket(BUCKET)
@@ -210,14 +287,90 @@ class Registrar:
                 time.sleep(60)
         print("Recording archive registrar started.", flush=True)
         while True:
-            for marker in sorted(ROOT.rglob("*.mp4.ready")):
+            markers = sorted(
+                ROOT.rglob("*.mp4.ready")
+            )
+
+            marker_set = set(markers)
+
+            for stale in list(
+                self.retry_state
+            ):
+                if stale not in marker_set:
+                    self.retry_state.pop(
+                        stale,
+                        None,
+                    )
+
+            for marker in markers:
+                now = time.monotonic()
+
+                previous = self.retry_state.get(
+                    marker
+                )
+
+                if (
+                    previous is not None
+                    and now < previous[1]
+                ):
+                    continue
+
                 try:
                     self.process(marker)
+
+                    self.retry_state.pop(
+                        marker,
+                        None,
+                    )
+
                 except Exception as exc:
+                    previous = self.retry_state.get(
+                        marker
+                    )
+
+                    attempt = (
+                        previous[0] + 1
+                        if previous is not None
+                        else 1
+                    )
+
+                    delay = retry_delay(
+                        attempt
+                    )
+
+                    self.retry_state[marker] = (
+                        attempt,
+                        time.monotonic()
+                        + delay,
+                    )
+
+                    response = getattr(
+                        exc,
+                        "response",
+                        None,
+                    )
+
+                    status = getattr(
+                        response,
+                        "status_code",
+                        None,
+                    )
+
+                    status_text = (
+                        f" status={status}"
+                        if status is not None
+                        else ""
+                    )
+
                     print(
-                        f"Archive retry pending: {type(exc).__name__}",
+                        "Archive retry pending: "
+                        f"{type(exc).__name__}"
+                        f"{status_text} "
+                        f"attempt={attempt} "
+                        f"retry_in={delay:.0f}s",
                         flush=True,
                     )
+
             time.sleep(POLL)
 
 
@@ -234,6 +387,10 @@ def self_test():
         name, storage = storage_identity("device-a", started)
         assert name == "server-1700000000.mp4"
         assert storage.startswith("server-recordings/device-a/")
+
+        assert retry_delay(1) == RETRY_BASE_SECONDS
+        assert retry_delay(2) >= retry_delay(1)
+        assert retry_delay(100) == RETRY_MAX_SECONDS
     finally:
         ROOT = old
     print("REGISTRAR_SELF_TEST=PASS")

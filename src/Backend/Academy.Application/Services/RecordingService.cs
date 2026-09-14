@@ -303,19 +303,26 @@ public sealed class RecordingService
                 device.Status == DeviceStatus.Online &&
                 device.LastSeenUtc >= recentOnlineCutoff &&
                 !string.IsNullOrWhiteSpace(device.LiveKitStreamKey))
-            .Select(device => device.LiveKitStreamKey!.Trim())
-            .Where(streamKey =>
-                !streamKey.Contains('/') &&
-                !streamKey.Contains('\\'))
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(
-                streamKey => streamKey,
-                StringComparer.Ordinal)
-            .Select(streamKey =>
+            .Select(device =>
                 new ServerArchiveTargetResponse
                 {
-                    StreamKey = streamKey
+                    DeviceId = device.DeviceId.Trim(),
+                    StreamKey =
+                        device.LiveKitStreamKey!.Trim()
                 })
+            .Where(target =>
+                !string.IsNullOrWhiteSpace(
+                    target.DeviceId) &&
+                !target.StreamKey.Contains('/') &&
+                !target.StreamKey.Contains('\\'))
+            .GroupBy(
+                target => target.StreamKey,
+                StringComparer.Ordinal)
+            .Where(group => group.Count() == 1)
+            .Select(group => group.Single())
+            .OrderBy(
+                target => target.StreamKey,
+                StringComparer.Ordinal)
             .ToArray();
     }
 

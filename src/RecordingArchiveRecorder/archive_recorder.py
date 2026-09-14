@@ -54,6 +54,8 @@ CANONICAL_CLASSROOM_AUDIO_TITLE = (
     "Academy Class Mixed Audio"
 )
 
+DEVICE_ID_FILE = ".device-id"
+
 shutdown = threading.Event()
 
 
@@ -63,6 +65,60 @@ def valid_stream_key(value):
         and "/" not in value
         and "\\" not in value
     )
+
+
+def valid_device_id(value):
+    return bool(
+        value
+        and value == value.strip()
+        and len(value) <= 128
+        and "\n" not in value
+        and "\r" not in value
+        and "/" not in value
+        and "\\" not in value
+    )
+
+
+def write_device_identity(directory, device_id):
+    if not valid_device_id(device_id):
+        raise RuntimeError(
+            "Archive target device identity is invalid."
+        )
+
+    identity = directory / DEVICE_ID_FILE
+
+    if identity.exists():
+        existing = identity.read_text(
+            encoding="utf-8"
+        ).strip()
+
+        if existing != device_id:
+            raise RuntimeError(
+                "Archive stream device identity changed."
+            )
+
+        return
+
+    temporary = directory / (
+        f"{DEVICE_ID_FILE}.tmp-"
+        f"{os.getpid()}-"
+        f"{threading.get_ident()}"
+    )
+
+    temporary.write_text(
+        device_id + "\n",
+        encoding="utf-8",
+    )
+
+    try:
+        os.replace(
+            temporary,
+            identity,
+        )
+    finally:
+        temporary.unlink(
+            missing_ok=True,
+        )
 
 
 def build_url(stream_key):
@@ -244,8 +300,9 @@ def recover_orphans():
 
 
 class StreamWorker:
-    def __init__(self, stream_key):
+    def __init__(self, stream_key, device_id):
         self.stream_key = stream_key
+        self.device_id = device_id
         self.stop_event = threading.Event()
 
         self.thread = threading.Thread(
@@ -269,6 +326,11 @@ class StreamWorker:
         directory.mkdir(
             parents=True,
             exist_ok=True,
+        )
+
+        write_device_identity(
+            directory,
+            self.device_id,
         )
 
         output = str(
@@ -419,7 +481,7 @@ class ArchiveRecorder:
                 "Archive target response is invalid."
             )
 
-        targets = set()
+        targets = {}
 
         for item in values:
             if not isinstance(item, dict):
@@ -430,19 +492,61 @@ class ArchiveRecorder:
                 or ""
             ).strip()
 
-            if valid_stream_key(key):
-                targets.add(key)
+            device_id = (
+                item.get("deviceId")
+                or ""
+            ).strip()
+
+            if (
+                not valid_stream_key(key)
+                or not valid_device_id(device_id)
+            ):
+                continue
+
+            existing = targets.get(key)
+
+            if (
+                existing is not None
+                and existing != device_id
+            ):
+                raise RuntimeError(
+                    "Archive target stream key is ambiguous."
+                )
+
+            targets[key] = device_id
 
         return targets
 
     def reconcile(self, targets):
         existing = set(self.workers)
+        desired = set(targets)
 
         for stream_key in sorted(
-            targets - existing
+            existing & desired
+        ):
+            if (
+                self.workers[stream_key].device_id
+                != targets[stream_key]
+            ):
+                raise RuntimeError(
+                    "Active archive stream device identity changed."
+                )
+
+        for stream_key in sorted(
+            existing - desired
+        ):
+            worker = self.workers.pop(
+                stream_key
+            )
+
+            worker.stop()
+
+        for stream_key in sorted(
+            desired - existing
         ):
             worker = StreamWorker(
-                stream_key
+                stream_key,
+                targets[stream_key],
             )
 
             self.workers[
@@ -450,15 +554,6 @@ class ArchiveRecorder:
             ] = worker
 
             worker.start()
-
-        for stream_key in sorted(
-            existing - targets
-        ):
-            worker = self.workers.pop(
-                stream_key
-            )
-
-            worker.stop()
 
     def run(self):
         ROOT.mkdir(
@@ -510,6 +605,13 @@ def self_test():
     assert not valid_stream_key("")
     assert not valid_stream_key("live/abc")
     assert not valid_stream_key(r"live\abc")
+
+    assert valid_device_id(
+        "82f9b22d-2d5b-46b2-b372-ef864219e383"
+    )
+    assert not valid_device_id("")
+    assert not valid_device_id("bad/device")
+
     assert SEGMENT_SECONDS >= 60
 
     print(

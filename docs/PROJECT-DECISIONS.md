@@ -308,3 +308,24 @@ Status: accepted Owner clarification 2026-09-15.
   of proven Live behavior.
 - Product priority `Audio -> Live -> QA -> Recording` describes importance; it
   does not assert that Audio currently has an open incident.
+## RBAC-002 - Manager dashboard surface
+
+Status: accepted Owner requirement 2026-09-15.
+
+- Manager dashboard navigation is limited to Live Monitoring and the Academy
+  section.
+- Academy includes Teachers, Students, Courses, Schedules, Sessions and
+  Attendance.
+- Overview, Devices page, Recordings, Quality pages, Users and Activity Log are
+  not shown to Manager accounts.
+- If a Manager manually opens a restricted dashboard URL, the dashboard shows a
+  professional centered `Administration Access Required` state instead of
+  rendering the restricted page.
+- Manager login/root navigation lands on Live Monitoring.
+- UI hiding is not the security boundary. Restricted Recordings, QA Alerts and
+  Activity Log API families require Administration authorization.
+- Scoped device-list access remains available to Managers because Live
+  Monitoring and Schedules require visible device metadata. The standalone
+  Devices dashboard page remains restricted.
+- Existing Academy data behavior and Manager assignment/scoping logic are not
+  broadened or redesigned by this decision.

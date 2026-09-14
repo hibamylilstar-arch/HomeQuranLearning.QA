@@ -896,7 +896,7 @@ app.MapGet("/api/admin/activity-logs", async (
     {
         return Results.Forbid();
     }
-}).RequireAuthorization(OwnerAdminManagerPolicy);
+}).RequireAuthorization(OwnerOrAdminPolicy);
 app.MapGet("/api/admin/devices", async (
     ClaimsPrincipal user,
     HttpRequest request,
@@ -1095,7 +1095,7 @@ app.MapGet("/api/admin/recordings", async (
     var (userId, role) = GetUserInfo(user);
     var recordings = await dashboardQueryService.GetVisibleRecordingsAsync(userId, role, cancellationToken);
     return Results.Ok(recordings);
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapGet("/api/admin/recordings/{recordingId:guid}/playback-url", async (
     ClaimsPrincipal user,
@@ -1138,7 +1138,7 @@ app.MapGet("/api/admin/recordings/{recordingId:guid}/playback-url", async (
         return Results.BadRequest(
             new { error = "Recording file is not available." });
     }
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapGet("/api/admin/recordings/{recordingId:guid}/download-url", async (
     ClaimsPrincipal user,
@@ -1183,7 +1183,7 @@ app.MapGet("/api/admin/recordings/{recordingId:guid}/download-url", async (
         url,
         fileName = recording.FileName
     });
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPost("/api/admin/recordings/{recordingId:guid}/preserve", async (
     ClaimsPrincipal user,
@@ -1211,7 +1211,7 @@ app.MapPost("/api/admin/recordings/{recordingId:guid}/preserve", async (
         cancellationToken);
 
     return Results.Ok(new { preserved = true });
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPost("/api/admin/recordings/{recordingId:guid}/unpreserve", async (
     ClaimsPrincipal user,
@@ -1239,7 +1239,7 @@ app.MapPost("/api/admin/recordings/{recordingId:guid}/unpreserve", async (
         cancellationToken);
 
     return Results.Ok(new { preserved = false });
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapDelete("/api/admin/recordings/{recordingId:guid}", async (
     ClaimsPrincipal user,
@@ -1327,7 +1327,7 @@ app.MapGet("/api/admin/qa-alerts", async (
     var (userId, role) = GetUserInfo(user);
     var alerts = await dashboardQueryService.GetVisibleQaAlertsAsync(userId, role, cancellationToken);
     return Results.Ok(alerts);
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapGet("/api/admin/qa-alerts/{alertId:guid}/evidence-playback", async (
     ClaimsPrincipal user,
@@ -1402,7 +1402,7 @@ app.MapGet("/api/admin/qa-alerts/{alertId:guid}/evidence-playback", async (
         evidenceBytes,
         contentType,
         enableRangeProcessing: true);
-}).RequireAuthorization();
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapPost("/api/admin/qa-alerts/{alertId:guid}/review", async (
     ClaimsPrincipal user,
@@ -1473,7 +1473,7 @@ app.MapPost("/api/admin/qa-alerts/{alertId:guid}/review", async (
                     "QA alert was updated by another reviewer. Refresh and try again."
             });
     }
-}).RequireAuthorization(OwnerAdminManagerPolicy);
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapGet("/api/admin/users", async (
     ClaimsPrincipal user,

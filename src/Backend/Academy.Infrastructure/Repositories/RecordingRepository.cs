@@ -39,20 +39,7 @@ public sealed class RecordingRepository : IRecordingRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Recording>> GetPendingQaAsync(
-        CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.Recordings
-            .AsNoTracking()
-            .Where(x =>
-                x.Status == RecordingStatus.Uploaded &&
-                x.QaProcessedAtUtc == null &&
-                x.AudioLayoutVersion == 1)
-            .OrderByDescending(x => x.StartedAtUtc)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<Recording?> GetByIdAsync(
+public async Task<Recording?> GetByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {
@@ -60,27 +47,7 @@ public sealed class RecordingRepository : IRecordingRepository
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
-    public async Task<Recording?> GetByIdWithQaProvenanceAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.Recordings
-            .Include(x => x.Device)
-            .Include(x => x.Teacher)
-            .Include(x => x.Session)
-                .ThenInclude(x => x!.Teacher)
-            .Include(x => x.Session)
-                .ThenInclude(x => x!.Student)
-            .Include(x => x.Session)
-                .ThenInclude(x => x!.Course)
-            .Include(x => x.Session)
-                .ThenInclude(x => x!.Device)
-            .FirstOrDefaultAsync(
-                x => x.Id == id,
-                cancellationToken);
-    }
-
-    public async Task<Recording?> GetByDeviceAndFileNameAsync(
+public async Task<Recording?> GetByDeviceAndFileNameAsync(
         Guid deviceId,
         string fileName,
         CancellationToken cancellationToken = default)

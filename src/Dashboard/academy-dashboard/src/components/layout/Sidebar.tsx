@@ -12,7 +12,6 @@ type IconName =
   | "recordings"
   | "rules"
   | "alerts"
-  | "candidates"
   | "teachers"
   | "students"
   | "courses"
@@ -94,14 +93,6 @@ function NavIcon({
     );
   }
 
-  if (name === "candidates") {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={common} aria-hidden="true">
-        <circle cx="10" cy="10" r="5" />
-        <path d="m14 14 6 6M8 10l1.4 1.4L12.5 8" />
-      </svg>
-    );
-  }
 
   if (
     name === "teachers" ||
@@ -236,11 +227,6 @@ export default function Sidebar({
           name: "QA Alerts",
           href: "/qa-alerts",
           icon: "alerts" as IconName,
-        },
-        {
-          name: "QA Candidates",
-          href: "/qa-candidates",
-          icon: "candidates" as IconName,
         },
       ],
     },

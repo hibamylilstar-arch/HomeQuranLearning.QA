@@ -40,9 +40,6 @@ public sealed class QaAlert
 
     public string? AnalysisIdempotencyKey { get; set; }
 
-    // Direct-audio provenance. Intentionally no FK because raw
-    // transport chunks are short-lived while alert history is longer.
-    public Guid? SourceQaAudioChunkId { get; set; }
 
     // Standalone evidence generated from direct QA chunks.
     // Recording-backed historical alerts leave these null.
@@ -83,5 +80,4 @@ public sealed class QaAlert
 
     public DateTimeOffset UpdatedAtUtc { get; set; }
 
-    public QaCandidate? ConfirmedCandidate { get; set; }
 }

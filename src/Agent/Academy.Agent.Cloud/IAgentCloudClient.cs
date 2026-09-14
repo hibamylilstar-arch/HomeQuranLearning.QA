@@ -10,33 +10,9 @@ public interface IAgentCloudClient
         string deviceId,
         CancellationToken cancellationToken = default);
 
-    Task<AgentQaRestrictedRuleResponse> GetQaRestrictedRuleAsync(
+    Task<AgentQaRestrictedRulesResponse> GetQaRestrictedRulesAsync(
         string deviceId,
         CancellationToken cancellationToken = default);
-
-    async Task<AgentQaRestrictedRulesResponse>
-        GetQaRestrictedRulesAsync(
-            string deviceId,
-            CancellationToken cancellationToken = default)
-    {
-        AgentQaRestrictedRuleResponse rule =
-            await GetQaRestrictedRuleAsync(
-                deviceId,
-                cancellationToken);
-
-        var response =
-            new AgentQaRestrictedRulesResponse();
-
-        if (rule.Enabled &&
-            rule.QaRuleId.HasValue &&
-            !string.IsNullOrWhiteSpace(
-                rule.Phrase))
-        {
-            response.Rules.Add(rule);
-        }
-
-        return response;
-    }
 
     Task<AgentLocalRestrictedQaAlertResponse>
         UploadLocalRestrictedQaAlertAsync(
@@ -45,10 +21,6 @@ public interface IAgentCloudClient
 
     Task<AgentSessionEventResponse> SubmitSessionEventAsync(
         AgentSessionEventRequest request,
-        CancellationToken cancellationToken = default);
-
-    Task<AgentQaAudioChunkResponse> UploadQaAudioChunkAsync(
-        QaAudioChunkUploadRequest request,
         CancellationToken cancellationToken = default);
 
     Task<RecordingResponse> SubmitRecordingAsync(

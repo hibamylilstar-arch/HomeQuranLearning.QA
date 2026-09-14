@@ -229,7 +229,6 @@ public sealed class AuditSaveChangesInterceptor :
             Recording or
             QaRule or
             QaAlert or
-            QaCandidate or
             ManagerTeacherAssignment or
             DeviceTeacherAssignment;
     }
@@ -250,9 +249,6 @@ public sealed class AuditSaveChangesInterceptor :
 
             QaAlert =>
                 "QA Alert",
-
-            QaCandidate =>
-                "QA Review",
 
             _ =>
                 entity.GetType().Name
@@ -468,23 +464,6 @@ public sealed class AuditSaveChangesInterceptor :
                 "DeletedAtUtc") is not null
         ) {
             return "Deleted";
-        }
-
-        if (
-            entry.Entity is QaCandidate &&
-            (
-                Changed(
-                    entry,
-                    "ReviewVersion") ||
-                Changed(
-                    entry,
-                    "ReviewReason") ||
-                Changed(
-                    entry,
-                    "Status")
-            )
-        ) {
-            return "Reviewed";
         }
 
         if (

@@ -1,344 +1,97 @@
-# HomeQuranLearning.QA — Current Technical State
+# Current Architecture
 
-## Status
+## Windows Agent
 
-Canonical checkpoint:
+The Agent is responsible for:
 
-- Working branch: `codex/final-classroom-agent-installer`
-- Current phase base: `f4426c1`
-- Latest closed product phase: `7A-6 — attendance operations/reporting`
-- Current product phase: production rollout and classroom installer completion
-- Phase status: `IN_PROGRESS`; production routing, roaming Agent access, Owner user management, responsive dashboard and classroom installer are being finalized for VPS rollout.
-- Current QA limitation: legacy layout-0 recordings capture system/loopback audio only and remain non-attributable. New layout-1 recordings have proven teacher-microphone provenance. 7A-5C now adds a versioned, fail-closed lexical baseline that classifies timestamped teacher-track windows and posts review candidates only; production accuracy is not yet claimed.
+- device heartbeat
+- session awareness
+- screen capture
+- classroom audio capture
+- live publishing
+- recording
+- local restricted-word QA detection
+- local QA evidence buffering/upload
 
-Canonical resumable state: `docs/PROJECT-STATE.md`
+## Shared Audio
 
-## Purpose
+`ClassroomAudioRuntime` and `ClassroomAudioHub` are the shared audio
+foundation.
 
-Private internal QA, attendance, monitoring and evidence system for an online Quran academy using academy-owned/managed Windows teacher laptops.
+Live monitoring, recording, and QA must not independently compete for the
+same physical microphone endpoint.
 
-Expected scale:
+## Live Monitoring
 
-- 20+ teachers
-- approximately 15 simultaneous teacher laptops/classes at peak
-- roughly 2–3 hour peak windows
-- mostly stable teacher/device mapping with occasional substitutions
+Supported path:
 
-## Production engineering and VPS policy
+Agent capture
+→ FFmpeg
+→ LiveKit Ingress
+→ LiveKit
+→ dashboard
 
-Git remains the engineering source of truth. Production uses public HTTPS, application authentication, RBAC and outbound-only teacher Agents. Roaming teacher devices are not trusted or restricted by source IP. Releases are verified locally, committed/pushed normally, deployed to the VPS, then health/runtime verified. Destructive database/evidence operations and secret/security mutations remain separately protected.
-
-## Stack
-
-### Backend
-- ASP.NET Core
-- .NET 10
-- EF Core
-- PostgreSQL
+Screen video uses the proven `ddagrab` path.
 
-### Infrastructure
-- PostgreSQL
-- Redis
-- MinIO
-- LiveKit
-- LiveKit Ingress
-- ingress-manager
-- Docker Compose
+## QA
 
-### Dashboard
-- Next.js
-- React
-- TypeScript
+Supported path:
 
-### Agent
-- Academy.Agent.Service
-- Academy.Agent.Cloud
-- Academy.Agent.Audio
-- Academy.Agent.Capture
-- Academy.Agent.Media
-- Academy.Agent.Teams
-- Academy.Agent.TeamsHelper
+ClassroomAudioHub
+→ QaLocalVoskWorker
+→ active restricted rules
+→ local Vosk phrase detection
+→ local pre/post evidence WAV
+→ QA alert API
+→ QaAlert
+→ dashboard
 
-## Live monitoring — proven
+No server-side continuous STT worker is part of the supported design.
 
-```text
-Windows Agent
--> FFmpeg RTMP
--> LiveKit Ingress
--> LiveKit
--> Browser Dashboard
-```
+## QA Evidence
 
-Current proven screen path uses FFmpeg `ddagrab`.
+Evidence is captured locally around a restricted-word match.
 
-Known-good timing:
+Target evidence window:
 
-```text
-framerate=10
-dup_frames=1
-hwdownload
-format=bgra
-setpts=N/(10*TB)
-```
+- about 10 seconds before detection
+- about 20 seconds after detection
 
-Current system-audio path:
+Evidence is uploaded as WAV and associated directly with the resulting alert.
 
-```text
-NAudio / WASAPI loopback
--> local UDP
--> FFmpeg AAC
--> LiveKit
-```
+## Dashboard
 
-Live screen + system audio and dashboard audio enable/disable have been proven end-to-end locally.
+Current relevant surfaces include:
 
-This system-audio proof is not teacher-microphone provenance. The phase 7A-5
-design preserves it for live/class context while adding a separately
-attributable teacher track for QA.
+- Live
+- Recordings
+- QA Alerts
+- QA Rules
+- Sessions
+- Schedules
+- Teachers
+- Students
+- Courses
+- Devices
+- Users
+- Attendance reports
 
-## Recording — proven
+There is no QA Candidates dashboard.
 
-Recording was changed away from huge raw BGRA temporary files.
+## Data Model
 
-Current direction:
+Current QA product entities include:
 
-```text
-screen/audio capture
--> FFmpeg
--> direct H264 MP4
--> upload/recovery pipeline
-```
+- QaRule
+- QaAlert
 
-Historical recording/session identity must remain safe across later schedule or mapping changes.
+Retired experimental entities are absent from the current model.
 
-## Domain foundation
+Historical migration files may still reference retired entities.
 
-Implemented foundations include:
+## Retention
 
-- users
-- Owner/Admin/Manager roles and partial Manager teacher filtering
-- teachers
-- students
-- courses
-- devices
-- manager-teacher assignments
-- device heartbeats
-- schedules
-- sessions
-- session events
-- recordings
-- QA rules
-- QA alerts
+QA alert evidence cleanup is based on the current alert evidence retention
+policy.
 
-Auth includes JWT/HTTP-only dashboard flow plus agent and worker API keys.
-
-Some Manager-facing resources are filtered to assigned-teacher scope. Reconnaissance found important routes and playback/live/token operations that still lack complete permission + resource-scope enforcement. Treat authorization as incomplete until planned stabilization/O1 work is proved.
-
-## Scheduling/history
-
-Completed historical sessions must retain original TeacherId, StudentId, CourseId, DeviceId and scheduled window.
-
-## Attendance
-
-Implemented states include Unknown, Present, Late, Absent, Excused and NeedsReview.
-
-Review states include Pending, AutoResolved and Reviewed.
-
-Late threshold: `3 minutes`
-
-Teacher pre-class ready window: `5 minutes`
-
-Attendance is evidence-driven.
-
-## Teams attendance — completed
-
-Architecture:
-
-```text
-Academy.Agent.Service
-<-> secured Named Pipe
-<-> Academy.Agent.TeamsHelper
--> Teams UI Automation / WebView
-```
-
-Proven:
-
-- exact scheduled-student chat binding
-- outgoing message detection
-- stable IDs/timestamps
-- lesson attachment evidence
-- call snapshots/lifecycle
-- durable evidence journal
-- backend delivery
-- PostgreSQL persistence
-- dedupe/idempotency
-
-Backend event types:
-
-```text
-TeacherGreetingSent  = 19
-CallAttempted        = 20
-StudentCallConnected = 21
-CallEnded            = 22
-LessonShared         = 23
-```
-
-Source: `TeamsUIAutomation`
-
-Current semantics:
-
-- TeacherGreetingSent = teacher evidence only
-- CallAttempted = teacher evidence only
-- StudentCallConnected = explicit student presence
-- CallEnded = stop/duration evidence
-- LessonShared = strong teacher and student presence evidence, but not an arrival timestamp
-
-StudentCallConnected within 3 minutes => Present; later => Late.
-
-Known example:
-
-```text
-StudentCallConnected +2m
-CallEnded +12m
-=> ActiveSeconds 600
-```
-
-CallEnded alone does not prove attendance.
-
-LessonShared requires exact scheduled student chat + outgoing teacher message + lesson-related text + actual image in the same message.
-
-Image alone is insufficient. Keyword-only text is insufficient. Filename/extension are not semantics.
-
-## Teams call lifecycle
-
-```text
-Available / Idle -> Attempting -> Connected -> Available
-```
-
-Real evidence path has been proven:
-
-```text
-Teams UI
--> evidence journal
--> delivery worker
--> /api/agent/session-events
--> PostgreSQL
--> AttendanceReducer
-```
-
-## Daily attendance
-
-Daily reporting foundation is implemented.
-
-Timezone: `Asia/Karachi` / `Pakistan Standard Time`
-
-Manager filtering must remain enforced.
-
-## QA/STT worker
-
-Current STT engine: `faster-whisper 1.2.1`
-
-Current production-wired source:
-
-`spikes/SttSpike/qa_worker.py`
-
-Docker wiring:
-
-`infrastructure/docker/Dockerfile.worker`
-
-Current worker endpoints include pending recordings, mark processed, active QA rules and create QA alert.
-
-## Phase 7A-1 — closed GREEN
-
-Commit: `415bbec`
-
-Implemented:
-
-- `PendingQaRecordingDto.StartedAtUtc`
-- `CreateQaAlertRequest.QaRuleId`
-- reusable Whisper model
-- normalized transcript index
-- cross-segment phrase matching
-- recording-relative alert timestamps
-- exact QA rule linkage
-- duplicate retry suppression
-- successful-processing-only `QaProcessedAtUtc`
-- failure remains pending
-
-Self-test markers:
-
-```text
-QA_WORKER_TRANSCRIPT_INDEX_OK
-QA_WORKER_CROSS_SEGMENT_MATCH_OK
-QA_WORKER_RULE_LINK_OK
-QA_WORKER_TIMESTAMP_ALIGNMENT_OK
-QA_WORKER_SELF_TEST_OK
-```
-
-Gates:
-
-- full build GREEN
-- unit 67/67
-- integration 2/2
-- production runtime/API/DB proof GREEN
-
-Historical post-cleanup snapshot:
-
-```text
-Recordings 148
-QA Rules 1
-QA Alerts 5
-Sessions 20
-Session Events 163
-```
-
-These counts are historical proof only, not permanent invariants.
-
-## Known runtime helper behavior
-
-`.dev-runtime/Runtime.ps1 StartApi` may briefly show API OFF immediately after launch even when HTTP readiness succeeds later. Use bounded HTTP readiness checks.
-
-## Next engineering work
-
-The local dashboard evidence/operational vertical slice is implemented, backend/runtime/browser-proven and pushed at `051fe9e`; operational hardening is released at `e127a19`. Direct-IP VPS preparation and the secured real-data pilot configuration are released. Remote execution starts with a read-only VPS inventory and exact old-copy classification before any deployment or deletion.
-
-The dashboard proof includes 0-error/0-warning lint, a successful production build, full backend build/tests, authenticated login and proxy HTTP checks, 401 unauthenticated behavior and 404 missing/inaccessible event behavior. Browser proof verified the unauthenticated redirect, approved Owner login, 20-session rendering, the six-event raw timeline, filter empty-state/recovery and logout back to `/login`.
-
-7A-2 is released on `codex/7a-2-transcript-segments` at `f4617e0`. 7A-3 is released at `a2b8aae`, and controlled local multi-laptop readiness 7A-4 is released at `ee42315`.
-
-The 7A-3 review workflow exposes persisted transcript segments in the recording player, maps QA alert timestamps to recording-relative offsets, and provides click-to-seek controls. QA Alerts links now open the relevant recording review. If playback is unavailable, transcript and QA evidence remain reviewable.
-
-Likely concerns:
-
-- Recording linkage
-- deterministic SegmentIndex
-- StartSeconds / EndSeconds
-- transcript text
-- language
-- meaningful Whisper probability/log metadata
-- idempotent retry
-- transactional batch persistence
-
-Required order:
-
-```text
-download
--> transcribe
--> persist transcript segments
--> evaluate/persist alerts
--> mark processed only after all success
-```
-
-Phase 7A-5A implements teacher-audio provenance and intentionally reuses the
-full recording rather than storing duplicate clips. The later 7A-5B/5C slices
-cover the human-reviewed candidate lifecycle, multilingual Arabic-recitation
-exclusion and timestamp offsets for ten seconds of context on each side. See
-`docs/architecture/teacher-audio-context-qa.md`.
-
-## Production
-
-Production/VPS remains deferred until local dashboard, transcript QA, stability and controlled multi-laptop readiness gates are green.
-
-## Owner Control Plane direction
-
-The dedicated Owner Control Plane is a required future product track, not a current completed capability. The target authorization model is authenticated user + granular permission + resource scope, enforced by the backend. It also includes organization assignment history, configurable recording retention, audit, and secure centralized device/Main-Agent lifecycle. See `docs/OWNER-CONTROL-PLANE.md`.
+The retired chunk-retention worker path is not supported.

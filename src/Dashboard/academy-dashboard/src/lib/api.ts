@@ -4,7 +4,6 @@ import type {
   RecordingListItem,
   QaRuleListItem,
   QaAlertListItem,
-  QaCandidateListItem,
   UserListItem,
   TeacherListItem,
   ManagerAssignmentListItem,
@@ -13,7 +12,6 @@ import type {
   ScheduleListItem,
   SessionListItem,
   SessionEventListItem,
-  TranscriptSegmentListItem,
   DailyAttendanceReport,
   ActivityLogPage,
   ActivityLogQueryOptions,
@@ -138,7 +136,6 @@ function mutationSuccessMessage(
       "manager-assignments":
         "Manager assignment",
       "qa-rules": "QA rule",
-      "qa-candidates": "QA review",
       "qa-alerts": "QA alert",
     };
 
@@ -455,21 +452,6 @@ export async function getQaAlertEvidencePlaybackUrl(
   return `/api/qa-evidence/${encodeURIComponent(alertId)}`;
 }
 
-export async function getQaCandidates(): Promise<QaCandidateListItem[]> {
-  return proxyFetch<QaCandidateListItem[]>(["qa-candidates"]);
-}
-
-export async function reviewQaCandidate(
-  candidateId: string,
-  decision: "Confirmed" | "Dismissed",
-  reason: string
-): Promise<QaCandidateListItem> {
-  return proxyFetch<QaCandidateListItem>(["qa-candidates", candidateId, "review"], {
-    method: "POST",
-    body: JSON.stringify({ decision, reason }),
-  });
-}
-
 export async function getPlaybackUrl(recordingId: string): Promise<string> {
   return `/api/proxy/recordings/${encodeURIComponent(recordingId)}/media`;
 }
@@ -698,16 +680,6 @@ export async function deleteSchedule(
 
 export async function getSessions(): Promise<SessionListItem[]> {
   return proxyFetch<SessionListItem[]>(["sessions"]);
-}
-
-export async function getTranscriptSegments(
-  recordingId: string
-): Promise<TranscriptSegmentListItem[]> {
-  return proxyFetch<TranscriptSegmentListItem[]>([
-    "recordings",
-    recordingId,
-    "transcript-segments",
-  ]);
 }
 
 export async function getSessionEvents(

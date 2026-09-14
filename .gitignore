@@ -72,10 +72,8 @@ publish/
 __pycache__/
 *.pyc
 *.wav
-spikes/SttSpike/sample.wav
 
 # QA worker generated test files
-spikes/SttSpike/*.mp4
 
 # Backup artifacts
 backups/

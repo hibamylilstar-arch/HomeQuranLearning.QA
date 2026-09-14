@@ -679,7 +679,6 @@ public sealed class DashboardAttendanceAccessTests
         return new DashboardQueryService(
             Mock.Of<IRecordingRepository>(),
             Mock.Of<IQaAlertRepository>(),
-            Mock.Of<IQaCandidateRepository>(),
             Mock.Of<IDeviceRepository>(),
             CreateEmptyDeviceTeacherAssignmentRepository(),
             assignmentRepository.Object,

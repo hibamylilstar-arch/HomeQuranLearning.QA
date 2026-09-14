@@ -9,7 +9,6 @@ public sealed class DashboardQueryService
 {
     private readonly IRecordingRepository _recordingRepository;
     private readonly IQaAlertRepository _qaAlertRepository;
-    private readonly IQaCandidateRepository _qaCandidateRepository;
     private readonly IDeviceRepository _deviceRepository;
     private readonly IDeviceTeacherAssignmentRepository _deviceTeacherAssignmentRepository;
     private readonly IManagerTeacherAssignmentRepository _assignmentRepository;
@@ -32,7 +31,6 @@ public sealed class DashboardQueryService
     public DashboardQueryService(
         IRecordingRepository recordingRepository,
         IQaAlertRepository qaAlertRepository,
-        IQaCandidateRepository qaCandidateRepository,
         IDeviceRepository deviceRepository,
         IDeviceTeacherAssignmentRepository deviceTeacherAssignmentRepository,
         IManagerTeacherAssignmentRepository assignmentRepository,
@@ -41,7 +39,6 @@ public sealed class DashboardQueryService
     {
         _recordingRepository = recordingRepository;
         _qaAlertRepository = qaAlertRepository;
-        _qaCandidateRepository = qaCandidateRepository;
         _deviceRepository = deviceRepository;
         _deviceTeacherAssignmentRepository = deviceTeacherAssignmentRepository;
         _assignmentRepository = assignmentRepository;
@@ -253,8 +250,6 @@ public sealed class DashboardQueryService
                         x.EvidenceStartSeconds,
                     EvidenceEndSeconds =
                         x.EvidenceEndSeconds,
-                    SourceQaAudioChunkId =
-                        x.SourceQaAudioChunkId,
                     HasDirectEvidence =
                         !string.IsNullOrWhiteSpace(
                             x.EvidenceStorageKey),
@@ -686,64 +681,6 @@ public sealed class DashboardQueryService
             .ToList();
     }
 
-    public async Task<IReadOnlyList<QaCandidateDto>> GetVisibleQaCandidatesAsync(
-        Guid userId,
-        string role,
-        CancellationToken cancellationToken = default)
-    {
-        var candidates = await _qaCandidateRepository.GetAllAsync(cancellationToken);
-
-        if (role != UserRole.Owner.ToString())
-        {
-            var visibleRecordings =
-                await GetVisibleRecordingsAsync(
-                    userId,
-                    role,
-                    cancellationToken);
-
-            var visibleRecordingIds =
-                visibleRecordings
-                    .Select(x => x.Id)
-                    .ToHashSet();
-
-            candidates = candidates
-                .Where(x =>
-                    x.RecordingId is Guid recordingId &&
-                    visibleRecordingIds.Contains(
-                        recordingId))
-                .ToList();
-        }
-
-        return candidates
-            .OrderBy(x => x.Status)
-            .ThenByDescending(x => x.CreatedAtUtc)
-            .Select(ToCandidateDto)
-            .ToList();
-    }
-
-    public async Task<bool> CanAccessCandidateAsync(
-        Guid candidateId,
-        Guid userId,
-        string role,
-        CancellationToken cancellationToken = default)
-    {
-        var candidate =
-            await _qaCandidateRepository.GetByIdAsync(
-                candidateId,
-                cancellationToken);
-
-        if (candidate?.RecordingId is not Guid recordingId)
-        {
-            return false;
-        }
-
-        return await CanAccessRecordingAsync(
-            recordingId,
-            userId,
-            role,
-            cancellationToken);
-    }
-
     public async Task<bool> CanAccessRecordingAsync(
         Guid recordingId,
         Guid userId,
@@ -897,147 +834,7 @@ public sealed class DashboardQueryService
         return assignments.Select(x => x.TeacherId).ToHashSet();
     }
 
-    private static QaCandidateDto ToCandidateDto(
-        QaCandidate candidate)
-    {
-        Recording? recording =
-            candidate.Recording;
-
-        Session? session =
-            recording?.Session;
-
-        Device? device =
-            recording?.Device ??
-            session?.Device;
-
-        Guid? teacherId =
-            candidate.TeacherId ??
-            recording?.TeacherId ??
-            session?.TeacherId;
-
-        string? laptopName =
-            candidate.LaptopName ??
-            (!string.IsNullOrWhiteSpace(
-                device?.RecordingDisplayName)
-                ? device!.RecordingDisplayName
-                : device?.DeviceName);
-
-        DateTimeOffset? observedAtUtc =
-            recording is null
-                ? null
-                : recording.StartedAtUtc
-                    .AddSeconds(
-                        candidate.TriggerStartSeconds);
-
-        string detectionReason =
-            !string.IsNullOrWhiteSpace(
-                candidate.DetectionReason)
-                ? candidate.DetectionReason
-                : candidate.QaRuleId.HasValue
-                    ? "Restricted Rule"
-                    : "Off-topic Conversation";
-
-        return new QaCandidateDto
-        {
-            Id = candidate.Id,
-            RecordingId =
-                candidate.RecordingId,
-            RecordingFileName =
-                recording?.FileName ??
-                string.Empty,
-            DeviceId =
-                candidate.DeviceId ??
-                recording?.DeviceId,
-            LaptopName =
-                laptopName,
-            ActualDeviceName =
-                candidate.ActualDeviceName ??
-                device?.DeviceName,
-            SessionId =
-                candidate.SessionId ??
-                recording?.SessionId,
-            TeacherId =
-                teacherId,
-            TeacherName =
-                candidate.TeacherName ??
-                recording?.Teacher?.FullName ??
-                session?.Teacher?.FullName ??
-                string.Empty,
-            StudentId =
-                candidate.StudentId ??
-                session?.StudentId,
-            StudentName =
-                candidate.StudentName ??
-                session?.Student?.FullName,
-            CourseId =
-                candidate.CourseId ??
-                session?.CourseId,
-            CourseName =
-                candidate.CourseName ??
-                session?.Course?.Name,
-            QaRuleId =
-                candidate.QaRuleId,
-            RulePhrase =
-                candidate.QaRule?.Phrase,
-            MatchedPhrase =
-                candidate.MatchedPhrase,
-            ConfirmedQaAlertId =
-                candidate.ConfirmedQaAlertId,
-            PolicyVersion =
-                candidate.PolicyVersion,
-            AnalysisVersion =
-                candidate.AnalysisVersion,
-            SourceTrackIndex =
-                candidate.SourceTrackIndex,
-            AudioLayoutVersion =
-                candidate.AudioLayoutVersion,
-            TriggerStartSeconds =
-                candidate.TriggerStartSeconds,
-            TriggerEndSeconds =
-                candidate.TriggerEndSeconds,
-            ContextStartSeconds =
-                candidate.ContextStartSeconds,
-            ContextEndSeconds =
-                candidate.ContextEndSeconds,
-            EvidenceStartSeconds =
-                candidate.EvidenceStartSeconds,
-            EvidenceEndSeconds =
-                candidate.EvidenceEndSeconds,
-            ObservedAtUtc =
-                observedAtUtc,
-            ObservedOffsetSeconds =
-                candidate.TriggerStartSeconds,
-            Transcript =
-                candidate.Transcript,
-            LanguageFamily =
-                candidate.LanguageFamily,
-            IntentCategory =
-                candidate.IntentCategory,
-            DetectionReason =
-                detectionReason,
-            TriggerConfidence =
-                candidate.TriggerConfidence,
-            AsrConfidence =
-                candidate.AsrConfidence,
-            IntentConfidence =
-                candidate.IntentConfidence,
-            AnalysisIdempotencyKey =
-                candidate.AnalysisIdempotencyKey,
-            Status =
-                candidate.Status.ToString(),
-            ReviewedByUserId =
-                candidate.ReviewedByUserId,
-            ReviewedAtUtc =
-                candidate.ReviewedAtUtc,
-            ReviewReason =
-                candidate.ReviewReason,
-            CreatedAtUtc =
-                candidate.CreatedAtUtc,
-            UpdatedAtUtc =
-                candidate.UpdatedAtUtc
-        };
-    }
-    private static bool IsOwnerOrAdmin(string role)
+private static bool IsOwnerOrAdmin(string role)
     {
         return role == UserRole.Owner.ToString() ||
                role == UserRole.Admin.ToString();

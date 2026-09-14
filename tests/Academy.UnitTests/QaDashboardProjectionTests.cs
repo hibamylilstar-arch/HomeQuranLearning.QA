@@ -8,819 +8,206 @@ namespace Academy.UnitTests;
 
 public sealed class QaDashboardProjectionTests
 {
-    private const string OwnerTrialDeviceId =
-        "82f9b22d-2d5b-46b2-b372-ef864219e383";
-
-    private static (
-        Recording Recording,
-        Device Device,
-        Teacher Teacher,
-        Student Student,
-        Course Course,
-        Session Session)
-        CreateGraph(
-            string managedDeviceId,
-            string physicalName,
-            string? displayName)
+    [Fact]
+    public async Task LocalEvidence_ManagerSeesOnlyAssignedTeacherAlert()
     {
-        var startedAt =
-            new DateTimeOffset(
-                2026,
-                9,
-                7,
-                13,
-                0,
-                0,
-                TimeSpan.Zero);
+        Guid managerId = Guid.NewGuid();
+        Guid assignedTeacherId = Guid.NewGuid();
+        Guid otherTeacherId = Guid.NewGuid();
 
-        var device = new Device
-        {
-            Id = Guid.NewGuid(),
-            DeviceId = managedDeviceId,
-            DeviceName = physicalName,
-            RecordingDisplayName = displayName
-        };
+        Session assignedSession =
+            CreateSession(
+                assignedTeacherId,
+                "Assigned Laptop");
 
-        var teacher = new Teacher
-        {
-            Id = Guid.NewGuid(),
-            FullName = "Teacher Dashboard"
-        };
+        Session otherSession =
+            CreateSession(
+                otherTeacherId,
+                "Other Laptop");
 
-        var student = new Student
-        {
-            Id = Guid.NewGuid(),
-            FullName = "Student Dashboard"
-        };
+        QaAlert assignedAlert =
+            CreateAlert(
+                assignedSession,
+                assignedTeacherId,
+                "Assigned Laptop");
 
-        var course = new Course
-        {
-            Id = Guid.NewGuid(),
-            Name = "Qaida"
-        };
+        QaAlert otherAlert =
+            CreateAlert(
+                otherSession,
+                otherTeacherId,
+                "Other Laptop");
 
-        var session = new Session
-        {
-            Id = Guid.NewGuid(),
-            TeacherId = teacher.Id,
-            Teacher = teacher,
-            StudentId = student.Id,
-            Student = student,
-            CourseId = course.Id,
-            Course = course,
-            DeviceId = device.Id,
-            Device = device,
-            ScheduledStartUtc = startedAt,
-            ScheduledEndUtc = startedAt.AddHours(1),
-            StartedAtUtc = startedAt,
-            Status = SessionStatus.Completed
-        };
+        var alerts =
+            new Mock<IQaAlertRepository>();
 
-        var recording = new Recording
-        {
-            Id = Guid.NewGuid(),
-            DeviceId = device.Id,
-            Device = device,
-            TeacherId = teacher.Id,
-            Teacher = teacher,
-            SessionId = session.Id,
-            Session = session,
-            FileName = "qa-dashboard.mp4",
-            StartedAtUtc = startedAt,
-            EndedAtUtc = startedAt.AddMinutes(1),
-            Duration = TimeSpan.FromMinutes(1),
-            AudioLayoutVersion = 1
-        };
+        alerts
+            .Setup(x =>
+                x.GetAllAsync(
+                    It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                new[]
+                {
+                    assignedAlert,
+                    otherAlert
+                });
 
-        return (
-            recording,
-            device,
-            teacher,
-            student,
-            course,
-            session);
-    }
-
-    private static DashboardQueryService CreateService(
-        IReadOnlyList<Recording> recordings,
-        IReadOnlyList<QaAlert> alerts,
-        IReadOnlyList<QaCandidate> candidates,
-        IReadOnlyList<Session>? sessions = null,
-        IReadOnlyList<Guid>? managerTeacherIds = null)
-    {
-        var recordingRepository =
+        var recordings =
             new Mock<IRecordingRepository>();
 
-        recordingRepository
+        recordings
             .Setup(x =>
                 x.GetAllWithDeviceAsync(
                     It.IsAny<CancellationToken>()))
-            .ReturnsAsync(recordings);
+            .ReturnsAsync(
+                Array.Empty<Recording>());
 
-        var alertRepository =
-            new Mock<IQaAlertRepository>();
-
-        alertRepository
-            .Setup(x =>
-                x.GetAllAsync(
-                    It.IsAny<CancellationToken>()))
-            .ReturnsAsync(alerts);
-
-        var candidateRepository =
-            new Mock<IQaCandidateRepository>();
-
-        candidateRepository
-            .Setup(x =>
-                x.GetAllAsync(
-                    It.IsAny<CancellationToken>()))
-            .ReturnsAsync(candidates);
-
-        IReadOnlyList<Session> dashboardSessions =
-            sessions ??
-            recordings
-                .Select(x => x.Session)
-                .Where(x => x is not null)
-                .Select(x => x!)
-                .GroupBy(x => x.Id)
-                .Select(x => x.First())
-                .ToArray();
-
-        var sessionRepository =
+        var sessions =
             new Mock<ISessionRepository>();
 
-        sessionRepository
+        sessions
             .Setup(x =>
                 x.GetAllWithDetailsAsync(
                     It.IsAny<CancellationToken>()))
             .ReturnsAsync(
-                dashboardSessions);
+                new[]
+                {
+                    assignedSession,
+                    otherSession
+                });
 
-        var deviceTeacherAssignments =
-            new Mock<
-                IDeviceTeacherAssignmentRepository>();
+        var assignments =
+            new Mock<IManagerTeacherAssignmentRepository>();
 
-        deviceTeacherAssignments
+        assignments
+            .Setup(x =>
+                x.GetByManagerUserIdAsync(
+                    managerId,
+                    It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                new[]
+                {
+                    new ManagerTeacherAssignment
+                    {
+                        Id = Guid.NewGuid(),
+                        ManagerUserId = managerId,
+                        TeacherId = assignedTeacherId,
+                        AssignedAtUtc = DateTimeOffset.UtcNow
+                    }
+                });
+
+        var deviceTeachers =
+            new Mock<IDeviceTeacherAssignmentRepository>();
+
+        deviceTeachers
             .Setup(x =>
                 x.GetAllWithTeachersAsync(
                     It.IsAny<CancellationToken>()))
             .ReturnsAsync(
-                Array.Empty<
-                    DeviceTeacherAssignment>());
-
-        var managerAssignments =
-            new Mock<
-                IManagerTeacherAssignmentRepository>();
-
-        IReadOnlyList<Guid>
-            effectiveManagerTeacherIds =
-                managerTeacherIds ??
-                dashboardSessions
-                    .Select(x => x.TeacherId)
-                    .Distinct()
-                    .ToArray();
-
-        managerAssignments
-            .Setup(x =>
-                x.GetByManagerUserIdAsync(
-                    It.IsAny<Guid>(),
-                    It.IsAny<CancellationToken>()))
-            .ReturnsAsync(
-                effectiveManagerTeacherIds
-                    .Select(
-                        teacherId =>
-                            new ManagerTeacherAssignment
-                            {
-                                Id =
-                                    Guid.NewGuid(),
-                                ManagerUserId =
-                                    Guid.NewGuid(),
-                                TeacherId =
-                                    teacherId,
-                                AssignedAtUtc =
-                                    DateTimeOffset.UtcNow
-                            })
-                    .ToArray());
-
-        return new DashboardQueryService(
-            recordingRepository.Object,
-            alertRepository.Object,
-            candidateRepository.Object,
-            Mock.Of<IDeviceRepository>(),
-            deviceTeacherAssignments.Object,
-            managerAssignments.Object,
-            sessionRepository.Object,
-            Mock.Of<ISessionEventRepository>());
-    }
-
-    [Fact]
-    public async Task
-        Alerts_ManagerPreservesVisibilityAndProjectsCommercialEvidence()
-    {
-        var normal =
-            CreateGraph(
-                "normal-device",
-                "WIN-NORMAL",
-                "Teacher Laptop A");
-
-        var trial =
-            CreateGraph(
-                OwnerTrialDeviceId,
-                "WIN-OWNER-TRIAL",
-                "Owner Trial");
-
-        var normalAlert = new QaAlert
-        {
-            Id = Guid.NewGuid(),
-            RecordingId =
-                normal.Recording.Id,
-            Recording =
-                normal.Recording,
-            MatchedPhrase =
-                "WhatsApp",
-            DetectionReason =
-                "Restricted Rule",
-            Transcript =
-                "WhatsApp number",
-            PolicyVersion =
-                "QA-001-v1",
-            AnalysisVersion =
-                "QA-2A-rule-two-pass-v1",
-            SourceTrackIndex = 0,
-            AudioLayoutVersion = 1,
-            TriggerStartSeconds = 12,
-            TriggerEndSeconds = 14,
-            EvidenceStartSeconds = 2,
-            EvidenceEndSeconds = 34,
-            TimestampUtc =
-                normal.Recording.StartedAtUtc
-                    .AddSeconds(12),
-            Status = QaAlertStatus.Open,
-            CreatedAtUtc =
-                normal.Recording.StartedAtUtc,
-            UpdatedAtUtc =
-                normal.Recording.StartedAtUtc
-        };
-
-        var trialAlert = new QaAlert
-        {
-            Id = Guid.NewGuid(),
-            RecordingId =
-                trial.Recording.Id,
-            Recording =
-                trial.Recording,
-            DetectionReason =
-                "Off-topic Conversation",
-            Transcript =
-                "Private conversation",
-            SourceTrackIndex = 0,
-            AudioLayoutVersion = 1,
-            TriggerStartSeconds = 10,
-            TriggerEndSeconds = 12,
-            TimestampUtc =
-                trial.Recording.StartedAtUtc
-                    .AddSeconds(10),
-            Status = QaAlertStatus.Open
-        };
+                Array.Empty<DeviceTeacherAssignment>());
 
         var service =
-            CreateService(
-                new[]
-                {
-                    normal.Recording,
-                    trial.Recording
-                },
-                new[]
-                {
-                    normalAlert,
-                    trialAlert
-                },
-                Array.Empty<QaCandidate>());
-
-        var managerVisible =
-            await service.GetVisibleQaAlertsAsync(
-                Guid.NewGuid(),
-                UserRole.Manager.ToString());
-
-        var item =
-            Assert.Single(
-                managerVisible);
-
-        Assert.Equal(
-            normalAlert.Id,
-            item.Id);
-
-        Assert.Equal(
-            "Teacher Laptop A",
-            item.LaptopName);
-
-        Assert.Equal(
-            "WIN-NORMAL",
-            item.ActualDeviceName);
-
-        Assert.Equal(
-            "Teacher Dashboard",
-            item.TeacherName);
-
-        Assert.Equal(
-            "Student Dashboard",
-            item.StudentName);
-
-        Assert.Equal(
-            "Qaida",
-            item.CourseName);
-
-        Assert.Equal(
-            normal.Device.Id,
-            item.DeviceId!.Value);
-
-        Assert.Equal(
-            normal.Session.Id,
-            item.SessionId!.Value);
-
-        Assert.Equal(
-            normal.Student.Id,
-            item.StudentId!.Value);
-
-        Assert.Equal(
-            normal.Course.Id,
-            item.CourseId!.Value);
-
-        Assert.Equal(
-            12d,
-            item.ObservedOffsetSeconds!.Value);
-
-        Assert.Equal(
-            2d,
-            item.EvidenceStartSeconds!.Value);
-
-        Assert.Equal(
-            34d,
-            item.EvidenceEndSeconds!.Value);
-
-        var ownerVisible =
-            await service.GetVisibleQaAlertsAsync(
-                Guid.NewGuid(),
-                UserRole.Owner.ToString());
-
-        Assert.Equal(
-            2,
-            ownerVisible.Count);
-    }
-
-    [Fact]
-    public async Task
-        Alerts_ManagerUsesSessionVisibilityForDirectAudioEvidence()
-    {
-        var normal =
-            CreateGraph(
-                "normal-direct-device",
-                "WIN-DIRECT",
-                "Direct Laptop");
-
-        var trial =
-            CreateGraph(
-                OwnerTrialDeviceId,
-                "WIN-OWNER-DIRECT",
-                "Owner Direct");
-
-        var normalAlert =
-            new QaAlert
-            {
-                Id =
-                    Guid.NewGuid(),
-
-                RecordingId =
-                    null,
-
-                SourceQaAudioChunkId =
-                    Guid.NewGuid(),
-
-                EvidenceStorageKey =
-                    "qa/evidence/normal.wav",
-
-                EvidenceContentType =
-                    "audio/wav",
-
-                EvidenceDurationSeconds =
-                    31,
-
-                EvidenceStartUtc =
-                    normal.Session
-                        .ScheduledStartUtc
-                        .AddSeconds(10),
-
-                EvidenceEndUtc =
-                    normal.Session
-                        .ScheduledStartUtc
-                        .AddSeconds(41),
-
-                DeviceId =
-                    normal.Device.Id,
-
-                SessionId =
-                    normal.Session.Id,
-
-                TeacherId =
-                    normal.Teacher.Id,
-
-                StudentId =
-                    normal.Student.Id,
-
-                CourseId =
-                    normal.Course.Id,
-
-                LaptopName =
-                    "Direct Laptop",
-
-                ActualDeviceName =
-                    "WIN-DIRECT",
-
-                TeacherName =
-                    normal.Teacher.FullName,
-
-                StudentName =
-                    normal.Student.FullName,
-
-                CourseName =
-                    normal.Course.Name,
-
-                QaRuleId =
-                    Guid.NewGuid(),
-
-                MatchedPhrase =
-                    "WhatsApp",
-
-                DetectionReason =
-                    "Restricted Rule",
-
-                Transcript =
-                    "WhatsApp number",
-
-                TimestampUtc =
-                    normal.Session
-                        .ScheduledStartUtc
-                        .AddSeconds(20),
-
-                Status =
-                    QaAlertStatus.Open
-            };
-
-        var trialAlert =
-            new QaAlert
-            {
-                Id =
-                    Guid.NewGuid(),
-
-                RecordingId =
-                    null,
-
-                SourceQaAudioChunkId =
-                    Guid.NewGuid(),
-
-                EvidenceStorageKey =
-                    "qa/evidence/trial.wav",
-
-                SessionId =
-                    trial.Session.Id,
-
-                DeviceId =
-                    trial.Device.Id,
-
-                QaRuleId =
-                    Guid.NewGuid(),
-
-                MatchedPhrase =
-                    "WhatsApp",
-
-                DetectionReason =
-                    "Restricted Rule",
-
-                Transcript =
-                    "WhatsApp",
-
-                TimestampUtc =
-                    trial.Session
-                        .ScheduledStartUtc
-                        .AddSeconds(20),
-
-                Status =
-                    QaAlertStatus.Open
-            };
-
-        var service =
-            CreateService(
-                Array.Empty<Recording>(),
-                new[]
-                {
-                    normalAlert,
-                    trialAlert
-                },
-                Array.Empty<QaCandidate>(),
-                new[]
-                {
-                    normal.Session,
-                    trial.Session
-                });
-
-        var managerVisible =
-            await service
-                .GetVisibleQaAlertsAsync(
-                    Guid.NewGuid(),
-                    UserRole.Manager.ToString());
-
-        var item =
-            Assert.Single(
-                managerVisible);
-
-        Assert.Equal(
-            normalAlert.Id,
-            item.Id);
-
-        Assert.Null(
-            item.RecordingId);
-
-        Assert.True(
-            item.HasDirectEvidence);
-
-        Assert.Equal(
-            normalAlert.SourceQaAudioChunkId,
-            item.SourceQaAudioChunkId);
-
-        Assert.Equal(
-            normal.Session.Id,
-            item.SessionId);
-
-        Assert.Equal(
-            "Direct Laptop",
-            item.LaptopName);
-
-        Assert.Equal(
-            "WIN-DIRECT",
-            item.ActualDeviceName);
-
-        Assert.Equal(
-            31d,
-            item.EvidenceDurationSeconds);
-
-        var ownerVisible =
-            await service
-                .GetVisibleQaAlertsAsync(
-                    Guid.NewGuid(),
-                    UserRole.Owner.ToString());
-
-        Assert.Equal(
-            2,
-            ownerVisible.Count);
-    }
-
-    [Fact]
-    public async Task
-        Alerts_ManagerSeesOnlyAssignedTeacherAlerts()
-    {
-        var assigned =
-            CreateGraph(
-                "assigned-device",
-                "WIN-ASSIGNED",
-                "Assigned Laptop");
-
-        var unassigned =
-            CreateGraph(
-                "unassigned-device",
-                "WIN-UNASSIGNED",
-                "Unassigned Laptop");
-
-        var assignedAlert =
-            new QaAlert
-            {
-                Id = Guid.NewGuid(),
-                RecordingId =
-                    assigned.Recording.Id,
-                Recording =
-                    assigned.Recording,
-                TeacherId =
-                    assigned.Teacher.Id,
-                MatchedPhrase =
-                    "Restricted",
-                TimestampUtc =
-                    assigned.Recording
-                        .StartedAtUtc
-                        .AddSeconds(10),
-                Status =
-                    QaAlertStatus.Open
-            };
-
-        var unassignedAlert =
-            new QaAlert
-            {
-                Id = Guid.NewGuid(),
-                RecordingId =
-                    unassigned.Recording.Id,
-                Recording =
-                    unassigned.Recording,
-                TeacherId =
-                    unassigned.Teacher.Id,
-                MatchedPhrase =
-                    "Restricted",
-                TimestampUtc =
-                    unassigned.Recording
-                        .StartedAtUtc
-                        .AddSeconds(10),
-                Status =
-                    QaAlertStatus.Open
-            };
-
-        var service =
-            CreateService(
-                new[]
-                {
-                    assigned.Recording,
-                    unassigned.Recording
-                },
-                new[]
-                {
-                    assignedAlert,
-                    unassignedAlert
-                },
-                Array.Empty<QaCandidate>(),
-                managerTeacherIds:
-                    new[]
-                    {
-                        assigned.Teacher.Id
-                    });
+            new DashboardQueryService(
+                recordings.Object,
+                alerts.Object,
+                Mock.Of<IDeviceRepository>(),
+                deviceTeachers.Object,
+                assignments.Object,
+                sessions.Object,
+                Mock.Of<ISessionEventRepository>());
 
         var visible =
-            await service
-                .GetVisibleQaAlertsAsync(
-                    Guid.NewGuid(),
-                    UserRole.Manager
-                        .ToString());
+            await service.GetVisibleQaAlertsAsync(
+                managerId,
+                UserRole.Manager.ToString());
 
-        var item =
-            Assert.Single(visible);
+        var item = Assert.Single(visible);
 
         Assert.Equal(
             assignedAlert.Id,
             item.Id);
 
         Assert.Equal(
-            assigned.Teacher.Id,
+            assignedSession.Id,
+            item.SessionId);
+
+        Assert.Equal(
+            assignedTeacherId,
             item.TeacherId);
-    }
-
-    [Fact]
-    public async Task
-        Candidates_ManagerPreservesVisibilityAndProjectsCommercialEvidence()
-    {
-        var normal =
-            CreateGraph(
-                "normal-device",
-                "WIN-NORMAL",
-                "Teacher Laptop B");
-
-        var trial =
-            CreateGraph(
-                OwnerTrialDeviceId,
-                "WIN-OWNER-TRIAL",
-                "Owner Trial");
-
-        var normalCandidate =
-            new QaCandidate
-            {
-                Id = Guid.NewGuid(),
-                RecordingId =
-                    normal.Recording.Id,
-                Recording =
-                    normal.Recording,
-                MatchedPhrase = null,
-                DetectionReason =
-                    "Off-topic Conversation",
-                PolicyVersion =
-                    "QA-001-v1",
-                AnalysisVersion =
-                    "QA-2B-off-topic-two-pass-v1",
-                SourceTrackIndex = 0,
-                AudioLayoutVersion = 1,
-                TriggerStartSeconds = 12,
-                TriggerEndSeconds = 14,
-                ContextStartSeconds = 2,
-                ContextEndSeconds = 24,
-                EvidenceStartSeconds = 2,
-                EvidenceEndSeconds = 34,
-                Transcript =
-                    "We are going shopping tomorrow",
-                LanguageFamily = "Latin",
-                IntentCategory =
-                    "OffTopicConversation",
-                AnalysisIdempotencyKey =
-                    "candidate-normal",
-                Status =
-                    QaCandidateStatus.Pending,
-                CreatedAtUtc =
-                    normal.Recording.StartedAtUtc,
-                UpdatedAtUtc =
-                    normal.Recording.StartedAtUtc
-            };
-
-        var trialCandidate =
-            new QaCandidate
-            {
-                Id = Guid.NewGuid(),
-                RecordingId =
-                    trial.Recording.Id,
-                Recording =
-                    trial.Recording,
-                DetectionReason =
-                    "Off-topic Conversation",
-                PolicyVersion = "p",
-                AnalysisVersion = "a",
-                SourceTrackIndex = 0,
-                AudioLayoutVersion = 1,
-                TriggerStartSeconds = 1,
-                TriggerEndSeconds = 2,
-                ContextStartSeconds = 0,
-                ContextEndSeconds = 12,
-                Transcript = "x",
-                LanguageFamily = "en",
-                IntentCategory = "x",
-                AnalysisIdempotencyKey =
-                    "candidate-trial",
-                Status =
-                    QaCandidateStatus.Pending
-            };
-
-        var service =
-            CreateService(
-                new[]
-                {
-                    normal.Recording,
-                    trial.Recording
-                },
-                Array.Empty<QaAlert>(),
-                new[]
-                {
-                    normalCandidate,
-                    trialCandidate
-                });
-
-        var managerVisible =
-            await service.GetVisibleQaCandidatesAsync(
-                Guid.NewGuid(),
-                UserRole.Manager.ToString());
-
-        var item =
-            Assert.Single(
-                managerVisible);
 
         Assert.Equal(
-            normalCandidate.Id,
-            item.Id);
-
-        Assert.Null(
-            item.MatchedPhrase);
-
-        Assert.Equal(
-            "Off-topic Conversation",
-            item.DetectionReason);
-
-        Assert.Equal(
-            "Teacher Laptop B",
+            "Assigned Laptop",
             item.LaptopName);
 
+        Assert.True(item.HasDirectEvidence);
         Assert.Equal(
-            "WIN-NORMAL",
-            item.ActualDeviceName);
+            30d,
+            item.EvidenceDurationSeconds);
+    }
 
-        Assert.Equal(
-            "Teacher Dashboard",
-            item.TeacherName);
+    private static Session CreateSession(
+        Guid teacherId,
+        string laptopName)
+    {
+        var device =
+            new Device
+            {
+                Id = Guid.NewGuid(),
+                DeviceId = Guid.NewGuid().ToString(),
+                DeviceName = laptopName,
+                RecordingDisplayName = laptopName
+            };
 
-        Assert.Equal(
-            "Student Dashboard",
-            item.StudentName);
+        return new Session
+        {
+            Id = Guid.NewGuid(),
+            TeacherId = teacherId,
+            StudentId = Guid.NewGuid(),
+            CourseId = Guid.NewGuid(),
+            DeviceId = device.Id,
+            Device = device,
+            ScheduledStartUtc =
+                DateTimeOffset.UtcNow.AddMinutes(-10),
+            ScheduledEndUtc =
+                DateTimeOffset.UtcNow.AddMinutes(20),
+            StartedAtUtc =
+                DateTimeOffset.UtcNow.AddMinutes(-10),
+            Status = SessionStatus.Live
+        };
+    }
 
-        Assert.Equal(
-            "Qaida",
-            item.CourseName);
+    private static QaAlert CreateAlert(
+        Session session,
+        Guid teacherId,
+        string laptopName)
+    {
+        return new QaAlert
+        {
+            Id = Guid.NewGuid(),
+            QaRuleId = Guid.NewGuid(),
+            MatchedPhrase = "whatsapp",
+            DetectionReason = "Restricted Rule",
+            Transcript = "whatsapp",
+            TimestampUtc = DateTimeOffset.UtcNow,
 
-        Assert.Equal(
-            12d,
-            item.ObservedOffsetSeconds!.Value);
+            EvidenceStorageKey =
+                $"qa/evidence/{Guid.NewGuid():N}.wav",
 
-        Assert.Equal(
-            2d,
-            item.EvidenceStartSeconds!.Value);
+            EvidenceContentType = "audio/wav",
+            EvidenceDurationSeconds = 30,
 
-        Assert.Equal(
-            34d,
-            item.EvidenceEndSeconds!.Value);
+            DeviceId = session.DeviceId,
+            SessionId = session.Id,
+            TeacherId = teacherId,
+            StudentId = session.StudentId,
+            CourseId = session.CourseId,
 
-        var ownerVisible =
-            await service.GetVisibleQaCandidatesAsync(
-                Guid.NewGuid(),
-                UserRole.Owner.ToString());
+            LaptopName = laptopName,
+            ActualDeviceName =
+                session.Device?.DeviceName,
 
-        Assert.Equal(
-            2,
-            ownerVisible.Count);
+            Status = QaAlertStatus.Open,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        };
     }
 }

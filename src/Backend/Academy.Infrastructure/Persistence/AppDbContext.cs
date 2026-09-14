@@ -16,9 +16,6 @@ public sealed class AppDbContext : DbContext
     public DbSet<RecordingAudioCoverageGap> RecordingAudioCoverageGaps => Set<RecordingAudioCoverageGap>();
     public DbSet<QaRule> QaRules => Set<QaRule>();
     public DbSet<QaAlert> QaAlerts => Set<QaAlert>();
-    public DbSet<QaAudioChunk> QaAudioChunks => Set<QaAudioChunk>();
-    public DbSet<QaCandidate> QaCandidates => Set<QaCandidate>();
-    public DbSet<TranscriptSegment> TranscriptSegments => Set<TranscriptSegment>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
     public DbSet<ManagerTeacherAssignment> ManagerTeacherAssignments => Set<ManagerTeacherAssignment>();
@@ -117,7 +114,6 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.ReviewNote).HasMaxLength(2048);
             entity.Property(x => x.ReviewVersion).IsConcurrencyToken();
             entity.HasIndex(x => x.AnalysisIdempotencyKey).IsUnique();
-            entity.HasIndex(x => x.SourceQaAudioChunkId);
             entity.HasIndex(x => x.EvidenceDeleteAfterUtc);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
 
@@ -132,106 +128,6 @@ public sealed class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.SetNull);
         });
 
-        modelBuilder.Entity<QaAudioChunk>(entity =>
-        {
-            entity.ToTable("qa_audio_chunks");
-            entity.HasKey(x => x.Id);
-
-            entity.Property(x => x.StorageKey)
-                .IsRequired()
-                .HasMaxLength(1024);
-
-            entity.Property(x => x.ContentType)
-                .IsRequired()
-                .HasMaxLength(128);
-
-            entity.Property(x => x.LastError)
-                .HasMaxLength(2048);
-
-            entity.HasIndex(
-                x => new
-                {
-                    x.DeviceId,
-                    x.SessionId,
-                    x.CaptureId,
-                    x.SequenceNumber
-                })
-                .IsUnique();
-
-            entity.HasIndex(
-                x => new
-                {
-                    x.SessionId,
-                    x.StartedAtUtc
-                });
-
-            entity.HasIndex(
-                x => new
-                {
-                    x.ProcessedAtUtc,
-                    x.CreatedAtUtc
-                });
-
-            entity.HasIndex(x => x.DeleteAfterUtc);
-
-            entity.HasOne(x => x.Device)
-                .WithMany()
-                .HasForeignKey(x => x.DeviceId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(x => x.Session)
-                .WithMany()
-                .HasForeignKey(x => x.SessionId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<QaCandidate>(entity =>
-        {
-            entity.ToTable("qa_candidates");
-            entity.HasKey(x => x.Id);
-            entity.Property(x => x.MatchedPhrase).HasMaxLength(512);
-            entity.Property(x => x.PolicyVersion).IsRequired().HasMaxLength(128);
-            entity.Property(x => x.AnalysisVersion).IsRequired().HasMaxLength(128);
-            entity.Property(x => x.Transcript).IsRequired().HasMaxLength(4096);
-            entity.Property(x => x.LanguageFamily).IsRequired().HasMaxLength(64);
-            entity.Property(x => x.IntentCategory).IsRequired().HasMaxLength(128);
-            entity.Property(x => x.DetectionReason).HasMaxLength(64);
-            entity.Property(x => x.LaptopName).HasMaxLength(256);
-            entity.Property(x => x.ActualDeviceName).HasMaxLength(256);
-            entity.Property(x => x.TeacherName).HasMaxLength(256);
-            entity.Property(x => x.StudentName).HasMaxLength(256);
-            entity.Property(x => x.CourseName).HasMaxLength(256);
-            entity.Property(x => x.AnalysisIdempotencyKey).IsRequired().HasMaxLength(512);
-            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
-            entity.Property(x => x.ReviewReason).HasMaxLength(2048);
-            entity.Property(x => x.ReviewVersion).IsConcurrencyToken();
-            entity.HasIndex(x => x.AnalysisIdempotencyKey).IsUnique();
-            entity.HasIndex(x => new
-            {
-                x.RecordingId,
-                x.PolicyVersion,
-                x.AnalysisVersion,
-                x.SourceTrackIndex,
-                x.TriggerStartSeconds,
-                x.TriggerEndSeconds
-            }).IsUnique();
-
-            entity.HasOne(x => x.Recording)
-                .WithMany(x => x.QaCandidates)
-                .HasForeignKey(x => x.RecordingId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(x => x.QaRule)
-                .WithMany()
-                .HasForeignKey(x => x.QaRuleId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            entity.HasOne(x => x.ConfirmedQaAlert)
-                .WithOne(x => x.ConfirmedCandidate)
-                .HasForeignKey<QaCandidate>(x => x.ConfirmedQaAlertId)
-                .OnDelete(DeleteBehavior.SetNull);
-        });
-
         modelBuilder.Entity<RecordingAudioCoverageGap>(entity =>
         {
             entity.ToTable("recording_audio_coverage_gaps");
@@ -241,20 +137,6 @@ public sealed class AppDbContext : DbContext
 
             entity.HasOne(x => x.Recording)
                 .WithMany(x => x.TeacherAudioCoverageGaps)
-                .HasForeignKey(x => x.RecordingId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<TranscriptSegment>(entity =>
-        {
-            entity.ToTable("transcript_segments");
-            entity.HasKey(x => x.Id);
-            entity.Property(x => x.Text).IsRequired().HasMaxLength(4096);
-            entity.Property(x => x.Language).HasMaxLength(32);
-            entity.HasIndex(x => new { x.RecordingId, x.SegmentIndex }).IsUnique();
-
-            entity.HasOne(x => x.Recording)
-                .WithMany()
                 .HasForeignKey(x => x.RecordingId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

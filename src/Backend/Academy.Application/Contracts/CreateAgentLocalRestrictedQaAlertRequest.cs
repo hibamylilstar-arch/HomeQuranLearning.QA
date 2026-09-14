@@ -38,3 +38,10 @@ public sealed class AgentQaRestrictedRulesResponse
         Rules { get; init; } =
             new();
 }
+
+public sealed class AgentLocalRestrictedQaAlertResponse
+{
+    public Guid AlertId { get; init; }
+
+    public bool Duplicate { get; init; }
+}

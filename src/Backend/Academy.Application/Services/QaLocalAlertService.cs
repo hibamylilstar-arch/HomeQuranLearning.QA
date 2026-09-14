@@ -9,7 +9,6 @@ namespace Academy.Application.Services;
 
 public sealed class QaLocalAlertService
 {
-    private const string CanonicalPhrase = "whatsapp";
     private const string RestrictedRuleReason = "Restricted Rule";
 
     private const int MaximumActiveRestrictedRules = 64;
@@ -66,64 +65,7 @@ public sealed class QaLocalAlertService
                 : bucketName.Trim();
     }
 
-    public async Task<AgentQaRestrictedRuleResponse>
-        GetActiveRestrictedRuleAsync(
-            string deviceId,
-            CancellationToken cancellationToken = default)
-    {
-        string canonicalDeviceId =
-            RequireText(
-                deviceId,
-                nameof(deviceId),
-                256);
-
-        _ =
-            await _deviceRepository.GetByDeviceIdAsync(
-                canonicalDeviceId,
-                cancellationToken)
-            ?? throw new KeyNotFoundException(
-                "Unknown device.");
-
-        IReadOnlyList<QaRule> rules =
-            await _ruleRepository.GetAllAsync(
-                cancellationToken);
-
-        QaRule[] active =
-            rules
-                .Where(
-                    x =>
-                        x.IsActive &&
-                        string.Equals(
-                            x.Phrase.Trim(),
-                            CanonicalPhrase,
-                            StringComparison.OrdinalIgnoreCase))
-                .ToArray();
-
-        if (active.Length == 0)
-        {
-            return new AgentQaRestrictedRuleResponse
-            {
-                Enabled = false,
-                QaRuleId = null,
-                Phrase = CanonicalPhrase
-            };
-        }
-
-        if (active.Length > 1)
-        {
-            throw new InvalidOperationException(
-                "Multiple active WhatsApp QA rules exist.");
-        }
-
-        return new AgentQaRestrictedRuleResponse
-        {
-            Enabled = true,
-            QaRuleId = active[0].Id,
-            Phrase = CanonicalPhrase
-        };
-    }
-
-    public async Task<AgentQaRestrictedRulesResponse>
+public async Task<AgentQaRestrictedRulesResponse>
         GetActiveRestrictedRulesAsync(
             string deviceId,
             CancellationToken cancellationToken = default)
@@ -205,7 +147,7 @@ public sealed class QaLocalAlertService
         };
     }
 
-    public async Task<DirectQaAlertResponse>
+    public async Task<AgentLocalRestrictedQaAlertResponse>
         CreateRestrictedAsync(
             CreateAgentLocalRestrictedQaAlertRequest request,
             Stream audio,
@@ -375,7 +317,7 @@ public sealed class QaLocalAlertService
                     "AnalysisIdempotencyKey is already used by different QA evidence.");
             }
 
-            return new DirectQaAlertResponse
+            return new AgentLocalRestrictedQaAlertResponse
             {
                 AlertId = existing.Id,
                 Duplicate = true
@@ -474,7 +416,6 @@ public sealed class QaLocalAlertService
             {
                 Id = alertId,
                 RecordingId = null,
-                SourceQaAudioChunkId = null,
                 QaRuleId = rule.Id,
                 MatchedPhrase =
                     normalizedRulePhrase,
@@ -565,7 +506,7 @@ public sealed class QaLocalAlertService
             throw;
         }
 
-        return new DirectQaAlertResponse
+        return new AgentLocalRestrictedQaAlertResponse
         {
             AlertId = alert.Id,
             Duplicate = false

@@ -133,28 +133,6 @@ services:
         max-size: "10m"
         max-file: "5"
 
-  worker:
-    build:
-      context: ../..
-      dockerfile: infrastructure/docker/Dockerfile.worker
-    container_name: academy-qa-worker
-    restart: unless-stopped
-    environment:
-      BACKEND_BASE_URL: http://api:8080
-      WORKER_API_KEY: ${WORKER_API_KEY}
-      HF_HOME: /app/hf_cache
-    volumes:
-      - worker_hf_cache:/app/hf_cache
-    depends_on:
-      - api
-    networks:
-      - academy
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-
   livekit:
     image: livekit/livekit-server:v1.13.5
     container_name: academy-livekit
@@ -281,7 +259,6 @@ volumes:
   postgres_data:
   redis_data:
   minio_data:
-  worker_hf_cache:
   caddy_data:
   caddy_config:
 

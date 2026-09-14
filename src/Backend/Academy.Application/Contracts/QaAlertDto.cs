@@ -38,7 +38,6 @@ public sealed class QaAlertDto
 
     public double? EvidenceEndSeconds { get; init; }
 
-    public Guid? SourceQaAudioChunkId { get; init; }
 
     public bool HasDirectEvidence { get; init; }
 

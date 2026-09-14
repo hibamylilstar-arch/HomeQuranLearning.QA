@@ -37,7 +37,6 @@ public sealed class Recording
 
     public DateTimeOffset? PreservedAtUtc { get; set; }
 
-    public DateTimeOffset? QaProcessedAtUtc { get; set; }
 
     public int AudioLayoutVersion { get; set; }
 
@@ -66,7 +65,6 @@ public sealed class Recording
 
     public ICollection<QaAlert> QaAlerts { get; set; } = new List<QaAlert>();
 
-    public ICollection<QaCandidate> QaCandidates { get; set; } = new List<QaCandidate>();
 
     public ICollection<RecordingAudioCoverageGap> TeacherAudioCoverageGaps { get; set; } =
         new List<RecordingAudioCoverageGap>();

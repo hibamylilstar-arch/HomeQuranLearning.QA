@@ -47,9 +47,6 @@ export default function NavLinks() {
       <Link href="/qa-alerts" className="rounded-md px-3 py-2 hover:bg-slate-100">
         QA Alerts
       </Link>
-      <Link href="/qa-candidates" className="rounded-md px-3 py-2 hover:bg-slate-100">
-        QA Candidates
-      </Link>
       {isOwnerOrAdmin && (
         <>
           <Link href="/teachers" className="rounded-md px-3 py-2 hover:bg-slate-100">

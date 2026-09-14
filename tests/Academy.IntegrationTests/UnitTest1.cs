@@ -304,7 +304,6 @@ public class RecordingServiceIntegrationTests : IntegrationTestBase
         var dashboard = new DashboardQueryService(
             new RecordingRepository(DbContext),
             new QaAlertRepository(DbContext),
-            new QaCandidateRepository(DbContext),
             new DeviceRepository(DbContext),
             new DeviceTeacherAssignmentRepository(DbContext),
             new ManagerTeacherAssignmentRepository(DbContext),

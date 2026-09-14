@@ -40,6 +40,11 @@ export default function QaAlertsPage() {
   const [evidenceErrors, setEvidenceErrors] =
     useState<Record<string, string>>({});
 
+  const [
+    mobileEvidenceVersions,
+    setMobileEvidenceVersions,
+  ] = useState<Record<string, number>>({});
+
   const [searchQuery, setSearchQuery] =
     useState("");
   const [statusFilter, setStatusFilter] =
@@ -146,6 +151,23 @@ export default function QaAlertsPage() {
       [alertId]:
         `${url}?v=${Date.now()}`,
     }));
+  }
+
+  function retryMobileEvidence(
+    alertId: string
+  ) {
+    setEvidenceErrors((current) => ({
+      ...current,
+      [alertId]: "",
+    }));
+
+    setMobileEvidenceVersions(
+      (current) => ({
+        ...current,
+        [alertId]:
+          (current[alertId] ?? 0) + 1,
+      })
+    );
   }
 
   if (loading) {
@@ -467,46 +489,34 @@ export default function QaAlertsPage() {
                       </div>
 
                       {alert.hasDirectEvidence ? (
-                        <>
-                          {!evidenceUrls[
-                            alert.id
-                          ] ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void showEvidence(
-                                  alert.id
-                                )
-                              }
-                              className="flex w-full items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-slate-700 active:bg-slate-800"
-                            >
-                              Play evidence
-                            </button>
-                          ) : (
-                            <div className="min-w-0 max-w-full overflow-hidden">
-                              <audio
-                                controls
-                                autoPlay
-                                preload="metadata"
-                                src={
-                                  evidenceUrls[
-                                    alert.id
-                                  ]
-                                }
-                                onError={() =>
-                                  setEvidenceErrors(
-                                    (current) => ({
-                                      ...current,
-                                      [alert.id]:
-                                        "Audio evidence could not be loaded.",
-                                    })
-                                  )
-                                }
-                                className="h-10 w-full max-w-full"
-                              />
-                            </div>
-                          )}
-                        </>
+                        <div className="min-w-0 max-w-full overflow-hidden">
+                          <audio
+                            key={`${alert.id}:${
+                              mobileEvidenceVersions[
+                                alert.id
+                              ] ?? 0
+                            }`}
+                            controls
+                            preload="none"
+                            src={`/api/qa-evidence/${encodeURIComponent(
+                              alert.id
+                            )}?v=${
+                              mobileEvidenceVersions[
+                                alert.id
+                              ] ?? 0
+                            }`}
+                            onError={() =>
+                              setEvidenceErrors(
+                                (current) => ({
+                                  ...current,
+                                  [alert.id]:
+                                    "Audio evidence could not be loaded.",
+                                })
+                              )
+                            }
+                            className="h-10 w-full max-w-full"
+                          />
+                        </div>
                       ) : null}
 
                       {alert.recordingId ? (
@@ -540,7 +550,7 @@ export default function QaAlertsPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              void showEvidence(
+                              retryMobileEvidence(
                                 alert.id
                               )
                             }

@@ -1,4 +1,5 @@
 using Academy.Application.Abstractions;
+using Academy.Application.Services;
 using Academy.Domain.Entities;
 using Academy.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -61,6 +62,10 @@ public sealed class QaAudioChunkRepository :
             checked(
                 limit * 4);
 
+        DateTimeOffset retentionCutoffUtc =
+            claimedAtUtc -
+            QaAudioChunkService.RawChunkRetention;
+
         Guid[] candidateIds =
             await _dbContext
                 .QaAudioChunks
@@ -68,6 +73,10 @@ public sealed class QaAudioChunkRepository :
                 .Where(
                     x =>
                         x.ProcessedAtUtc == null &&
+                        x.DeleteAfterUtc >
+                            claimedAtUtc &&
+                        x.CreatedAtUtc >
+                            retentionCutoffUtc &&
                         x.EndedAtUtc <=
                             readyBeforeUtc &&
                         x.AttemptCount <
@@ -109,6 +118,10 @@ public sealed class QaAudioChunkRepository :
                         x =>
                             x.Id == chunkId &&
                             x.ProcessedAtUtc == null &&
+                            x.DeleteAfterUtc >
+                                claimedAtUtc &&
+                            x.CreatedAtUtc >
+                                retentionCutoffUtc &&
                             x.EndedAtUtc <=
                                 readyBeforeUtc &&
                             x.AttemptCount <

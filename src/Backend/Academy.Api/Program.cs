@@ -54,6 +54,7 @@ builder.Services.AddScoped<LiveKitTokenService>();
 
 builder.Services.AddHostedService<Academy.Api.SessionSchedulerWorker>();
 builder.Services.AddHostedService<Academy.Api.RecordingRetentionWorker>();
+builder.Services.AddHostedService<Academy.Api.QaRetentionCleanupWorker>();
 
 builder.Services.AddSingleton(builder.Configuration["Storage:Bucket"] ?? "academy-recordings");
 

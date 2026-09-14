@@ -17,6 +17,9 @@ public sealed class QaAudioChunkService
     public const long MaxChunkBytes =
         512L * 1024L;
 
+    public static readonly TimeSpan RawChunkRetention =
+        TimeSpan.FromHours(6);
+
     private readonly IQaAudioChunkRepository _chunkRepository;
     private readonly IDeviceRepository _deviceRepository;
     private readonly ISessionRepository _sessionRepository;
@@ -226,11 +229,6 @@ public sealed class QaAudioChunkService
             "audio/wav",
             cancellationToken);
 
-        DateTimeOffset retentionBaseUtc =
-            session.ScheduledEndUtc > nowUtc
-                ? session.ScheduledEndUtc
-                : nowUtc;
-
         var chunk = new QaAudioChunk
         {
             Id = Guid.NewGuid(),
@@ -248,7 +246,8 @@ public sealed class QaAudioChunkService
             Channels = wave.Channels,
             BitsPerSample = wave.BitsPerSample,
             DeleteAfterUtc =
-                retentionBaseUtc.AddHours(24),
+                nowUtc +
+                RawChunkRetention,
             CreatedAtUtc = nowUtc,
             UpdatedAtUtc = nowUtc
         };

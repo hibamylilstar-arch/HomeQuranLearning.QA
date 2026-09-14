@@ -26,7 +26,7 @@ Image alone is insufficient. Keyword-only text without an image is insufficient.
 
 ## QA-001 — Teacher-speech provenance and human-confirmed findings
 
-Status: accepted 2026-08-28.
+Status: accepted 2026-08-28; historical and superseded by QA-002 / QA-003 where they conflict.
 
 - Teacher speech used for QA must come from a separately attributable teacher
   microphone track. System/loopback or mixed audio alone is insufficient.
@@ -38,15 +38,15 @@ Status: accepted 2026-08-28.
 - Teacher communication with a parent during class is prohibited.
 - Communication with a student is limited to lesson teaching/correction,
   necessary class control and necessary technical continuity.
-- Automation creates a QA candidate. Only an authorized human confirmation can
-  turn that candidate into a QA alert/evidence finding.
+- Historical behavior at this stage created a QA candidate before an alert.
+  This workflow is superseded by QA-003 and is not the current product path.
 - Candidate review exposes ten seconds before and ten seconds after the trigger
   and preserves the ability to inspect the complete recording at that offset.
 - Missing teacher-audio provenance or coverage is an explicit coverage failure,
   never proof of compliant silence.
 
-The detailed proposed design and implementation gates are in
-`docs/architecture/teacher-audio-context-qa.md`.
+The candidate/teacher-track design from this phase is retired. Current authority is
+`docs/architecture/classroom-monitoring-product-contract.md` plus QA-002 / QA-003.
 
 ## RET-001 — Owner-configurable recording retention and capacity
 
@@ -242,3 +242,50 @@ Status: accepted 2026-09-04; extends DEV-001, DEV-002 and DEV-003.
 Permanent engineering principle:
 
 `User intent first. AI improves implementation; AI does not invent product restrictions.`
+
+## QA-003 - Direct local restricted-word alerts
+
+Status: accepted production architecture 2026-09-14.
+
+- `QaLocalVoskWorker` performs local restricted-word detection.
+- QA consumes the shared classroom conversation.
+- Local evidence is approximately 10 seconds before + 20 seconds after match.
+- Evidence is uploaded as WAV through the direct restricted-alert path.
+- A valid detection creates `QaAlert` directly.
+- No active `QaCandidate` persistence/dashboard remains.
+- Human oversight is Review / Ignore / Reopen.
+- Server STT, faster-whisper, chunks, transcripts, semantic experiments and
+  recording QA polling are retired.
+
+## REC-002 - Stable archive identity across stream rotation
+
+Status: accepted and production-proven 2026-09-15.
+
+- Archive identity must not depend only on the current stream key.
+- Backend targets provide stable DeviceId + StreamKey.
+- Recorder persists `.device-id`.
+- Registrar resolves the sidecar first.
+- Registrar uses bounded exponential retry backoff.
+- Stream/ingress rotation must not orphan finalized recordings.
+- Four historical orphan archives were recovered before this fix.
+
+## MEDIA-001 - Current transport and capacity
+
+Status: accepted operational clarification 2026-09-15.
+
+- Current deployed transport is Agent FFmpeg RTMP -> MediaMTX ->
+  LiveKit Ingress -> LiveKit -> dashboard.
+- WHIP/no-transcode is future work, not current production.
+- Ingress transcoding is the proven major VPS CPU scaling cost.
+- One-layer ingress tuning did not materially reduce it.
+- Short-term higher-concurrency scaling is more VPS vCPU.
+- Media redesign is lower priority than current Agent audio/live reliability.
+
+## OPS-001 - Interactive VPS shell safety
+
+Status: accepted operational rule 2026-09-15.
+
+- The Owner decides when to close the interactive root SSH shell.
+- AI commands must not use parent-shell `set -e`, `exit 1`, or another
+  top-level failure path that can terminate that shell.
+- Risky strict-mode work belongs inside a subshell.

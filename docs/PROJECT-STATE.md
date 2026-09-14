@@ -1,135 +1,89 @@
-# HomeQuranLearning.QA â€” Project State
+# HomeQuranLearning.QA - Current Project State
 
-## Status
+Last verified: 2026-09-15
 
-The project now uses one supported QA architecture: local Agent-side Vosk
-restricted-word detection with local evidence capture.
+Canonical operational handoff: `docs/PROJECT-HANDOFF.md`.
 
-Legacy server-side QA/STT experiments have been removed from active source.
+## Current checkpoint
 
-## Verified Build/Test State
+Production application code is at:
 
-The cleanup verification completed with:
+`e4590085ed99aa3de3ad4bf80769f79771615ca2`
 
-- full .NET solution build: PASS
-- Unit tests: 148 passed, 0 failed
-- Integration tests: 4 passed, 0 failed
-- Agent tests: 173 passed, 0 failed
-- Next.js production dashboard build: PASS
-- active legacy QA code references: ZERO
-- `git diff --check`: PASS
+## Current priority
 
-## Live Monitoring
+Audio -> Live -> QA -> Recording.
 
-The established live path remains:
-
-Windows Agent
-â†’ screen/audio capture
-â†’ FFmpeg
-â†’ LiveKit Ingress
-â†’ LiveKit room
-â†’ dashboard
-
-The live architecture was intentionally not changed during QA cleanup.
-
-A previous owner-machine live buffering issue was traced to an obsolete local
-QA worker service competing for resources. Removing that legacy service
-restored smooth live viewing.
+Immediate work is the Windows Agent audio pipeline, not another broad VPS
+investigation.
 
 ## Audio
 
-Audio is the highest-priority subsystem.
+Shared foundation:
 
-Shared classroom audio is owned by the Agent and reused through
-`ClassroomAudioRuntime` / `ClassroomAudioHub`.
+- `ClassroomAudioRuntime`
+- `ClassroomAudioHub`
 
-QA must consume shared audio rather than opening another microphone pipeline.
+Next proof must map microphone/loopback ownership, all consumers,
+queues/buffers, endpoint selection, route changes, echo and latency.
+
+## Live
+
+Current production path:
+
+Agent -> FFmpeg -> RTMP -> MediaMTX -> LiveKit Ingress -> LiveKit -> dashboard.
+
+`ddagrab` remains the proven screen path.
+
+WHIP/no-transcode is not yet deployed.
+
+## QA
+
+Current supported restricted-word path:
+
+`ClassroomAudioHub`
+-> `QaLocalVoskWorker`
+-> local Vosk
+-> local WAV evidence
+-> direct alert API
+-> `QaAlert`
+-> Review / Ignore / Reopen
+
+There is no active QA Candidates product.
+
+Server QA worker, faster-whisper, continuous QA chunks, transcripts,
+semantic/off-topic experiments and recording QA polling are retired.
+
+`RemoveLegacyQaExperiments` is already deployed.
 
 ## Recording
 
-The supported recording architecture remains intact.
+Server archive path:
 
-QA no longer polls recordings for speech-to-text processing and recordings no
-longer contain QA-processing state.
+MediaMTX -> archive recorder -> MP4/`.ready` -> archive registrar -> MinIO/backend.
 
-## Final QA Flow
+Production fix `e4590085...` persists stable device identity in `.device-id`
+and uses registrar exponential backoff.
 
-1. eligible live class session exists
-2. Agent shared classroom audio is available
-3. `QaLocalVoskWorker` loads active restricted rules
-4. Vosk performs local phrase detection
-5. local rolling evidence keeps approximately:
-   - 10 seconds before detection
-   - 20 seconds after detection
-6. Agent uploads WAV evidence
-7. API validates device/session/rule/phrase
-8. API creates `QaAlert`
-9. dashboard exposes evidence and review workflow
+Four historical orphans were recovered.
 
-## Current QA Alert Workflow
+Post-fix `.ready` count was zero and registrar returned to idle CPU.
 
-Supported actions:
+Archive retry-storm incident is closed unless new evidence appears.
 
-- Review
-- Ignore
-- Reopen
+## Capacity
 
-Manager visibility is constrained to assigned teachers.
+4-vCPU VPS is CPU-limited mainly by RTMP -> LiveKit Ingress transcoding at
+higher concurrency.
 
-Evidence cleanup is handled through QA alert evidence retention.
+One-layer ingress tuning did not materially reduce CPU.
 
-## Permanently Removed Components
+More vCPU is the practical short-term scale path; no-transcode publishing is
+later.
 
-The active product no longer contains:
+## Next task
 
-- Python server QA worker
-- continuous QA audio chunk pipeline
-- server Whisper/faster-whisper QA
-- QA Candidates
-- transcript segment persistence
-- semantic/off-topic classifier
-- recording QA polling
-- direct chunk-backed QA alert service
-- retired local STT spike
-- worker Docker image/service
-
-Historical migrations remain because EF migration history is immutable.
-
-## Schema Cleanup
-
-Forward migration:
-
-`RemoveLegacyQaExperiments`
-
-Its `Up()` removes:
-
-- `qa_audio_chunks`
-- `qa_candidates`
-- retired transcript persistence table
-- retired chunk-origin alert index
-- retired recording QA-processing column
-- retired chunk-origin alert column
-
-The migration does not modify the supported live-monitoring, recording,
-session, schedule, teacher, student, or course schema.
-
-## Deployment State
-
-Do not apply the new cleanup migration to production until the cleanup commit
-has been pushed and deployment is intentionally started.
-
-The legacy VPS QA worker must remain disabled/removed.
-
-## Next Engineering Task
-
-Inspect and simplify the active Windows audio endpoint pipeline so that an
-active headset/handfree communication microphone and output are selected
-automatically in preference to built-in laptop devices.
-
-Goals:
-
-- reduce buffering
-- eliminate teacher echo
-- preserve live-feed stability
-- keep one shared capture architecture
-- avoid extra waiting/buffering stages between audio consumers
+Inspect and simplify the active Windows communication-audio path so the Agent
+follows the effective headset/handfree mic and output, supports wired/USB/
+Bluetooth/default communication routes, recovers from route changes, removes
+teacher echo and reduces buffering while preserving Live stability.

@@ -1,97 +1,54 @@
-# Current Architecture
+# Current Supported Architecture
 
-## Windows Agent
+Last verified: 2026-09-15
 
-The Agent is responsible for:
+## Agent
 
-- device heartbeat
-- session awareness
-- screen capture
-- classroom audio capture
-- live publishing
-- recording
-- local restricted-word QA detection
-- local QA evidence buffering/upload
+The Agent owns heartbeat, session awareness, screen capture, classroom audio,
+live publishing, recording, local restricted-word QA and evidence upload.
 
-## Shared Audio
+## Shared audio
 
-`ClassroomAudioRuntime` and `ClassroomAudioHub` are the shared audio
-foundation.
+`ClassroomAudioRuntime` and `ClassroomAudioHub` are the shared foundation.
 
-Live monitoring, recording, and QA must not independently compete for the
-same physical microphone endpoint.
+Physical classroom audio should be captured once and fanned out.
 
-## Live Monitoring
+The next phase must prove source/runtime matches this rule and identify any
+duplicate capture or blocking/buffering boundary.
 
-Supported path:
+## Live
 
-Agent capture
-→ FFmpeg
-→ LiveKit Ingress
-→ LiveKit
-→ dashboard
+Agent -> FFmpeg -> RTMP -> MediaMTX -> LiveKit Ingress -> LiveKit -> dashboard.
 
-Screen video uses the proven `ddagrab` path.
+Screen capture uses `ddagrab`.
+
+Current production still uses ingress transcoding.
 
 ## QA
 
-Supported path:
+`ClassroomAudioHub`
+-> `QaLocalVoskWorker`
+-> restricted rules
+-> local Vosk
+-> local WAV evidence
+-> direct `QaAlert`
+-> dashboard.
 
-ClassroomAudioHub
-→ QaLocalVoskWorker
-→ active restricted rules
-→ local Vosk phrase detection
-→ local pre/post evidence WAV
-→ QA alert API
-→ QaAlert
-→ dashboard
+No server STT worker and no QA Candidates product are supported.
 
-No server-side continuous STT worker is part of the supported design.
+## Recording
 
-## QA Evidence
+MediaMTX
+-> archive recorder
+-> finalized MP4/`.ready`
+-> archive registrar
+-> MinIO/backend.
 
-Evidence is captured locally around a restricted-word match.
+Recorder persists `.device-id`.
+Registrar uses sidecar identity first and bounded exponential retry backoff.
 
-Target evidence window:
+## Immediate architecture investigation
 
-- about 10 seconds before detection
-- about 20 seconds after detection
-
-Evidence is uploaded as WAV and associated directly with the resulting alert.
-
-## Dashboard
-
-Current relevant surfaces include:
-
-- Live
-- Recordings
-- QA Alerts
-- QA Rules
-- Sessions
-- Schedules
-- Teachers
-- Students
-- Courses
-- Devices
-- Users
-- Attendance reports
-
-There is no QA Candidates dashboard.
-
-## Data Model
-
-Current QA product entities include:
-
-- QaRule
-- QaAlert
-
-Retired experimental entities are absent from the current model.
-
-Historical migration files may still reference retired entities.
-
-## Retention
-
-QA alert evidence cleanup is based on the current alert evidence retention
-policy.
-
-The retired chunk-retention worker path is not supported.
+Prove effective communication mic/render selection, shared consumers,
+queue/buffer boundaries, back-pressure, route-change recovery, teacher echo
+source and end-to-end latency before changing the proven media transport.

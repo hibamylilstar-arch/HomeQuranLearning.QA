@@ -187,8 +187,9 @@ class.
 Speaker identification or diarization may be added later as optional analytics,
 but it is not a core dependency for detection.
 
-Existing candidate review, context review, auditability and human review
-mechanisms may continue unless separately changed by the Owner.
+The retired QA Candidate layer is no longer part of the active product.
+Restricted-word detection may create the direct `QaAlert`; evidence plus
+Review / Ignore / Reopen provides the active human oversight workflow.
 
 Arabic Quran/Qaida recitation handling and contextual multilingual analysis may
 continue where useful, but they must operate on the approved classroom-audio
@@ -454,7 +455,7 @@ Keep where valid:
 - screen capture path;
 - session identity/history;
 - recording authorization/storage contracts;
-- candidate review/audit mechanisms;
+- direct QA alert review/audit mechanisms;
 - historical evidence readability.
 
 Replace or remove mechanisms whose purpose is based on the old USB-only,
@@ -462,20 +463,21 @@ speaker-attribution or multi-evidence attendance assumptions.
 
 ---
 
-## 13. Development order
+## 13. Current development order
 
-Implementation order after this contract is accepted:
+Current engineering order is:
 
-1. make communication audio routing transport-agnostic;
-2. prove actual effective microphone + render endpoint capture;
-3. prove Bluetooth development-machine behavior;
-4. verify Live audio continuity and latency;
-5. migrate Recording to shared classroom audio;
-6. simplify attendance to LessonShared truth;
-7. align QA with mixed classroom conversation;
-8. only then continue broader production hardening.
+1. inspect actual Agent microphone/render capture ownership;
+2. map Live, Recording, QA and session/attendance consumers;
+3. identify queue, buffer, UDP, resample and FFmpeg latency boundaries;
+4. prove effective communication endpoint selection for wired, USB, Bluetooth
+   and Windows Default / Default Communications routes;
+5. remove teacher echo and reduce latency without duplicate capture;
+6. physically validate on the Owner canary;
+7. preserve the proven Live path during the audio change;
+8. address VPS concurrency/no-transcode publishing afterward.
 
-Latency tuning must not be used to hide an incorrect audio-source selection.
+Latency tuning must not hide incorrect audio-source selection.
 
 
 <!-- HQL_LESSON_EVIDENCE_IMAGE_OR_TEXT_20260906_BEGIN -->

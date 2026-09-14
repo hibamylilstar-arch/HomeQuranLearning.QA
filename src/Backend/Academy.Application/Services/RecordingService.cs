@@ -295,8 +295,13 @@ public sealed class RecordingService
         var devices =
             await _deviceRepository.GetAllAsync(cancellationToken);
 
+        DateTimeOffset recentOnlineCutoff =
+            DateTimeOffset.UtcNow.AddMinutes(-2);
+
         return devices
             .Where(device =>
+                device.Status == DeviceStatus.Online &&
+                device.LastSeenUtc >= recentOnlineCutoff &&
                 !string.IsNullOrWhiteSpace(device.LiveKitStreamKey))
             .Select(device => device.LiveKitStreamKey!.Trim())
             .Where(streamKey =>

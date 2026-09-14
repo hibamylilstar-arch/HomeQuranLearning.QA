@@ -7,6 +7,7 @@ import urllib.request
 
 from livekit.api import LiveKitAPI
 from livekit.protocol import ingress as ing
+from livekit.protocol import models
 
 BACKEND_BASE_URL = os.environ.get("BACKEND_BASE_URL", "http://localhost:5100")
 WORKER_API_KEY = os.environ.get("WORKER_API_KEY", "local-dev-worker-key")
@@ -68,6 +69,32 @@ async def create_ingress(room_name, identity, name):
         participant_identity=identity,
         participant_name="Agent",
         enable_transcoding=True,
+        video=ing.IngressVideoOptions(
+            name="classroom-screen",
+            source=models.TrackSource.SCREEN_SHARE,
+            options=ing.IngressVideoEncodingOptions(
+                video_codec=models.VideoCodec.H264_BASELINE,
+                frame_rate=5.0,
+                layers=[
+                    models.VideoLayer(
+                        quality=models.VideoQuality.HIGH,
+                        width=426,
+                        height=240,
+                        bitrate=250_000,
+                    ),
+                ],
+            ),
+        ),
+        audio=ing.IngressAudioOptions(
+            name="classroom-audio",
+            source=models.TrackSource.SCREEN_SHARE_AUDIO,
+            options=ing.IngressAudioEncodingOptions(
+                audio_codec=models.AudioCodec.OPUS,
+                bitrate=64_000,
+                disable_dtx=True,
+                channels=1,
+            ),
+        ),
     )
 
     try:

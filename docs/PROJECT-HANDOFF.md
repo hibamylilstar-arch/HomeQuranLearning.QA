@@ -119,7 +119,8 @@ For about 15 simultaneous classes:
 - short term: more VPS vCPU
 - later: proven no-transcode/WHIP publishing
 
-Do not prioritize media redesign over the current audio mission.
+This capacity note is not an instruction to begin media redesign unless the
+Owner selects that work.
 
 ## Owner canary
 
@@ -136,37 +137,31 @@ inspect exact source/runtime
 
 Do not update teacher laptops with unproven Agent changes.
 
-## Next engineering mission
+## Current issue / task state
 
-Inspect the active Windows Agent audio pipeline end-to-end before changing it.
+No active teacher echo, repeated-voice, buffering or delay defect is currently
+established.
 
-Prove:
+Earlier chat observations were diagnostic/observational only. They must not be
+treated as an unresolved product bug. If such symptoms existed previously, the
+Owner considers them fixed/resolved unless fresh evidence shows otherwise.
 
-1. physical microphone capture owner
-2. playback/loopback capture owner
-3. Live/Recording/QA/session/attendance consumers
-4. any duplicate physical capture
-5. queue/ring-buffer/UDP/resample/FFmpeg waiting stages
-6. whether a consumer can block/back-pressure capture
-7. effective communication microphone selection
-8. effective render/output selection
-9. route-change recovery for wired/USB/Bluetooth
-10. exact source of teacher echo/repeated voice
-11. latency/buffering sources
+Future AI engineers must not automatically begin an audio investigation from
+historical chat context.
 
-Target behavior:
+Start audio troubleshooting only when:
 
-- follow the actual communication headset/handfree mic and output
-- support wired, USB, Bluetooth and internal endpoints
-- resolve Windows Default / Default Communications correctly
-- recover automatically after route changes
-- eliminate teacher echo
-- reduce buffering/delay
-- keep one physical capture architecture
-- preserve proven Live stability
+1. the Owner reports a current reproducible symptom; or
+2. fresh runtime evidence demonstrates a regression.
 
-Do not change LiveKit/media transport during this Agent audio investigation
-unless direct evidence points there.
+The existing audio product contract still requires the Agent to follow the
+effective communication microphone/render route, support valid wired/USB/
+Bluetooth/internal endpoints, share canonical classroom audio where designed,
+and preserve Live stability. Those are architecture requirements, not a claim
+that the current runtime is failing them.
+
+There is no standing engineering task implied by this handoff. Continue from
+the Owner's current request and the latest verified project state.
 
 ## Closed boundaries - do not re-prove without new evidence
 

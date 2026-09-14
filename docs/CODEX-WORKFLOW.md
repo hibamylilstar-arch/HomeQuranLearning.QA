@@ -29,5 +29,8 @@ Never put secrets/tokens/stream keys in docs or chat.
 Never use top-level `set -e` or `exit 1` in the Owner's interactive VPS root
 shell.
 
-Current continuation is the Windows Agent audio pipeline investigation in
-`docs/PROJECT-HANDOFF.md`.
+There is no standing audio-investigation continuation.
+
+Resume from the Owner's current request and `docs/PROJECT-HANDOFF.md`.
+Historical diagnostic observations must not be treated as open defects without
+fresh Owner/runtime evidence.

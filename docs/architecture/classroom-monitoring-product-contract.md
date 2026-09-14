@@ -463,21 +463,22 @@ speaker-attribution or multi-evidence attendance assumptions.
 
 ---
 
-## 13. Current development order
+## 13. Development-state rule
 
-Current engineering order is:
+This contract defines required product behavior. It does not declare that an
+audio defect is currently open.
 
-1. inspect actual Agent microphone/render capture ownership;
-2. map Live, Recording, QA and session/attendance consumers;
-3. identify queue, buffer, UDP, resample and FFmpeg latency boundaries;
-4. prove effective communication endpoint selection for wired, USB, Bluetooth
-   and Windows Default / Default Communications routes;
-5. remove teacher echo and reduce latency without duplicate capture;
-6. physically validate on the Owner canary;
-7. preserve the proven Live path during the audio change;
-8. address VPS concurrency/no-transcode publishing afterward.
+As of 2026-09-15, the Owner does not report an active teacher echo,
+repeated-voice, buffering or delay problem. Earlier diagnostic observations are
+not a standing defect and are considered resolved unless fresh evidence proves
+otherwise.
 
-Latency tuning must not hide incorrect audio-source selection.
+Future work must be selected from the Owner's current request / roadmap.
+
+If a new audio regression is reported, preserve the effective-route and
+capture-once architecture while diagnosing that specific current evidence.
+Do not reopen historical symptoms merely because they appear in an old chat or
+historical note.
 
 
 <!-- HQL_LESSON_EVIDENCE_IMAGE_OR_TEXT_20260906_BEGIN -->

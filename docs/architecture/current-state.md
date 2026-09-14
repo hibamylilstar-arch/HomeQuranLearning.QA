@@ -13,8 +13,8 @@ live publishing, recording, local restricted-word QA and evidence upload.
 
 Physical classroom audio should be captured once and fanned out.
 
-The next phase must prove source/runtime matches this rule and identify any
-duplicate capture or blocking/buffering boundary.
+This is an architecture contract, not evidence of an active runtime defect.
+Do not launch a remediation phase without fresh Owner/runtime evidence.
 
 ## Live
 
@@ -47,8 +47,13 @@ MediaMTX
 Recorder persists `.device-id`.
 Registrar uses sidecar identity first and bounded exponential retry backoff.
 
-## Immediate architecture investigation
+## Current runtime status rule
 
-Prove effective communication mic/render selection, shared consumers,
-queue/buffer boundaries, back-pressure, route-change recovery, teacher echo
-source and end-to-end latency before changing the proven media transport.
+No active echo, repeated-voice, buffering or delay issue is established by this
+document.
+
+Historical diagnostic observations are considered resolved unless fresh
+evidence demonstrates otherwise.
+
+Architecture inspection should be driven by a current feature/change request or
+a newly observed regression, not by stale chat history.

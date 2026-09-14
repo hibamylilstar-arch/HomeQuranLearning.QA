@@ -27,15 +27,25 @@ Current deployed application-code checkpoint before this docs refresh:
 - registrar uses bounded exponential retry backoff
 - `RemoveLegacyQaExperiments` is already deployed
 
-## Current next task
+## Current issue state
 
-Inspect the Windows Agent audio endpoint and buffering pipeline.
+There is no standing audio echo, repeated-voice, buffering or delay defect
+currently established.
 
-Prove effective communication mic/render selection, all consumers, duplicate
-capture, queues/buffers, back-pressure, route-change recovery, echo source and
-latency before changing behavior.
+Historical observations from earlier diagnostic chats must not be converted into
+an open engineering task. If such symptoms existed previously, the Owner
+considers them resolved unless fresh runtime evidence proves otherwise.
 
-Preserve the proven Live transport during this investigation.
+Do not start an audio-remediation investigation without either:
+
+- a fresh Owner report of a current problem; or
+- fresh runtime evidence showing a real regression.
+
+The effective communication-route architecture remains a product requirement,
+not evidence that the current implementation is broken.
+
+The next task comes from the Owner's current request / roadmap, not from an old
+chat symptom.
 
 ## Capacity
 

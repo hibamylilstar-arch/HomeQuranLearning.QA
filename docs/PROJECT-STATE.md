@@ -14,8 +14,8 @@ Production application code is at:
 
 Audio -> Live -> QA -> Recording.
 
-Immediate work is the Windows Agent audio pipeline, not another broad VPS
-investigation.
+This priority order describes product importance. It does not mean an audio
+incident is currently open.
 
 ## Audio
 
@@ -24,8 +24,11 @@ Shared foundation:
 - `ClassroomAudioRuntime`
 - `ClassroomAudioHub`
 
-Next proof must map microphone/loopback ownership, all consumers,
-queues/buffers, endpoint selection, route changes, echo and latency.
+No current echo, repeated-voice, buffering or delay defect is established.
+
+Historical observations must not be reopened automatically. Treat the current
+audio path as the accepted baseline unless the Owner reports a fresh problem or
+new runtime evidence shows a regression.
 
 ## Live
 
@@ -83,7 +86,7 @@ later.
 
 ## Next task
 
-Inspect and simplify the active Windows communication-audio path so the Agent
-follows the effective headset/handfree mic and output, supports wired/USB/
-Bluetooth/default communication routes, recovers from route changes, removes
-teacher echo and reduces buffering while preserving Live stability.
+No standing audio bug-fix task is defined by this document.
+
+The next engineering task must come from the Owner's current request / roadmap.
+Do not infer a task from historical diagnostic observations.

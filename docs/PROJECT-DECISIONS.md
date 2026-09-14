@@ -289,3 +289,22 @@ Status: accepted operational rule 2026-09-15.
 - AI commands must not use parent-shell `set -e`, `exit 1`, or another
   top-level failure path that can terminate that shell.
 - Risky strict-mode work belongs inside a subshell.
+## AUDIO-002 - Historical audio observations are not open defects
+
+Status: accepted Owner clarification 2026-09-15.
+
+- Earlier chat observations about audio buffering, repeated teacher voice,
+  echo-like behavior or delay were diagnostic/observational context, not a
+  standing unresolved defect.
+- As of this clarification, the Owner reports no such active problem. If any of
+  those symptoms existed previously, they are considered fixed/resolved unless
+  fresh runtime evidence proves otherwise.
+- Future AI engineers must not convert old chat history or stale documentation
+  into a new audio-remediation mission.
+- Audio troubleshooting begins only from a fresh Owner report of a current
+  symptom or fresh runtime evidence of a regression.
+- Existing audio architecture requirements remain valid: effective
+  communication routes, shared/canonical audio where specified, and preservation
+  of proven Live behavior.
+- Product priority `Audio -> Live -> QA -> Recording` describes importance; it
+  does not assert that Audio currently has an open incident.

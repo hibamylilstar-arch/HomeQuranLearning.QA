@@ -5,6 +5,9 @@ namespace HomeQuranLearning.ClassroomAgent.Setup;
 
 internal static class AgentConfigurationWriter
 {
+    private const string QaModelDirectoryName =
+        "vosk-model-en-us-0.22-lgraph";
+
     public static void Write(
         string agentDirectory,
         DeploymentConfig deployment,
@@ -15,6 +18,11 @@ internal static class AgentConfigurationWriter
                 InstallerPaths.InstallRoot,
                 "tools",
                 "ffmpeg.exe");
+
+        string qaModelPath =
+            Path.Combine(
+                agentDirectory,
+                QaModelDirectoryName);
 
         string configPath =
             Path.Combine(
@@ -42,6 +50,13 @@ internal static class AgentConfigurationWriter
                     existing,
                     "LiveStreaming");
 
+            JsonObject qaLocalVosk =
+                existing["QaLocalVosk"] as JsonObject
+                ?? new JsonObject();
+
+            existing["QaLocalVosk"] =
+                qaLocalVosk;
+
             // Preserve device/runtime choices such as Recording.Enabled,
             // recording destination, frame rate and LiveStreaming.Enabled.
             // Only deployment-owned values are refreshed during an update.
@@ -65,6 +80,15 @@ internal static class AgentConfigurationWriter
 
             liveStreaming["FfmpegPath"] =
                 ffmpegPath;
+
+            // Restricted local QA is production-managed. Ship the exact model
+            // inside the immutable Agent payload so every managed laptop uses
+            // the same detector assets after install/update.
+            qaLocalVosk["Enabled"] =
+                true;
+
+            qaLocalVosk["ModelPath"] =
+                qaModelPath;
 
             File.WriteAllText(
                 configPath,
@@ -123,6 +147,11 @@ internal static class AgentConfigurationWriter
                 IngestBaseUrl =
                     deployment.LiveIngestBaseUrl.TrimEnd('/'),
                 FfmpegPath = ffmpegPath
+            },
+            QaLocalVosk = new
+            {
+                Enabled = true,
+                ModelPath = qaModelPath
             }
         };
 

@@ -18,7 +18,9 @@ param(
 
     [string]$Version = "",
 
-    [string]$CodeSigningCertificateThumbprint = ""
+    [string]$CodeSigningCertificateThumbprint = "",
+
+    [string]$VoskModelPath = ""
 )
 
 Set-StrictMode -Version Latest
@@ -123,6 +125,42 @@ if (-not (Test-Path -LiteralPath $ffmpegLicense -PathType Leaf)) {
     throw "The approved FFmpeg license file was not found beside the selected build."
 }
 
+if ([string]::IsNullOrWhiteSpace($VoskModelPath)) {
+    $localAppData =
+        [Environment]::GetFolderPath(
+            [Environment+SpecialFolder]::LocalApplicationData)
+
+    if ([string]::IsNullOrWhiteSpace($localAppData)) {
+        throw "LocalAppData is unavailable. Supply -VoskModelPath explicitly."
+    }
+
+    $VoskModelPath =
+        Join-Path `
+            $localAppData `
+            "HomeQuranLearning\VoskModelCache\vosk-model-en-us-0.22-lgraph"
+}
+
+$resolvedVoskModel =
+    [IO.Path]::GetFullPath($VoskModelPath)
+
+if (-not (Test-Path -LiteralPath $resolvedVoskModel -PathType Container)) {
+    throw "Approved Vosk model directory was not found at '$resolvedVoskModel'."
+}
+
+foreach ($relativeModelFile in @(
+    "am\final.mdl",
+    "conf\mfcc.conf"
+)) {
+    $requiredModelFile =
+        Join-Path `
+            $resolvedVoskModel `
+            $relativeModelFile
+
+    if (-not (Test-Path -LiteralPath $requiredModelFile -PathType Leaf)) {
+        throw "Vosk model is incomplete. Missing '$relativeModelFile'."
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $gitShort =
         (& git -C $repo rev-parse --short=12 HEAD).Trim()
@@ -203,6 +241,30 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "Classroom Agent publish failed."
     }
+
+    Write-Host "Packaging production Vosk QA model..." -ForegroundColor Cyan
+
+    $voskDestination =
+        Join-Path `
+            $agentOutput `
+            "vosk-model-en-us-0.22-lgraph"
+
+    New-Item `
+        -ItemType Directory `
+        -Path $voskDestination `
+        -Force |
+        Out-Null
+
+    Get-ChildItem `
+        -LiteralPath $resolvedVoskModel `
+        -Force |
+        ForEach-Object {
+            Copy-Item `
+                -LiteralPath $_.FullName `
+                -Destination $voskDestination `
+                -Recurse `
+                -Force
+        }
 
     Write-Host "Publishing Microsoft Teams evidence helper..." -ForegroundColor Cyan
     & dotnet publish `
@@ -374,6 +436,8 @@ try {
     Write-Host "INSTALLER_SIGNATURE=$signatureState" -ForegroundColor Yellow
     Write-Host "TEAMS_HELPER_DEFAULT=YES" -ForegroundColor Green
     Write-Host "LIVE_STREAMING_DEFAULT=YES" -ForegroundColor Green
+    Write-Host "LOCAL_QA_DEFAULT=YES" -ForegroundColor Green
+    Write-Host "VOSK_MODEL_INCLUDED=YES" -ForegroundColor Green
     Write-Host "SECRET_PRINTED=NO" -ForegroundColor Green
 }
 finally {

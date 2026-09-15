@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getDevices, getLiveSessions, getLiveKitToken } from "@/lib/api";
 import LiveVideo from "@/components/LiveVideo";
 import type { DeviceListItem, SessionListItem } from "@/types";
+import { formatAcademyTime } from "@/lib/time";
 
 type FeedAccess = { url: string; token: string };
 
@@ -18,21 +19,6 @@ function isRecentlyOnline(device: DeviceListItem) {
   return Number.isFinite(lastSeen) && Date.now() - lastSeen <= ONLINE_WINDOW_MS;
 }
 
-function formatTime(value: string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
 
 async function requestFeedAccess(deviceId: string) {
   const identity = `viewer-device-${deviceId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -102,8 +88,13 @@ function DeviceLiveCard({
   }
 
   const laptopName = device.recordingDisplayName || device.deviceName;
-  const startTime = formatTime(session?.startedAtUtc);
-  const endTime = formatTime(session?.endedAtUtc);
+  const startTime = session?.startedAtUtc
+    ? formatAcademyTime(session.startedAtUtc)
+    : null;
+
+  const endTime = session?.endedAtUtc
+    ? formatAcademyTime(session.endedAtUtc)
+    : null;
   const classTiming =
     startTime && endTime
       ? `${startTime} – ${endTime}`

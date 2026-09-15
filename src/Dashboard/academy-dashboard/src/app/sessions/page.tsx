@@ -12,6 +12,10 @@ import {
   getSessionEvents,
 } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
+import {
+  formatAcademyDateTime,
+  formatAcademyTime,
+} from "@/lib/time";
 import type {
   SessionListItem,
   TeacherListItem,
@@ -862,7 +866,7 @@ export default function SessionsPage() {
                       </td>
 
                       <td className="whitespace-nowrap px-4 py-4 text-slate-500">
-                        {new Date(session.startedAtUtc).toLocaleString()}
+                        {formatAcademyDateTime(session.startedAtUtc)}
                       </td>
 
                       <td className="px-4 py-4">
@@ -886,9 +890,9 @@ export default function SessionsPage() {
                         {session.lessonSharedStatus === "Pending" && (
                           <div className="mt-1 whitespace-nowrap text-[10px] text-slate-400">
                             Grace closes{" "}
-                            {new Date(
+                            {formatAcademyTime(
                               session.lessonGraceEndsAtUtc
-                            ).toLocaleTimeString()}
+                            )}
                           </div>
                         )}
                       </td>
@@ -1027,7 +1031,7 @@ export default function SessionsPage() {
                 {" / "}
                 {evidenceSession.studentFullName}
                 {" | "}
-                {new Date(evidenceSession.startedAtUtc).toLocaleString()}
+                {formatAcademyDateTime(evidenceSession.startedAtUtc)}
               </p>
             </div>
             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
@@ -1157,7 +1161,7 @@ export default function SessionsPage() {
                         )}
                     </div>
                     <time className="whitespace-nowrap text-[10px] font-medium text-slate-400">
-                      {new Date(event.occurredAtUtc).toLocaleString()}
+                      {formatAcademyDateTime(event.occurredAtUtc)}
                     </time>
                   </div>
                 </li>
@@ -1197,9 +1201,9 @@ export default function SessionsPage() {
                 {" / "}
                 {selectedSession.studentFullName}
                 {" | "}
-                {new Date(
+                {formatAcademyDateTime(
                   selectedSession.startedAtUtc
-                ).toLocaleString()}
+                )}
               </p>
             </div>
 

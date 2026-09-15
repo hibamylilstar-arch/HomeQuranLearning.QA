@@ -1,3 +1,50 @@
+const academyTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Asia/Karachi",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: true,
+});
+
+const academyDateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Asia/Karachi",
+  year: "numeric",
+  month: "short",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: true,
+});
+
+export function formatAcademyTime(value: string | Date): string {
+  const date =
+    value instanceof Date
+      ? value
+      : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return typeof value === "string"
+      ? value
+      : "";
+  }
+
+  return academyTimeFormatter.format(date);
+}
+
+export function formatAcademyDateTime(value: string | Date): string {
+  const date =
+    value instanceof Date
+      ? value
+      : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return typeof value === "string"
+      ? value
+      : "";
+  }
+
+  return academyDateTimeFormatter.format(date);
+}
+
 export function normalizeTime24(value: string): string {
   const parts = value.split(":");
 

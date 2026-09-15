@@ -129,10 +129,33 @@ internal sealed class InstallCoordinator
             string agentDirectory =
                 Path.Combine(applicationRoot, "agent");
 
-            progress.Report("Protecting the device credential with Windows DPAPI...");
-            WindowsProtectedSecretStore.ProtectToFile(
-                InstallerPaths.SecretPath,
-                deployment.AgentApiKey);
+            bool writeDeploymentCredential =
+                AgentCredentialUpdatePolicy
+                    .ShouldWriteDeploymentCredential(
+                        preserveExistingConfiguration,
+                        File.Exists(
+                            InstallerPaths.SecretPath));
+
+            if (writeDeploymentCredential)
+            {
+                progress.Report(
+                    "Protecting the device credential with Windows DPAPI...");
+
+                WindowsProtectedSecretStore.ProtectToFile(
+                    InstallerPaths.SecretPath,
+                    deployment.AgentApiKey);
+
+                _log.Write(
+                    "AGENT_CREDENTIAL_WRITTEN");
+            }
+            else
+            {
+                progress.Report(
+                    "Preserving the existing protected device credential...");
+
+                _log.Write(
+                    "AGENT_CREDENTIAL_PRESERVED");
+            }
 
             AgentConfigurationWriter.Write(
                 agentDirectory,

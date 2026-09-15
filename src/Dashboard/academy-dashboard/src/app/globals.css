@@ -205,7 +205,7 @@ svg {
   .sessions-data-cards td:nth-child(7)::before { content: "Lesson Shared"; }
   .sessions-data-cards td:nth-child(8)::before { content: "Participation"; }
   .sessions-data-cards td:nth-child(9)::before { content: "Teacher Attendance"; }
-  .sessions-data-cards td:nth-child(12)::before { content: "Student Attendance"; }
+  .sessions-data-cards td:nth-child(10)::before { content: "Student Attendance"; }
   .sessions-data-cards td:nth-child(11)::before { content: "Review"; }
   .sessions-data-cards td:nth-child(12)::before { content: "Actions"; }
 

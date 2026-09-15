@@ -1,43 +1,80 @@
 import { NextResponse } from "next/server";
+import { setAuthCookies } from "@/lib/server-auth";
 
-const backendBaseUrl = process.env.BACKEND_BASE_URL ?? "http://localhost:5100";
+const backendBaseUrl =
+  process.env.BACKEND_BASE_URL ??
+  "http://localhost:5100";
 
-export async function POST(request: Request) {
-  const { email, password } = await request.json();
+export async function POST(
+  request: Request
+) {
+  const { email, password } =
+    await request.json();
 
-  const res = await fetch(`${backendBaseUrl}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
+  const res =
+    await fetch(
+      `${backendBaseUrl}/api/auth/login`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+        cache: "no-store",
+      }
+    );
 
   if (!res.ok) {
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    return NextResponse.json(
+      {
+        error:
+          "Invalid credentials",
+      },
+      {
+        status: 401,
+      }
+    );
   }
 
-  const data = await res.json();
-  const token = data.token as string;
+  const data =
+    (await res.json()) as {
+      token?: string;
+      refreshToken?: string;
+    };
 
-  const response = NextResponse.json({ user: data });
+  if (
+    !data.token ||
+    !data.refreshToken
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Authentication response was incomplete.",
+      },
+      {
+        status: 502,
+      }
+    );
+  }
 
-  const forwardedProto =
-    request.headers
-      .get("x-forwarded-proto")
-      ?.split(",")[0]
-      .trim()
-      .toLowerCase();
+  const response =
+    NextResponse.json({
+      ok: true,
+    });
 
-  const requestIsHttps =
-    forwardedProto
-      ? forwardedProto === "https"
-      : new URL(request.url).protocol === "https:";
-  response.cookies.set("qa_auth_token", token, {
-    httpOnly: true,
-    secure: requestIsHttps,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 2, // 2 hours
-  });
+  setAuthCookies(
+    response,
+    request,
+    {
+      token: data.token,
+      refreshToken:
+        data.refreshToken,
+    }
+  );
 
   return response;
 }

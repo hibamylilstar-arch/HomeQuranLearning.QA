@@ -167,12 +167,44 @@ app.MapPost("/api/auth/login", async (
 {
     try
     {
-        var response = await authService.LoginAsync(request, cancellationToken);
+        var response =
+            await authService.LoginAsync(
+                request,
+                cancellationToken);
+
         return Results.Ok(response);
     }
     catch (InvalidOperationException ex)
     {
-        return Results.Json(new { message = ex.Message }, statusCode: 401);
+        return Results.Json(
+            new { message = ex.Message },
+            statusCode: 401);
+    }
+});
+
+app.MapPost("/api/auth/refresh", async (
+    RefreshTokenRequest request,
+    AuthService authService,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var response =
+            await authService.RefreshAsync(
+                request.RefreshToken,
+                cancellationToken);
+
+        return Results.Ok(response);
+    }
+    catch (SecurityTokenException)
+    {
+        return Results.Json(
+            new
+            {
+                message =
+                    "Invalid or expired dashboard session."
+            },
+            statusCode: 401);
     }
 });
 
@@ -181,13 +213,30 @@ app.MapGet("/api/auth/me", async (
     AuthService authService,
     CancellationToken cancellationToken) =>
 {
-    string? userIdValue = user.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (userIdValue is null || !Guid.TryParse(userIdValue, out Guid userId))
+    string? userIdValue =
+        user.FindFirstValue(
+            ClaimTypes.NameIdentifier);
+
+    if (
+        userIdValue is null ||
+        !Guid.TryParse(
+            userIdValue,
+            out Guid userId)
+    )
     {
         return Results.Unauthorized();
     }
 
-    var profile = await authService.GetCurrentUserAsync(userId, cancellationToken);
+    var profile =
+        await authService.GetCurrentUserAsync(
+            userId,
+            cancellationToken);
+
+    if (!profile.IsActive)
+    {
+        return Results.Unauthorized();
+    }
+
     return Results.Ok(profile);
 }).RequireAuthorization();
 

@@ -8,33 +8,99 @@ import {
   ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { AuthUser, fetchCurrentUser, logoutUser } from "@/lib/auth";
+import {
+  AuthUser,
+  fetchCurrentUser,
+  logoutUser,
+} from "@/lib/auth";
 
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  setUser: (user: AuthUser | null) => void;
+  setUser: (
+    user: AuthUser | null
+  ) => void;
   logout: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue>({
-  user: null,
-  loading: true,
-  setUser: () => {},
-  logout: async () => {},
-});
+const AuthContext =
+  createContext<AuthContextValue>({
+    user: null,
+    loading: true,
+    setUser: () => {},
+    logout: async () => {},
+  });
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const [user, setUser] =
+    useState<AuthUser | null>(
+      null
+    );
+
+  const [loading, setLoading] =
+    useState(true);
 
   useEffect(() => {
     fetchCurrentUser()
       .then(setUser)
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+      .catch(() =>
+        setUser(null)
+      )
+      .finally(() =>
+        setLoading(false)
+      );
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const renewSession =
+      async () => {
+        try {
+          const response =
+            await fetch(
+              "/api/auth/refresh",
+              {
+                method: "POST",
+                credentials:
+                  "include",
+              }
+            );
+
+          if (
+            response.status ===
+            401
+          ) {
+            setUser(null);
+            router.replace(
+              "/login"
+            );
+          }
+        } catch {
+          // A transient network failure
+          // must not sign the user out.
+        }
+      };
+
+    const intervalId =
+      window.setInterval(
+        renewSession,
+        60 * 60 * 1000
+      );
+
+    return () =>
+      window.clearInterval(
+        intervalId
+      );
+  }, [router, user]);
 
   async function logout() {
     try {
@@ -46,12 +112,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, setUser, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        setUser,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  return useContext(AuthContext);
+  return useContext(
+    AuthContext
+  );
 }

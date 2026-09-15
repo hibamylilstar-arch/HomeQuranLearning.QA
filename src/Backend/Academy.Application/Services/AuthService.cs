@@ -11,6 +11,9 @@ namespace Academy.Application.Services;
 
 public sealed class AuthService
 {
+    private const string RefreshTokenUseClaim = "token_use";
+    private const string RefreshTokenUseValue = "refresh";
+
     private readonly IUserRepository _userRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly JwtOptions _jwtOptions;
@@ -29,36 +32,82 @@ public sealed class AuthService
         LoginRequest request,
         CancellationToken cancellationToken = default)
     {
-        var user = await _userRepository.GetByEmailAsync(request.Email, cancellationToken)
-            ?? throw new InvalidOperationException("Invalid email or password.");
+        var user = await _userRepository.GetByEmailAsync(
+            request.Email,
+            cancellationToken)
+            ?? throw new InvalidOperationException(
+                "Invalid email or password.");
 
         if (!user.IsActive)
         {
             throw new InvalidOperationException("User is inactive.");
         }
 
-        if (!_passwordHasher.Verify(request.Password, user.PasswordHash))
+        if (!_passwordHasher.Verify(
+                request.Password,
+                user.PasswordHash))
         {
-            throw new InvalidOperationException("Invalid email or password.");
+            throw new InvalidOperationException(
+                "Invalid email or password.");
         }
 
-        string token = GenerateToken(user);
+        return CreateLoginResponse(user);
+    }
 
-        return new LoginResponse
+    public async Task<LoginResponse> RefreshAsync(
+        string refreshToken,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
         {
-            Token = token,
-            FullName = user.FullName,
-            Email = user.Email,
-            Role = user.Role.ToString()
-        };
+            throw new SecurityTokenException(
+                "Refresh token is required.");
+        }
+
+        ClaimsPrincipal principal =
+            ValidateRefreshToken(refreshToken);
+
+        string? userIdValue =
+            principal
+                .FindFirst(ClaimTypes.NameIdentifier)
+                ?.Value;
+
+        if (
+            userIdValue is null ||
+            !Guid.TryParse(
+                userIdValue,
+                out Guid userId)
+        )
+        {
+            throw new SecurityTokenException(
+                "Refresh token user is invalid.");
+        }
+
+        var user =
+            await _userRepository.GetByIdAsync(
+                userId,
+                cancellationToken)
+            ?? throw new SecurityTokenException(
+                "Refresh token user was not found.");
+
+        if (!user.IsActive)
+        {
+            throw new SecurityTokenException(
+                "User is inactive.");
+        }
+
+        return CreateLoginResponse(user);
     }
 
     public async Task<UserDto> GetCurrentUserAsync(
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        var user = await _userRepository.GetByIdAsync(userId, cancellationToken)
-            ?? throw new InvalidOperationException("User not found.");
+        var user = await _userRepository.GetByIdAsync(
+            userId,
+            cancellationToken)
+            ?? throw new InvalidOperationException(
+                "User not found.");
 
         return new UserDto
         {
@@ -70,26 +119,155 @@ public sealed class AuthService
         };
     }
 
-    private string GenerateToken(User user)
+    private LoginResponse CreateLoginResponse(
+        User user)
+    {
+        return new LoginResponse
+        {
+            Token = GenerateAccessToken(user),
+            RefreshToken = GenerateRefreshToken(user),
+            FullName = user.FullName,
+            Email = user.Email,
+            Role = user.Role.ToString()
+        };
+    }
+
+    private string GenerateAccessToken(
+        User user)
     {
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Role, user.Role.ToString()),
-            new("full_name", user.FullName)
+            new(
+                ClaimTypes.NameIdentifier,
+                user.Id.ToString()),
+            new(
+                ClaimTypes.Email,
+                user.Email),
+            new(
+                ClaimTypes.Role,
+                user.Role.ToString()),
+            new(
+                "full_name",
+                user.FullName),
+            new(
+                JwtRegisteredClaimNames.Jti,
+                Guid.NewGuid().ToString("N"))
         };
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.SigningKey));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        return GenerateToken(
+            claims,
+            _jwtOptions.Audience,
+            DateTime.UtcNow.AddMinutes(
+                _jwtOptions.ExpiryMinutes));
+    }
 
-        var token = new JwtSecurityToken(
-            issuer: _jwtOptions.Issuer,
-            audience: _jwtOptions.Audience,
-            claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(_jwtOptions.ExpiryMinutes),
-            signingCredentials: creds);
+    private string GenerateRefreshToken(
+        User user)
+    {
+        var claims = new List<Claim>
+        {
+            new(
+                ClaimTypes.NameIdentifier,
+                user.Id.ToString()),
+            new(
+                RefreshTokenUseClaim,
+                RefreshTokenUseValue),
+            new(
+                JwtRegisteredClaimNames.Jti,
+                Guid.NewGuid().ToString("N"))
+        };
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return GenerateToken(
+            claims,
+            _jwtOptions.RefreshAudience,
+            DateTime.UtcNow.AddDays(
+                _jwtOptions.RefreshExpiryDays));
+    }
+
+    private string GenerateToken(
+        IReadOnlyCollection<Claim> claims,
+        string audience,
+        DateTime expiresUtc)
+    {
+        var key =
+            new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(
+                    _jwtOptions.SigningKey));
+
+        var creds =
+            new SigningCredentials(
+                key,
+                SecurityAlgorithms.HmacSha256);
+
+        var token =
+            new JwtSecurityToken(
+                issuer: _jwtOptions.Issuer,
+                audience: audience,
+                claims: claims,
+                expires: expiresUtc,
+                signingCredentials: creds);
+
+        return new JwtSecurityTokenHandler()
+            .WriteToken(token);
+    }
+
+    private ClaimsPrincipal ValidateRefreshToken(
+        string refreshToken)
+    {
+        var key =
+            new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(
+                    _jwtOptions.SigningKey));
+
+        var validation =
+            new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                RequireExpirationTime = true,
+                RequireSignedTokens = true,
+                ValidIssuer = _jwtOptions.Issuer,
+                ValidAudience =
+                    _jwtOptions.RefreshAudience,
+                IssuerSigningKey = key,
+                ClockSkew = TimeSpan.FromMinutes(1)
+            };
+
+        ClaimsPrincipal principal =
+            new JwtSecurityTokenHandler()
+                .ValidateToken(
+                    refreshToken,
+                    validation,
+                    out SecurityToken validatedToken);
+
+        if (
+            validatedToken is not JwtSecurityToken jwt ||
+            !string.Equals(
+                jwt.Header.Alg,
+                SecurityAlgorithms.HmacSha256,
+                StringComparison.Ordinal)
+        )
+        {
+            throw new SecurityTokenException(
+                "Refresh token algorithm is invalid.");
+        }
+
+        if (
+            !string.Equals(
+                principal
+                    .FindFirst(
+                        RefreshTokenUseClaim)
+                    ?.Value,
+                RefreshTokenUseValue,
+                StringComparison.Ordinal)
+        )
+        {
+            throw new SecurityTokenException(
+                "Token is not a refresh token.");
+        }
+
+        return principal;
     }
 }

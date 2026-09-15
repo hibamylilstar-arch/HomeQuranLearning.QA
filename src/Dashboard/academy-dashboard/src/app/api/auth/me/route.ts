@@ -1,26 +1,117 @@
 import { NextResponse } from "next/server";
+import {
+  clearAuthCookies,
+  getAccessToken,
+  refreshDashboardSession,
+  setAuthCookies,
+  type RefreshedSession,
+} from "@/lib/server-auth";
 
-const backendBaseUrl = process.env.BACKEND_BASE_URL ?? "http://localhost:5100";
+const backendBaseUrl =
+  process.env.BACKEND_BASE_URL ??
+  "http://localhost:5100";
 
-export async function GET(request: Request) {
-  const token = request.headers.get("cookie")
-    ?.split(";")
-    .map((c) => c.trim())
-    .find((c) => c.startsWith("qa_auth_token="))
-    ?.split("=")[1];
+async function getProfile(
+  token: string
+) {
+  return fetch(
+    `${backendBaseUrl}/api/auth/me`,
+    {
+      headers: {
+        Authorization:
+          `Bearer ${token}`,
+      },
+      cache: "no-store",
+    }
+  );
+}
 
-  if (!token) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+export async function GET(
+  request: Request
+) {
+  let token =
+    getAccessToken(request);
+
+  let refreshed:
+    RefreshedSession | null =
+      null;
+
+  let res =
+    token
+      ? await getProfile(token)
+      : null;
+
+  if (
+    !res ||
+    res.status === 401
+  ) {
+    refreshed =
+      await refreshDashboardSession(
+        request,
+        backendBaseUrl
+      );
+
+    if (!refreshed) {
+      const response =
+        NextResponse.json(
+          {
+            error:
+              "Not authenticated",
+          },
+          {
+            status: 401,
+          }
+        );
+
+      clearAuthCookies(
+        response,
+        request
+      );
+
+      return response;
+    }
+
+    token = refreshed.token;
+    res = await getProfile(token);
   }
-
-  const res = await fetch(`${backendBaseUrl}/api/auth/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
 
   if (!res.ok) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    const response =
+      NextResponse.json(
+        {
+          error:
+            res.status === 401
+              ? "Not authenticated"
+              : "Authentication service unavailable",
+        },
+        {
+          status: res.status,
+        }
+      );
+
+    if (res.status === 401) {
+      clearAuthCookies(
+        response,
+        request
+      );
+    }
+
+    return response;
   }
 
-  const data = await res.json();
-  return NextResponse.json(data);
+  const data =
+    await res.json();
+
+  const response =
+    NextResponse.json(data);
+
+  if (refreshed) {
+    setAuthCookies(
+      response,
+      request,
+      refreshed
+    );
+  }
+
+  return response;
 }

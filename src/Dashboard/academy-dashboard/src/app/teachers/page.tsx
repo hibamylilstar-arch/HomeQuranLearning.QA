@@ -1,5 +1,7 @@
 "use client";
 
+
+import DataTableScroller from "@/components/DataTableScroller";
 import { useEffect, useState } from "react";
 import {
   createTeacher,
@@ -199,7 +201,7 @@ export default function TeachersPage() {
           </h3>
         </div>
 
-        <div className="management-mobile-cards teachers-management-cards overflow-x-auto">
+        <DataTableScroller className="management-mobile-cards teachers-management-cards overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-xs">
             <thead className="bg-slate-50/75 text-left font-semibold uppercase tracking-wider text-slate-500">
               <tr>
@@ -242,7 +244,7 @@ export default function TeachersPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </DataTableScroller>
       </div>
 
       <ManagementModal

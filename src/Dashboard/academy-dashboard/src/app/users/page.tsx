@@ -1,5 +1,7 @@
 "use client";
 
+
+import DataTableScroller from "@/components/DataTableScroller";
 import { useEffect, useState } from "react";
 import { getUsers, createUser, setUserStatus, resetUserPassword, deleteUser } from "@/lib/api";
 import type { UserListItem } from "@/types";
@@ -221,7 +223,7 @@ export default function UsersPage() {
         <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
           <h3 className="text-sm font-semibold text-slate-800">Registered Users ({visibleUsers.length})</h3>
         </div>
-        <div className="management-mobile-cards users-management-cards overflow-x-auto">
+        <DataTableScroller className="management-mobile-cards users-management-cards overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-xs">
             <thead className="bg-slate-50/75 text-left uppercase text-slate-500 font-semibold tracking-wider">
               <tr>
@@ -336,7 +338,7 @@ export default function UsersPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </DataTableScroller>
       </div>
     </div>
   );

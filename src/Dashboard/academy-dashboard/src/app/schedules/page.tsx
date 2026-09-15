@@ -1,5 +1,7 @@
 "use client";
 
+
+import DataTableScroller from "@/components/DataTableScroller";
 import {
   useEffect,
   useMemo,
@@ -709,7 +711,7 @@ export default function SchedulesPage() {
           </p>
         </div>
 
-        <div className="management-mobile-cards schedules-management-cards overflow-x-auto">
+        <DataTableScroller className="management-mobile-cards schedules-management-cards overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-xs">
             <thead className="bg-slate-50/75 text-left font-semibold uppercase tracking-wider text-slate-500">
               <tr>
@@ -798,7 +800,7 @@ export default function SchedulesPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </DataTableScroller>
       </div>
 
       <ManagementModal

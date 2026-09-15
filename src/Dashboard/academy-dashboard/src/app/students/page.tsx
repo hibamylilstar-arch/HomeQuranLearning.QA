@@ -1,5 +1,7 @@
 "use client";
 
+
+import DataTableScroller from "@/components/DataTableScroller";
 import { formatTime12Hour } from "@/lib/time";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -322,7 +324,7 @@ export default function StudentsPage() {
           </div>
         </div>
 
-        <div className="management-mobile-cards students-management-cards overflow-x-auto">
+        <DataTableScroller className="management-mobile-cards students-management-cards overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-xs">
             <thead className="bg-slate-50/75 text-left font-semibold uppercase tracking-wider text-slate-500">
               <tr>
@@ -403,7 +405,7 @@ export default function StudentsPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </DataTableScroller>
       </div>
 
       <ManagementModal

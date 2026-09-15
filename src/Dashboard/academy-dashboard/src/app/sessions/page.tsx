@@ -1,5 +1,7 @@
 "use client";
 
+
+import DataTableScroller from "@/components/DataTableScroller";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getSessions,
@@ -219,6 +221,9 @@ export default function SessionsPage() {
   const evidenceSectionRef =
     useRef<HTMLElement | null>(null);
 
+  const evidenceDeepLinkHandledRef =
+    useRef(false);
+
 
   useEffect(() => {
     if (!evidenceSession) {
@@ -365,6 +370,70 @@ export default function SessionsPage() {
     };
   }, [authLoading, loadData]);
 
+  useEffect(() => {
+    if (
+      authLoading ||
+      loading ||
+      evidenceDeepLinkHandledRef.current
+    ) {
+      return;
+    }
+
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
+
+    const sessionId =
+      params.get("evidence");
+
+    evidenceDeepLinkHandledRef.current =
+      true;
+
+    if (!sessionId) {
+      return;
+    }
+
+    const session =
+      sessions.find(
+        (item) =>
+          item.id === sessionId
+      );
+
+    if (!session) {
+      setError(
+        "Requested session evidence is not available in your session view."
+      );
+      return;
+    }
+
+    setError("");
+    setEvidenceSession(session);
+    setSessionEvents([]);
+    setEventsError("");
+    setEventsLoading(true);
+
+    void getSessionEvents(
+      session.id
+    )
+      .then((events) => {
+        setSessionEvents(events);
+      })
+      .catch((err) => {
+        setEventsError(
+          err instanceof Error
+            ? err.message
+            : "Could not load session evidence"
+        );
+      })
+      .finally(() => {
+        setEventsLoading(false);
+      });
+  }, [
+    authLoading,
+    loading,
+    sessions,
+  ]);
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
 
@@ -794,7 +863,7 @@ export default function SessionsPage() {
           </h3>
         </div>
 
-        <div className="responsive-data-cards sessions-data-cards custom-scrollbar">
+        <DataTableScroller className="responsive-data-cards sessions-data-cards custom-scrollbar">
           <table className="min-w-[1080px] divide-y divide-slate-200 text-xs">
             <thead className="bg-slate-50/75 text-left font-semibold uppercase tracking-wider text-slate-500">
               <tr>
@@ -1016,7 +1085,7 @@ export default function SessionsPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </DataTableScroller>
       </div>
 
       {evidenceSession && (

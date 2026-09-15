@@ -1,5 +1,7 @@
 "use client";
 
+
+import DataTableScroller from "@/components/DataTableScroller";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
@@ -92,7 +94,7 @@ function ReportTable({
           {emptyMessage}
         </div>
       ) : (
-        <div className="responsive-data-cards attendance-report-cards">
+        <DataTableScroller className="responsive-data-cards attendance-report-cards">
           <table className="min-w-[920px] divide-y divide-slate-200 text-left text-xs">
             <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               <tr>
@@ -179,7 +181,7 @@ function ReportTable({
               ))}
             </tbody>
           </table>
-        </div>
+        </DataTableScroller>
       )}
     </section>
   );
@@ -442,7 +444,12 @@ export default function DailyAttendanceReportPage() {
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search teacher, student or course" className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-900" />
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900"><option value="ALL">All statuses</option><option value="Present">Present</option><option value="Late">Late</option><option value="NeedsReview">Needs Review</option><option value="Absent">Absent</option><option value="Excused">Excused</option><option value="Unknown">Unknown</option></select>
         </div>
-        {visibleSessions.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">No sessions match this view or filter.</p> : <div className="responsive-data-cards attendance-operations-cards"><table className="min-w-[760px] divide-y divide-slate-200 text-left text-xs"><thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><tr><th className="px-5 py-3">Time</th><th className="px-5 py-3">Teacher</th><th className="px-5 py-3">Student</th><th className="px-5 py-3">Course</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Evidence</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleSessions.map((item) => { const status = view === "student" ? item.studentAttendanceStatus : item.teacherAttendanceStatus; return <tr key={item.sessionId} className="hover:bg-slate-50"><td className="whitespace-nowrap px-5 py-4 text-slate-600">{formatScheduleTime(item.scheduledStartUtc)}</td><td className="px-5 py-4 font-medium text-slate-900">{item.teacherFullName || "Unknown"}</td><td className="px-5 py-4 text-slate-700">{item.studentFullName || "Unknown"}</td><td className="px-5 py-4 text-slate-700">{item.courseName || "Course"}</td><td className="px-5 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${attendanceBadgeClass(status)}`}>{status}</span></td><td className="px-5 py-4 text-slate-600">{formatDuration(item.activeSeconds)} active {" - "} {item.disconnectCount} disconnects <Link className="ml-2 font-semibold text-indigo-700" href={`/sessions/${item.sessionId}`}>Open</Link></td></tr>; })}</tbody></table></div>}
+        {visibleSessions.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">No sessions match this view or filter.</p> : <DataTableScroller className="responsive-data-cards attendance-operations-cards"><table className="min-w-[760px] divide-y divide-slate-200 text-left text-xs"><thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><tr><th className="px-5 py-3">Time</th><th className="px-5 py-3">Teacher</th><th className="px-5 py-3">Student</th><th className="px-5 py-3">Course</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Evidence</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleSessions.map((item) => { const status = view === "student" ? item.studentAttendanceStatus : item.teacherAttendanceStatus; return <tr key={item.sessionId} className="hover:bg-slate-50"><td className="whitespace-nowrap px-5 py-4 text-slate-600">{formatScheduleTime(item.scheduledStartUtc)}</td><td className="px-5 py-4 font-medium text-slate-900">{item.teacherFullName || "Unknown"}</td><td className="px-5 py-4 text-slate-700">{item.studentFullName || "Unknown"}</td><td className="px-5 py-4 text-slate-700">{item.courseName || "Course"}</td><td className="px-5 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${attendanceBadgeClass(status)}`}>{status}</span></td><td className="px-5 py-4 text-slate-600">{formatDuration(item.activeSeconds)} active {" - "} {item.disconnectCount} disconnects <Link
+  className="ml-2 inline-flex min-h-9 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-[10px] font-bold uppercase tracking-wider text-indigo-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1"
+  href={`/sessions?evidence=${encodeURIComponent(item.sessionId)}`}
+>
+  View Evidence
+</Link></td></tr>; })}</tbody></table></DataTableScroller>}
       </section>
 
       <ReportTable

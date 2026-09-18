@@ -9,6 +9,8 @@ $devicePath = Join-Path $dataRoot "device.json"
 $secretPath = Join-Path $dataRoot "Secrets\agent-api-key.bin"
 $updateRoot = Join-Path $dataRoot "Updates"
 $logPath = Join-Path $dataRoot "Logs\Updater.log"
+$readinessPath = Join-Path $dataRoot "update-readiness.json"
+$readinessMaxAgeSeconds = 15
 
 function Write-UpdaterLog {
     param([string]$Message)
@@ -21,6 +23,110 @@ function Write-UpdaterLog {
         -Value ((Get-Date).ToUniversalTime().ToString("o") + " " + $Message)
 }
 
+function Test-AgentUpdateReadiness {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Stage
+    )
+
+    if (-not (
+        Test-Path `
+            -LiteralPath $Path `
+            -PathType Leaf
+    )) {
+        Write-UpdaterLog (
+            "UPDATE_DEFER_READINESS_MISSING Stage=" +
+            $Stage
+        )
+
+        return $false
+    }
+
+    try {
+        $state =
+            Get-Content `
+                -LiteralPath $Path `
+                -Raw |
+            ConvertFrom-Json
+    }
+    catch {
+        Write-UpdaterLog (
+            "UPDATE_DEFER_READINESS_INVALID Stage=" +
+            $Stage
+        )
+
+        return $false
+    }
+
+    if ($null -eq $state.safeToUpdate -or
+        $null -eq $state.checkedAtUtc) {
+        Write-UpdaterLog (
+            "UPDATE_DEFER_READINESS_INCOMPLETE Stage=" +
+            $Stage
+        )
+
+        return $false
+    }
+
+    try {
+        $checkedAt =
+            [DateTimeOffset]::Parse(
+                [string]$state.checkedAtUtc,
+                [Globalization.CultureInfo]::InvariantCulture,
+                [Globalization.DateTimeStyles]::RoundtripKind
+            )
+    }
+    catch {
+        Write-UpdaterLog (
+            "UPDATE_DEFER_READINESS_TIMESTAMP_INVALID Stage=" +
+            $Stage
+        )
+
+        return $false
+    }
+
+    $ageSeconds =
+        (
+            [DateTimeOffset]::UtcNow -
+            $checkedAt.ToUniversalTime()
+        ).TotalSeconds
+
+    if ($ageSeconds -lt -5 -or
+        $ageSeconds -gt $readinessMaxAgeSeconds) {
+        Write-UpdaterLog (
+            "UPDATE_DEFER_READINESS_STALE Stage=" +
+            $Stage
+        )
+
+        return $false
+    }
+
+    $communicationMicrophoneInUse =
+        $false
+
+    if ($null -ne
+        $state.PSObject.Properties[
+            "communicationMicrophoneInUse"
+        ]) {
+        $communicationMicrophoneInUse =
+            [bool]$state.communicationMicrophoneInUse
+    }
+
+    if (-not [bool]$state.safeToUpdate -or
+        $communicationMicrophoneInUse) {
+        Write-UpdaterLog (
+            "UPDATE_DEFER_NOT_SAFE Stage=" +
+            $Stage
+        )
+
+        return $false
+    }
+
+    return $true
+}
 function Get-Sha256Upper {
     param([string]$Path)
 
@@ -305,6 +411,13 @@ try {
         return
     }
 
+    if (-not (
+        Test-AgentUpdateReadiness `
+            -Path $readinessPath `
+            -Stage "Preflight"
+    )) {
+        return
+    }
     if(-not (Test-Path $currentPath)){ return }
     if(-not (Test-Path $devicePath)){ return }
     if(-not (Test-Path $secretPath)){ return }
@@ -413,6 +526,18 @@ try {
         }
     }
 
+    if (-not (
+        Test-AgentUpdateReadiness `
+            -Path $readinessPath `
+            -Stage "PreInstall"
+    )) {
+        Write-UpdaterLog (
+            "UPDATE_PACKAGE_VERIFIED_DEFERRED Release=" +
+            $releaseId
+        )
+
+        return
+    }
     Write-UpdaterLog ("UPDATE_START Release=" + $releaseId)
 
     $process = Start-Process `

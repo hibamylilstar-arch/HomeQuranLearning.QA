@@ -14,10 +14,10 @@ public sealed class QaLocalVoskWorker : BackgroundService
     private const int PostContextFrames = 1000;  // ~20 seconds
 
     private const string PolicyVersion =
-        "qa-local-vosk-exact-high-rule-v2";
+        "qa-local-vosk-dual-pass-v3";
 
     private const string AnalysisVersion =
-        "vosk-model-en-us-0.22-lgraph-v1";
+        "vosk-model-en-us-0.22-lgraph-v1-dual-pass";
 
     private static readonly TimeSpan IdlePoll =
         TimeSpan.FromMilliseconds(250);
@@ -460,6 +460,37 @@ public sealed class QaLocalVoskWorker : BackgroundService
                     continue;
                 }
 
+                List<short[]> verificationFrames =
+                    preFrames
+                        .TakeLast(
+                            Math.Min(
+                                preFrames.Count,
+                                QaLocalVoskVerifier
+                                    .VerificationWindowFrames))
+                        .Select(
+                            x => x.Pcm16)
+                        .ToList();
+
+                QaLocalVoskVerification verification =
+                    QaLocalVoskVerifier.Verify(
+                        model,
+                        verificationFrames,
+                        matchedText);
+
+                if (!verification.Accepted)
+                {
+                    _logger.LogWarning(
+                        "Local Vosk QA candidate rejected by unrestricted verifier. SessionId={SessionId}, RuleId={RuleId}, CandidateText={CandidateText}, CandidateConfidence={CandidateConfidence:F3}, VerifierTranscript={VerifierTranscript}, VerifierConfidence={VerifierConfidence:F3}.",
+                        session.SessionId,
+                        qaRuleId,
+                        matchedText,
+                        confidence,
+                        verification.Transcript,
+                        verification.Confidence);
+
+                    continue;
+                }
+
                 DateTimeOffset triggerStartUtc =
                     frameUtc;
 
@@ -480,6 +511,8 @@ public sealed class QaLocalVoskWorker : BackgroundService
                         triggerEndUtc,
                         matchedText,
                         confidence,
+                        verification.Transcript,
+                        verification.Confidence,
                         idempotencyKey,
                         preFrames);
 
@@ -570,7 +603,13 @@ public sealed class QaLocalVoskWorker : BackgroundService
                     evidence.StartUtc,
 
                 Transcript =
-                    pending.MatchedText,
+                    pending.VerifierTranscript,
+
+                CandidateConfidence =
+                    pending.Confidence,
+
+                VerifierConfidence =
+                    pending.VerifierConfidence,
 
                 PolicyVersion =
                     PolicyVersion,
@@ -756,6 +795,8 @@ public sealed class QaLocalVoskWorker : BackgroundService
             DateTimeOffset triggerEndUtc,
             string matchedText,
             double confidence,
+            string verifierTranscript,
+            double verifierConfidence,
             string idempotencyKey,
             List<EvidenceFrame> frames)
         {
@@ -766,6 +807,8 @@ public sealed class QaLocalVoskWorker : BackgroundService
             TriggerEndUtc = triggerEndUtc;
             MatchedText = matchedText;
             Confidence = confidence;
+            VerifierTranscript = verifierTranscript;
+            VerifierConfidence = verifierConfidence;
             IdempotencyKey = idempotencyKey;
             Frames = frames;
         }
@@ -783,6 +826,10 @@ public sealed class QaLocalVoskWorker : BackgroundService
         public string MatchedText { get; }
 
         public double Confidence { get; }
+
+        public string VerifierTranscript { get; }
+
+        public double VerifierConfidence { get; }
 
         public string IdempotencyKey { get; }
 

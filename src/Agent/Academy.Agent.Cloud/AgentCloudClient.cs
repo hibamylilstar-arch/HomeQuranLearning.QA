@@ -177,6 +177,20 @@ public async Task<AgentQaRestrictedRulesResponse>
             "transcript");
 
         form.Add(
+            new StringContent(
+                request.CandidateConfidence.ToString(
+                    "R",
+                    CultureInfo.InvariantCulture)),
+            "candidateConfidence");
+
+        form.Add(
+            new StringContent(
+                request.VerifierConfidence.ToString(
+                    "R",
+                    CultureInfo.InvariantCulture)),
+            "verifierConfidence");
+
+        form.Add(
             new StringContent(request.PolicyVersion),
             "policyVersion");
 

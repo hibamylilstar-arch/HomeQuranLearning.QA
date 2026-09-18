@@ -636,6 +636,22 @@ app.MapPost("/api/agent/qa-alerts/local-restricted", async (
             new { error = "evidenceStartUtc is invalid." });
     }
 
+    double candidateConfidence = 0.0;
+
+    _ = double.TryParse(
+        form["candidateConfidence"].ToString(),
+        System.Globalization.NumberStyles.Float,
+        System.Globalization.CultureInfo.InvariantCulture,
+        out candidateConfidence);
+
+    double verifierConfidence = 0.0;
+
+    _ = double.TryParse(
+        form["verifierConfidence"].ToString(),
+        System.Globalization.NumberStyles.Float,
+        System.Globalization.CultureInfo.InvariantCulture,
+        out verifierConfidence);
+
     IFormFile? file =
         form.Files.GetFile("audio")
         ?? form.Files.FirstOrDefault();
@@ -663,6 +679,10 @@ app.MapPost("/api/agent/qa-alerts/local-restricted", async (
                 evidenceStartUtc,
             Transcript =
                 form["transcript"].ToString(),
+            CandidateConfidence =
+                candidateConfidence,
+            VerifierConfidence =
+                verifierConfidence,
             PolicyVersion =
                 form["policyVersion"].ToString(),
             AnalysisVersion =

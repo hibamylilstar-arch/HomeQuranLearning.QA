@@ -35,6 +35,10 @@ public sealed class AgentLocalRestrictedQaAlertUploadRequest
     public string Transcript { get; init; } =
         string.Empty;
 
+    public double CandidateConfidence { get; init; }
+
+    public double VerifierConfidence { get; init; }
+
     public string PolicyVersion { get; init; } =
         string.Empty;
 

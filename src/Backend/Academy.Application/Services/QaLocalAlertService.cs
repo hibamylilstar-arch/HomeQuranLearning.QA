@@ -11,6 +11,12 @@ public sealed class QaLocalAlertService
 {
     private const string RestrictedRuleReason = "Restricted Rule";
 
+    private const string DualPassPolicyVersion =
+        "qa-local-vosk-dual-pass-v3";
+
+    private const double MinimumCandidateConfidence = 0.80;
+    private const double MinimumVerifierConfidence = 0.90;
+
     private const int MaximumActiveRestrictedRules = 64;
     private const int MaximumRestrictedPhraseLength = 128;
     private const int MaximumRestrictedPhraseWords = 6;
@@ -284,17 +290,47 @@ public async Task<AgentQaRestrictedRulesResponse>
             NormalizePhrase(
                 transcript);
 
-        if (!rule.IsActive ||
-            rule.Severity != QaSeverity.High ||
-            !IsSupportedRestrictedPhrase(
-                normalizedRulePhrase) ||
-            !string.Equals(
-                normalizedTranscript,
-                normalizedRulePhrase,
-                StringComparison.Ordinal))
+        bool dualPass =
+            string.Equals(
+                policyVersion,
+                DualPassPolicyVersion,
+                StringComparison.Ordinal);
+
+        bool baseRuleValid =
+            rule.IsActive &&
+            rule.Severity == QaSeverity.High &&
+            IsSupportedRestrictedPhrase(
+                normalizedRulePhrase);
+
+        bool transcriptValid =
+            dualPass
+                ? ContainsExactPhrase(
+                    normalizedTranscript,
+                    normalizedRulePhrase)
+                : string.Equals(
+                    normalizedTranscript,
+                    normalizedRulePhrase,
+                    StringComparison.Ordinal);
+
+        bool confidenceValid =
+            !dualPass ||
+            (
+                double.IsFinite(
+                    request.CandidateConfidence) &&
+                request.CandidateConfidence >=
+                    MinimumCandidateConfidence &&
+                double.IsFinite(
+                    request.VerifierConfidence) &&
+                request.VerifierConfidence >=
+                    MinimumVerifierConfidence
+            );
+
+        if (!baseRuleValid ||
+            !transcriptValid ||
+            !confidenceValid)
         {
             throw new InvalidOperationException(
-                "The requested High-priority QA rule is not active or the transcript does not match it exactly.");
+                "The requested High-priority QA rule did not satisfy the active QA verification policy.");
         }
 
         QaAlert? existing =
@@ -423,6 +459,14 @@ public async Task<AgentQaRestrictedRulesResponse>
                 DetectionReason = RestrictedRuleReason,
                 Transcript =
                     normalizedTranscript,
+                CandidateConfidence =
+                    dualPass
+                        ? request.CandidateConfidence
+                        : null,
+                VerifierConfidence =
+                    dualPass
+                        ? request.VerifierConfidence
+                        : null,
                 PolicyVersion = policyVersion,
                 AnalysisVersion = analysisVersion,
                 SourceTrackIndex = null,
@@ -673,6 +717,63 @@ public async Task<AgentQaRestrictedRulesResponse>
                 .Split(
                     ' ',
                     StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private static bool ContainsExactPhrase(
+        string transcript,
+        string phrase)
+    {
+        string[] transcriptWords =
+            NormalizePhrase(transcript)
+                .Split(
+                    ' ',
+                    StringSplitOptions.RemoveEmptyEntries);
+
+        string[] phraseWords =
+            NormalizePhrase(phrase)
+                .Split(
+                    ' ',
+                    StringSplitOptions.RemoveEmptyEntries);
+
+        if (phraseWords.Length == 0 ||
+            transcriptWords.Length <
+                phraseWords.Length)
+        {
+            return false;
+        }
+
+        for (
+            int start = 0;
+            start <=
+                transcriptWords.Length -
+                phraseWords.Length;
+            start++)
+        {
+            bool match = true;
+
+            for (
+                int offset = 0;
+                offset < phraseWords.Length;
+                offset++)
+            {
+                if (!string.Equals(
+                        transcriptWords[
+                            start + offset],
+                        phraseWords[offset],
+                        StringComparison.Ordinal))
+                {
+                    match = false;
+                    break;
+                }
+            }
+
+            if (match)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string RequireText(

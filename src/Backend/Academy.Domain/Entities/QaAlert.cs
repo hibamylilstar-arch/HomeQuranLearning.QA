@@ -22,6 +22,10 @@ public sealed class QaAlert
 
     public string? Transcript { get; set; }
 
+    public double? CandidateConfidence { get; set; }
+
+    public double? VerifierConfidence { get; set; }
+
     public string? PolicyVersion { get; set; }
 
     public string? AnalysisVersion { get; set; }

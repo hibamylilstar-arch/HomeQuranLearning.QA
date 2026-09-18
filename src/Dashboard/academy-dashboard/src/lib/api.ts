@@ -473,6 +473,19 @@ export async function createUser(
   });
 }
 
+export async function updateUserFullName(
+  userId: string,
+  fullName: string
+): Promise<UserListItem> {
+  return proxyFetch<UserListItem>(
+    ["users", userId, "full-name"],
+    {
+      method: "PATCH",
+      body: JSON.stringify({ fullName }),
+    }
+  );
+}
+
 export async function setUserStatus(userId: string, isActive: boolean): Promise<void> { await proxyFetch(["users", userId, "status"], { method: "PATCH" }, new URLSearchParams({ isActive: String(isActive) })); }
 
 export async function resetUserPassword(userId: string, password: string): Promise<void> { await proxyFetch(["users", userId, "reset-password"], { method: "POST", body: JSON.stringify({ password }) }); }

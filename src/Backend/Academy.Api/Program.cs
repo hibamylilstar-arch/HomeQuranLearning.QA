@@ -1550,6 +1550,52 @@ app.MapGet("/api/admin/users", async (
     return Results.Ok(visibleUsers);
 }).RequireAuthorization(OwnerOrAdminPolicy);
 
+app.MapPatch("/api/admin/users/{userId:guid}/full-name", async (
+    ClaimsPrincipal user,
+    Guid userId,
+    UpdateUserFullNameRequest body,
+    AdminUserService adminUserService,
+    CancellationToken cancellationToken) =>
+{
+    var (actorId, actorRole) =
+        GetUserInfo(user);
+
+    if (actorId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (actorId != userId)
+    {
+        return Results.Forbid();
+    }
+
+    bool allowedRole =
+        actorRole == UserRole.Owner.ToString() ||
+        actorRole == UserRole.Admin.ToString();
+
+    if (!allowedRole)
+    {
+        return Results.Forbid();
+    }
+
+    try
+    {
+        var updatedUser =
+            await adminUserService.UpdateOwnFullNameAsync(
+                userId,
+                body.FullName,
+                cancellationToken);
+
+        return Results.Ok(updatedUser);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(
+            new { message = ex.Message });
+    }
+}).RequireAuthorization(OwnerOrAdminPolicy);
+
 app.MapPost("/api/admin/users", async (
     ClaimsPrincipal user,
     HttpRequest request,
@@ -1724,17 +1770,54 @@ app.MapPost("/api/admin/users/{userId:guid}/reset-password", async (
 }).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapDelete("/api/admin/users/{userId:guid}", async (
+    ClaimsPrincipal user,
     Guid userId,
     AdminUserService adminUserService,
     CancellationToken cancellationToken) =>
 {
+    var (actorId, actorRole) =
+        GetUserInfo(user);
+
+    if (actorId == Guid.Empty)
+    {
+        return Results.Unauthorized();
+    }
+
+    if (actorRole == UserRole.Admin.ToString())
+    {
+        var users =
+            await adminUserService.GetUsersAsync(
+                cancellationToken);
+
+        var target =
+            users.FirstOrDefault(
+                x => x.Id == userId);
+
+        if (target is null)
+        {
+            return Results.NotFound();
+        }
+
+        bool managerAccount =
+            string.Equals(
+                Convert.ToString(target.Role),
+                UserRole.Manager.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+
+        if (!managerAccount)
+        {
+            return Results.Forbid();
+        }
+    }
+
     try
     {
         await adminUserService.DeleteUserAsync(
             userId,
             cancellationToken);
 
-        return Results.Ok(new { deleted = true });
+        return Results.Ok(
+            new { deleted = true });
     }
     catch (InvalidOperationException ex)
     {
@@ -1750,8 +1833,7 @@ app.MapDelete("/api/admin/users/{userId:guid}", async (
                     "Account has preserved history. Disable it instead."
             });
     }
-}).RequireAuthorization(OwnerOnlyPolicy);
-
+}).RequireAuthorization(OwnerOrAdminPolicy);
 app.MapGet("/api/admin/teachers", async (
     ClaimsPrincipal user,
     HttpRequest request,

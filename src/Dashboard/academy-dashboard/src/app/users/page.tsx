@@ -3,7 +3,14 @@
 
 import DataTableScroller from "@/components/DataTableScroller";
 import { useEffect, useState } from "react";
-import { getUsers, createUser, setUserStatus, resetUserPassword, deleteUser } from "@/lib/api";
+import {
+  getUsers,
+  createUser,
+  setUserStatus,
+  resetUserPassword,
+  deleteUser,
+  updateUserFullName,
+} from "@/lib/api";
 import type { UserListItem } from "@/types";
 import {
   confirmDashboardAction,
@@ -12,7 +19,10 @@ import {
 import { useAuth } from "@/components/AuthProvider";
 
 export default function UsersPage() {
-  const { user: currentUser } = useAuth();
+  const {
+    user: currentUser,
+    setUser: setCurrentUser,
+  } = useAuth();
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -94,6 +104,55 @@ export default function UsersPage() {
       );
     }
   }
+  async function editOwnName(
+    user: UserListItem
+  ) {
+    const nextName =
+      await promptDashboardValue({
+        title: "Edit My Name",
+        message: `Change your dashboard name. Current name: ${user.fullName}`,
+        label: "Full Name",
+        placeholder: user.fullName,
+        inputType: "text",
+        confirmLabel: "Save Name",
+      });
+
+    const normalizedName =
+      nextName?.trim();
+
+    if (!normalizedName) {
+      return;
+    }
+
+    try {
+      setError("");
+
+      const updated =
+        await updateUserFullName(
+          user.id,
+          normalizedName
+        );
+
+      if (
+        currentUser &&
+        currentUser.id === updated.id
+      ) {
+        setCurrentUser({
+          ...currentUser,
+          fullName: updated.fullName,
+        });
+      }
+
+      await loadUsers();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to update name"
+      );
+    }
+  }
+
   async function removeUser(
     user: UserListItem
   ) {
@@ -113,6 +172,7 @@ export default function UsersPage() {
       setError("");
 
       await deleteUser(user.id);
+      await loadUsers();
     } catch (err) {
       setError(
         err instanceof Error
@@ -260,9 +320,20 @@ export default function UsersPage() {
                     </td>
                     <td className="px-6 py-4">
                       {user.role === "Owner" ? (
-                        <span className="text-slate-400">
-                          Protected
-                        </span>
+                        currentUser?.role === "Owner" &&
+                        user.id === currentUser.id ? (
+                          <button
+                            type="button"
+                            onClick={() => void editOwnName(user)}
+                            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-indigo-200 bg-white px-3.5 text-xs font-semibold text-indigo-700 shadow-sm transition-all hover:-translate-y-px hover:bg-indigo-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:translate-y-0"
+                          >
+                            Edit My Name
+                          </button>
+                        ) : (
+                          <span className="text-slate-400">
+                            Protected
+                          </span>
+                        )
                       ) : isOwner ? (
                         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
                           <button
@@ -317,16 +388,34 @@ export default function UsersPage() {
                           >
                             Reset Password
                           </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void removeUser(user)}
+                            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-rose-200 bg-white px-3.5 text-xs font-semibold text-rose-600 shadow-sm transition-all hover:-translate-y-px hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 active:translate-y-0"
+                          >
+                            Delete
+                          </button>
                         </div>
                       ) : currentUser?.role === "Admin" &&
                         user.id === currentUser.id ? (
-                        <button
-                          type="button"
-                          onClick={() => void resetPassword(user)}
-                          className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                        >
-                          Reset Password
-                        </button>
+                        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => void editOwnName(user)}
+                            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-indigo-200 bg-white px-3.5 text-xs font-semibold text-indigo-700 shadow-sm transition-all hover:-translate-y-px hover:bg-indigo-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 active:translate-y-0"
+                          >
+                            Edit My Name
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void resetPassword(user)}
+                            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                          >
+                            Reset Password
+                          </button>
+                        </div>
                       ) : (
                         <span className="text-slate-400">
                           No actions

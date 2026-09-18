@@ -77,6 +77,58 @@ public sealed class AdminUserService
         };
     }
 
+    public async Task<UserDto> UpdateOwnFullNameAsync(
+        Guid userId,
+        string fullName,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            throw new InvalidOperationException(
+                "Full name is required.");
+        }
+
+        string normalizedName =
+            fullName.Trim();
+
+        if (normalizedName.Length > 100)
+        {
+            throw new InvalidOperationException(
+                "Full name must be 100 characters or less.");
+        }
+
+        var user =
+            await _userRepository.GetByIdAsync(
+                userId,
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                "User not found.");
+
+        if (user.Role != UserRole.Owner &&
+            user.Role != UserRole.Admin)
+        {
+            throw new InvalidOperationException(
+                "Only Owner and Admin accounts may edit their own name.");
+        }
+
+        user.FullName = normalizedName;
+        user.UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+        _userRepository.Update(user);
+
+        await _unitOfWork.SaveChangesAsync(
+            cancellationToken);
+
+        return new UserDto
+        {
+            Id = user.Id,
+            FullName = user.FullName,
+            Email = user.Email,
+            Role = user.Role.ToString(),
+            IsActive = user.IsActive
+        };
+    }
+
     private static void EnsureManageable(User user)
     {
         if (user.Role == UserRole.Owner)

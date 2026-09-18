@@ -90,7 +90,8 @@ export default function DevicesPage() {
     useState(false);
 
   const canEditLaptopName =
-    user?.role === "Owner";
+    user?.role === "Owner" ||
+    user?.role === "Admin";
 
   const canManageUsualTeachers =
     user?.role === "Owner" ||

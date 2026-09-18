@@ -1133,7 +1133,7 @@ app.MapPatch("/api/admin/devices/{deviceId:guid}/recording-display-name", async 
         recordingDisplayName =
             device.RecordingDisplayName
     });
-}).RequireAuthorization(OwnerOnlyPolicy);
+}).RequireAuthorization(OwnerOrAdminPolicy);
 
 app.MapGet("/api/admin/recordings", async (
     ClaimsPrincipal user,
